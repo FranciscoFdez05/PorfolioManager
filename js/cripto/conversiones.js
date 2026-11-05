@@ -41,7 +41,6 @@ async function initConversionesLogic() {
         })
     }
 
-
     const filtroButton = document.getElementById("cvFiltroSinValorBtn")
     if (filtroButton && !filtroButton.dataset.bound) {
         filtroButton.dataset.bound = "true"
@@ -199,9 +198,7 @@ function refrescarConversionesSinValor() {
     boton.classList.toggle("hidden", !pendientes)
     boton.classList.toggle("cvFiltroActivo", filtrando)
     boton.setAttribute("aria-pressed", String(filtrando))
-    boton.textContent = filtrando
-        ? `Mostrar todas (${pendientes} sin valor)`
-        : `${pendientes} sin valor en euros`
+    boton.textContent = filtrando ? `Mostrar todas (${pendientes} sin valor)` : `${pendientes} sin valor en euros`
 }
 
 // Símbolo base de una cripto de la lista de Activos (BTC, ETH...), el mismo
@@ -218,7 +215,10 @@ function findConversionAssetBySymbol(symbol) {
 }
 
 function isConversionEntrada(row, asset) {
-    return String(row.tipo || "").toLowerCase() === getConvertedInOperationLabel(getConversionAssetSymbol(asset)).toLowerCase()
+    return (
+        String(row.tipo || "").toLowerCase() ===
+        getConvertedInOperationLabel(getConversionAssetSymbol(asset)).toLowerCase()
+    )
 }
 
 function formatConversionQuantity(value) {
@@ -255,7 +255,13 @@ function buildConversionesRowElement(row = {}, asset = conversionesCurrentAsset)
         `<td data-field="${campo}" data-value="${escapeHtml(valor)}" class="${clase}">${
             valor ? `${signo}${formatConversionQuantity(valor)} <span class="cvSimbolo">${escapeHtml(sym)}</span>` : "—"
         }</td>`
-    const celdaPropia = celdaCantidad("cantidad", cantidad, simbolo, entrada ? "cvCantidadIn" : "cvCantidadOut", entrada ? "+" : "−")
+    const celdaPropia = celdaCantidad(
+        "cantidad",
+        cantidad,
+        simbolo,
+        entrada ? "cvCantidadIn" : "cvCantidadOut",
+        entrada ? "+" : "−"
+    )
     const celdaContraparte = celdaCantidad(
         "cantidadContraparte",
         cantidadContraparte,
@@ -428,8 +434,7 @@ function openConversiónRowModal(rowId) {
               par: rowElement.querySelector('[data-field="par"]')?.dataset.value?.trim() || "",
               tipo: rowElement.querySelector('[data-field="tipo"]')?.dataset.value || "",
               cantidad: rowElement.querySelector('[data-field="cantidad"]')?.dataset.value || "",
-              cantidadContraparte:
-                  rowElement.querySelector('[data-field="cantidadContraparte"]')?.dataset.value || "",
+              cantidadContraparte: rowElement.querySelector('[data-field="cantidadContraparte"]')?.dataset.value || "",
               comision: rowElement.querySelector('[data-field="comision"]')?.dataset.value || "",
               comisionMoneda: rowElement.querySelector('[data-field="comision"]')?.dataset.moneda || "",
               valorEur: rowElement.querySelector('[data-field="valorEur"]')?.dataset.value || ""
@@ -459,7 +464,10 @@ function openConversiónRowModal(rowId) {
     const contraparteActual = String(rowData.par || "").split("/")[1] || ""
     const contrapartes = conversionesCryptoAssets
         .filter((otro) => getConversionAssetSymbol(otro) !== baseSymbol)
-        .map((otro) => ({ simbolo: getConversionAssetSymbol(otro), nombre: otro.name || getConversionAssetSymbol(otro) }))
+        .map((otro) => ({
+            simbolo: getConversionAssetSymbol(otro),
+            nombre: otro.name || getConversionAssetSymbol(otro)
+        }))
     if (contraparteActual && !contrapartes.some((c) => c.simbolo === contraparteActual.toUpperCase())) {
         contrapartes.unshift({ simbolo: contraparteActual, nombre: contraparteActual })
     }

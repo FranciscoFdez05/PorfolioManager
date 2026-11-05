@@ -18,8 +18,8 @@ Reglas de la fusión:
 
 import secrets
 import unicodedata
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
-from typing import Callable, Iterable
 
 from core.cripto_direcciones import REDES, TIPO_AUTO, DatoWalletInvalido, prepararDatoWallet
 from stores.carteras_conocidas_store import (

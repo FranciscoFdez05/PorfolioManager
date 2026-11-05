@@ -988,7 +988,10 @@ async function persistStablecoinsData(options = {}) {
         .catch(() => {})
         .then(() =>
             saveStablecoinsData(
-                { ...payloadSnapshot, ...(Number.isInteger(stablecoinsRevision) ? { revision: stablecoinsRevision } : {}) },
+                {
+                    ...payloadSnapshot,
+                    ...(Number.isInteger(stablecoinsRevision) ? { revision: stablecoinsRevision } : {})
+                },
                 options
             )
         )
@@ -1023,7 +1026,12 @@ async function fusionarStablecoinsTrasConflicto(payloadSnapshot) {
         servidor.rows
     )
     const fusionado = normalizeStablecoinsPayload({
-        catalog: fusionarListaTresVias(stablecoinsBase.catalog, payloadSnapshot.catalog, servidor.catalog, claveEstableAnual),
+        catalog: fusionarListaTresVias(
+            stablecoinsBase.catalog,
+            payloadSnapshot.catalog,
+            servidor.catalog,
+            claveEstableAnual
+        ),
         enabledSymbols: fusionarListaTresVias(
             stablecoinsBase.enabledSymbols,
             payloadSnapshot.enabledSymbols,

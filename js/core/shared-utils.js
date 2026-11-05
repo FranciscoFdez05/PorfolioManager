@@ -1505,7 +1505,8 @@ function _activarBusquedaTabla(caja) {
 // en pantallas estrechas, las pestañas de mes y los selectores de Métricas.
 // Los contenedores no cambian durante la visita (solo su contenido), así que
 // basta con engancharlos una vez al aparecer.
-const _SELECTOR_TIRAS_ARRASTRABLES = ".tabs, .gastosMonthTabs, .ingresosMonthTabs, .ahorroMonthTabs, .dividendosMonthTabs, .mToggleGroup"
+const _SELECTOR_TIRAS_ARRASTRABLES =
+    ".tabs, .gastosMonthTabs, .ingresosMonthTabs, .ahorroMonthTabs, .dividendosMonthTabs, .mToggleGroup"
 
 function _activarArrastreTiras(raiz) {
     if (raiz.matches?.(_SELECTOR_TIRAS_ARRASTRABLES)) activarArrastreHorizontal(raiz)

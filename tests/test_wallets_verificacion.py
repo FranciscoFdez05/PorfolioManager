@@ -5,14 +5,11 @@ from decimal import Decimal
 
 import pytest
 
-from core import wallets_libreta as wl
-from core import wallets_sync as wsync
-from core import wallets_vigilancia as wv
+from core import wallets_libreta as wl, wallets_sync as wsync, wallets_vigilancia as wv
 from core.cripto_direcciones import direccionesDeClavePublica
 from providers import blockchain_clients as bc
 from providers.blockchain_clients import ENTRE_WALLETS, ENVIADA, RECIBIDA, MovimientoWallet
-from stores import revisiones
-from stores import wallets_store as ws
+from stores import revisiones, wallets_store as ws
 from stores.rendimiento_activo import lotesVivos
 
 _SECRET = "a" * 64

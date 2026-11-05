@@ -28,8 +28,7 @@ from urllib.request import Request
 
 from core import settings
 from providers.api_stats import recordApiCall, recordApiResult
-from providers.conexion import abrir as urlopen
-from providers.conexion import servidorCaido
+from providers.conexion import abrir as urlopen, servidorCaido
 
 log = logging.getLogger(__name__)
 

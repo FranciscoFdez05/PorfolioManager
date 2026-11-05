@@ -465,7 +465,8 @@ function walletsErrorAvisos() {
     const { umbral, config } = walletsAvisosEnlace
     const valores = { ...config, umbralAviso: umbral }
     for (const campo of WALLETS_AVISOS_NUMEROS) {
-        if (!walletsUmbralValido(String(valores[campo] || ""))) return [campo, "Pon un número sin signo, por ejemplo 0,5"]
+        if (!walletsUmbralValido(String(valores[campo] || "")))
+            return [campo, "Pon un número sin signo, por ejemplo 0,5"]
     }
     for (const [campo, maximo] of Object.entries(WALLETS_AVISOS_ENTEROS)) {
         const texto = String(valores[campo] ?? "")
@@ -564,7 +565,12 @@ function walletsAvisosInterruptorHtml(campo, titulo, marcado, ayuda = "") {
         </div>`
 }
 
-function walletsAvisosCampoHtml(campo, titulo, valor, { tipo = "decimal", placeholder = "", ayuda = "", detalle = "" } = {}) {
+function walletsAvisosCampoHtml(
+    campo,
+    titulo,
+    valor,
+    { tipo = "decimal", placeholder = "", ayuda = "", detalle = "" } = {}
+) {
     const atributos =
         tipo === "hora"
             ? `type="time"`
@@ -1031,7 +1037,9 @@ function walletsResumenSincronizacion(resultado) {
     ]
     if (resultado.yaImportadas) partes.push(`${resultado.yaImportadas} ya estaban`)
     if (resultado.pendientes) {
-        partes.push(`${resultado.pendientes} entrada${resultado.pendientes === 1 ? "" : "s"} por verificar en Seguimiento`)
+        partes.push(
+            `${resultado.pendientes} entrada${resultado.pendientes === 1 ? "" : "s"} por verificar en Seguimiento`
+        )
     }
     const sinActivo = Object.entries(resultado.sinActivo || {})
     if (sinActivo.length) {

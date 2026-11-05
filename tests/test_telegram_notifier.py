@@ -175,6 +175,98 @@ def testNotificarRecuperadoSoloAvisaUnaVez(aislado, monkeypatch):
     assert len(llamadas) == 2
 
 
+@pytest.fixture
+def conReloj(aislado, monkeypatch):
+    """Telegram configurado, envíos capturados y un reloj que el test adelanta a mano."""
+    avisos = []
+    reloj = {"ahora": 1000.0}
+    monkeypatch.setattr(telegram_notifier, "_enviar", lambda token, chatId, texto: avisos.append(texto))
+    monkeypatch.setattr(telegram_notifier.time, "monotonic", lambda: reloj["ahora"])
+    telegram_notifier.escribirConfig("123456:ABC-token", "987654321")
+    return avisos, reloj
+
+
+def testConMargenElPrimerFalloNoAvisa(conReloj):
+    avisos, _reloj = conReloj
+
+    telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", "red inalcanzable", margenSegundos=900)
+
+    assert avisos == []
+
+
+def testConMargenUnCorteQueSeRecuperaNoMandaNingunAviso(conReloj):
+    """El caso real: falla un activo y el siguiente del mismo refresco acierta."""
+    avisos, reloj = conReloj
+
+    for _corte in range(5):
+        telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", "red inalcanzable", margenSegundos=900)
+        telegram_notifier.notificarRecuperado("Yahoo Finance")
+        reloj["ahora"] += 600
+
+    assert avisos == []
+
+
+def testConMargenFallarSinAciertosAvisaAlCumplirse(conReloj):
+    avisos, reloj = conReloj
+
+    telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", "red inalcanzable", margenSegundos=900)
+    reloj["ahora"] += 899
+    telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", "red inalcanzable", margenSegundos=900)
+    assert avisos == []
+
+    reloj["ahora"] += 1
+    telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", "red inalcanzable", margenSegundos=900)
+    assert len(avisos) == 1
+    assert "no responde" in avisos[0]
+
+
+def testConMargenUnAciertoReiniciaLaCuenta(conReloj):
+    avisos, reloj = conReloj
+
+    telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", margenSegundos=900)
+    reloj["ahora"] += 800
+    telegram_notifier.notificarRecuperado("Yahoo Finance")
+    telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", margenSegundos=900)
+    reloj["ahora"] += 800
+    telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", margenSegundos=900)
+
+    assert avisos == []
+
+
+def testConMargenLaRecuperacionSoloSaleSiSeAvisoDeLaCaida(conReloj):
+    avisos, reloj = conReloj
+
+    telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", margenSegundos=900)
+    reloj["ahora"] += 900
+    telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", margenSegundos=900)
+    telegram_notifier.notificarRecuperado("Yahoo Finance")
+
+    assert len(avisos) == 2
+    assert "vuelve a responder" in avisos[1]
+
+
+def testElMargenSeCuentaPorProveedor(conReloj):
+    avisos, reloj = conReloj
+
+    telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", margenSegundos=900)
+    reloj["ahora"] += 900
+    telegram_notifier.notificarProblema("no_responde", "Finnhub", margenSegundos=900)
+
+    assert avisos == []
+
+
+def testTrasLaCaidaAvisadaYRecuperadaHayQueEsperarOtroMargen(conReloj):
+    avisos, reloj = conReloj
+
+    telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", margenSegundos=900)
+    reloj["ahora"] += 900
+    telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", margenSegundos=900)
+    telegram_notifier.notificarRecuperado("Yahoo Finance")
+    telegram_notifier.notificarProblema("no_responde", "Yahoo Finance", margenSegundos=900)
+
+    assert len(avisos) == 2
+
+
 def testEnviarPruebaConfiguradoLlamaAEnviar(aislado, monkeypatch):
     llamadas = []
     monkeypatch.setattr(telegram_notifier, "_enviar", lambda token, chatId, texto: llamadas.append((token, chatId)))

@@ -222,8 +222,12 @@ def fetchAssetQuote(symbol, provider=None, useCache=True, targetCurrency=None, m
             categoria = "no_responde"
         else:
             categoria = "fallo"
+        # La cuota agotada no es intermitente: el proveedor ya ha dicho que no
+        # atenderá en un rato y queda en reposo, así que se avisa sin esperar.
+        margen = 0 if categoria == "cuota_agotada" else settings.proveedorAvisoMargenSegundos()
         telegram_notifier.notificarProblema(
-            categoria, _NOMBRE_PROVEEDOR.get(candidato, candidato), f"Al cotizar {symbol}: {error}"
+            categoria, _NOMBRE_PROVEEDOR.get(candidato, candidato), f"Al cotizar {symbol}: {error}",
+            margenSegundos=margen,
         )
 
     if lastError is None and any(proveedores_pausados.estaPausado(p) for p in _fallbackChain(proveedorPrincipal, symbol)):

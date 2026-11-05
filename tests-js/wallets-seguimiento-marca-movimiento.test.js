@@ -113,6 +113,47 @@ describe("quién pagó la comisión", () => {
     })
 })
 
+describe("comisión del exchange", () => {
+    const html = (cambios = {}, wallet = PROPIA_BTC) =>
+        window.walletsSegComisionExchangeHtml({ ...RECIBIDA, simbolo: "BTC", propia: "bc1mia", contraparte: "bc1otra", ...cambios }, wallet)
+
+    it("sale en los recibos de una wallet propia", () => {
+        expect(html()).toContain("Comisión del exchange")
+        expect(html()).toContain("Aplicar comisión")
+    })
+
+    it("no sale en un envío ni en una wallet ajena", () => {
+        expect(html({ tipo: "enviada", sentido: "enviada" })).toBe("")
+        expect(html({}, AJENA)).toBe("")
+    })
+
+    it("avisa si el origen sigue marcado como tuyo, salvo que sea una wallet enlazada", () => {
+        expect(html({ contraparteMarca: "propia" })).toContain("marcada como tuya")
+        expect(html({ contraparteMarca: "propia", contraparteEnlazada: true })).not.toContain("marcada como tuya")
+        expect(html()).not.toContain("marcada como tuya")
+    })
+
+    it("en un recibo solo hay un campo de comisión, el de este apartado", () => {
+        const mov = { ...RECIBIDA, simbolo: "BTC", contraparte: "bc1otra" }
+        const conjunto = window.walletsSegComisionExchangeHtml(mov, PROPIA_BTC) + window.walletsSegMarcaMovimientoHtml(mov, PROPIA_BTC)
+        expect(conjunto.match(/walletsSegMarcaMovComision/g)).toHaveLength(1)
+    })
+
+    it("un envío conserva su campo en la clasificación", () => {
+        const html = window.walletsSegMarcaMovimientoHtml({ ...RECIBIDA, tipo: "enviada", sentido: "enviada" }, PROPIA_ETH)
+        expect(html).toContain("Comisión a descontar")
+    })
+
+    it("una cantidad distinta de la de red se presenta como indicada por ti aunque el origen sea tuyo", () => {
+        const { importe, nota } = window.walletsSegComisionDetalle(
+            { ...RECIBIDA, tipo: "entre_wallet", simbolo: "BTC", comisionTx: "0.00000413", comisionMarcada: "0.000018", contraparteMarca: "propia" },
+            "BTC"
+        )
+        expect(importe).toBe("0,000018 BTC")
+        expect(nota).toContain("Indicada por ti")
+    })
+})
+
 describe("ventana del movimiento", () => {
     it("enseña origen y destino con su dueño, y el importe en la cabecera", () => {
         const mov = { ...RECIBIDA, tipo: "entre_wallet", cantidad: "0.5", propia: "bc1mia", contraparte: "bc1otra", contraparteMarca: "propia", contraparteApodo: "Fría" }

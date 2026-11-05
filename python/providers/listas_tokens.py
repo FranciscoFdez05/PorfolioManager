@@ -17,8 +17,8 @@ import logging
 import re
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 

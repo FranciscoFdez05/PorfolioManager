@@ -17,8 +17,8 @@ en `ENC1:` todo `API/*.key` en cada arranque y los dejaría ilegibles.
 import json
 import logging
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from cryptography.fernet import Fernet, InvalidToken
 

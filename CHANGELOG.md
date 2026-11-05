@@ -22,6 +22,36 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.0.1] — 2026-11-05
+
+**Esquema de base de datos:** no lo toca (sigue en la **27**). Para deshacer la
+actualización basta con volver a la imagen anterior. Excepción: la primera
+publicación de la 5.0.0 (commit `0256776`) iba con el esquema 26. Quien venga de
+ella sube al 27 al arrancar y, para volver atrás, debe restaurar además el `.db`
+que se guarda al migrar.
+
+### Cambiado
+
+- **Comisión del exchange.** El detalle de una transacción recibida tiene un apartado
+  para indicar lo que cobró el exchange por la retirada: sustituye a la comisión de
+  red en la fila y se resta de la posición. La transacción queda como «Entre mis
+  wallets» sin marcar el origen como tuyo. La columna «Comisión red» pasa a llamarse
+  «Comisión».
+- **Detalle de un seguimiento.** Cada wallet es una tarjeta con sus datos, sus avisos
+  y sus acciones. Las direcciones derivadas de sus claves públicas tienen apartado
+  propio, con su número.
+
+### Corregido
+
+- **Comisión indicada con origen propio.** Una cantidad distinta de la de red constaba
+  como pagada por ti. Ahora consta como indicada por ti.
+- **Avisos de proveedores en falso.** Un corte de red de segundos mandaba por Telegram
+  «no responde» y, al momento, «vuelve a responder». Ahora un proveedor debe llevar
+  15 minutos fallando sin ninguna cotización buena para avisar
+  (`[proveedores] aviso_margen_segundos`). La cuota agotada se sigue avisando al momento.
+
+---
+
 ## [5.0.0] — 2026-11-04
 
 **Esquema de base de datos:** sube al **27**. Al arrancar, las filas importadas de

@@ -5,7 +5,7 @@ pierde lo anterior, el fichero no lleva nada en claro y un fallo de la red o del
 almacén no se lleva lo guardado.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -222,7 +222,7 @@ class _LectorFalso:
 
 
 def _movimiento(hashTx: str, dia: int = 1) -> MovimientoWallet:
-    return MovimientoWallet(red="btc", hash=hashTx, fecha=datetime(2026, 1, dia, tzinfo=timezone.utc), simbolo="BTC",
+    return MovimientoWallet(red="btc", hash=hashTx, fecha=datetime(2026, 1, dia, tzinfo=UTC), simbolo="BTC",
                             cantidad=Decimal("0.5"), comision=None, tipo=RECIBIDA, contraparte="bc1qotra")
 
 

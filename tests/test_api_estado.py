@@ -466,7 +466,7 @@ def testUnaLlamadaRealQueFallaDejaElEstado(monkeypatch, error, esperado):
 
     _urlopen(monkeypatch, falla)
 
-    with pytest.raises(Exception):
+    with pytest.raises(URLError):
         fetchJson("https://proveedor.test", provider="EODHD", retries=0)
 
     assert lastApiResults()["EODHD"]["estado"] == esperado

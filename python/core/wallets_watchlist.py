@@ -10,8 +10,8 @@ o el ticker puesto a mano) y la Watchlist pide la cotización como con el resto
 de activos.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from core.cripto_direcciones import REDES
 from core.wallets_sync import resolverActivoToken

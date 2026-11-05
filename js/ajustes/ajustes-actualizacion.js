@@ -773,7 +773,8 @@ function _pintarModoProgresoUpd() {
         m.actualizarBtn.className = "primaryButton"
     } else {
         _resumenModalUpd(null, "Instalando en el servidor…")
-        m.nota.textContent = "Puedes cerrar esta ventana: la actualización sigue en el servidor y el botón de la versión la vuelve a abrir."
+        m.nota.textContent =
+            "Puedes cerrar esta ventana: la actualización sigue en el servidor y el botón de la versión la vuelve a abrir."
         m.nota.hidden = false
         _avisoModalUpd("")
         _botonesModalUpd({})

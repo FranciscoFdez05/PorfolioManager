@@ -1,6 +1,6 @@
 """Pruebas de la libreta de direcciones (core/wallets_libreta.py): cómo clasifica cada contraparte."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -20,7 +20,7 @@ def _wallet(valor=_BECH32, red="btc", tipo="direccion", propia=True, alias="Ledg
 
 
 def _mov(tipo=ENVIADA, contraparte=_BECH32, red="btc"):
-    return MovimientoWallet(red=red, hash="h1", fecha=datetime(2026, 1, 1, tzinfo=timezone.utc), simbolo="BTC",
+    return MovimientoWallet(red=red, hash="h1", fecha=datetime(2026, 1, 1, tzinfo=UTC), simbolo="BTC",
                             cantidad=Decimal("1"), comision=None, tipo=tipo, contraparte=contraparte)
 
 

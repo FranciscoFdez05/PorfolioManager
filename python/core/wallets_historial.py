@@ -7,8 +7,8 @@ las marcas se aplican al enseñarlo, y marcar una dirección se sigue viendo al 
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from stores.wallets_lecturas import SECCION_MOVIMIENTOS, LecturasRepository
 from stores.wallets_store import ahoraIso

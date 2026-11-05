@@ -108,6 +108,17 @@ describe("desplegar una fila", () => {
         expect(copiable.dataset.fullValue).toBe(DIRECCION)
     })
 
+    it("la pestaña Direcciones lista enmascaradas solo las derivadas del seguimiento, con su número", () => {
+        document.body.innerHTML = window.walletsSegDerivadasHtml({ wallets: [{ id: "w-2" }] })
+        const valores = [...document.querySelectorAll(".walletsSegDerivadaValor")].map((nodo) => nodo.textContent)
+        expect(valores).toEqual(["bc1qbbbb…2222", "bc1qcccc…3333"])
+        expect(document.querySelector(".walletsSegDerivadas .walletsSegContador").textContent).toBe("2")
+    })
+
+    it("la pestaña Direcciones no pinta el apartado si el seguimiento no tiene derivadas", () => {
+        expect(window.walletsSegDerivadasHtml({ wallets: [{ id: "w-1" }] })).toBe("")
+    })
+
     it("dos direcciones derivadas de la misma wallet se despliegan por separado", () => {
         window.abrirLibretaSeguimiento()
         pulsarResumen(2)

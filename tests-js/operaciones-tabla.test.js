@@ -63,8 +63,12 @@ const OPERACIONES = [
     }
 ]
 
+// El autoguardado tarda 500 ms y `vi.waitFor` espera 1000 de fábrica: con la máquina
+// ocupada ese margen no basta y el test falla sin que el guardado falle.
+const ESPERA_GUARDADO = { timeout: 5000 }
+
 let guardados = []
-let stablecoins = { catalog: [], enabledSymbols: [], rows: [] }
+let stablecoins ={ catalog: [], enabledSymbols: [], rows: [] }
 let avisos = []
 
 function respuesta(cuerpo) {
@@ -150,7 +154,7 @@ describe("selector de estado en la tabla", () => {
         expect(filasDelAnio("2025")).toContain("op-eth-1")
         expect(selectorEstado("op-eth-1").className).toContain("is-completado")
 
-        await vi.waitFor(() => expect(guardados).toHaveLength(1))
+        await vi.waitFor(() => expect(guardados).toHaveLength(1), ESPERA_GUARDADO)
         expect(guardados[0].rows.find((row) => row.id === "op-eth-1").estado).toBe("Completado")
     })
 
@@ -163,7 +167,7 @@ describe("selector de estado en la tabla", () => {
         const fila = document.querySelector('tr[data-operation-id="op-eth-1"]')
         expect(fila.querySelector(".operacionRowDeleteBtn").textContent).toBe("Eliminar")
 
-        await vi.waitFor(() => expect(guardados).toHaveLength(1))
+        await vi.waitFor(() => expect(guardados).toHaveLength(1), ESPERA_GUARDADO)
         expect(guardados[0].rows.find((row) => row.id === "op-eth-1").estado).toBe("Cancelado")
     })
 
@@ -177,7 +181,7 @@ describe("selector de estado en la tabla", () => {
         await initOperacionesLogic()
 
         cambiarEstado("op-eth-1", "Completado")
-        await vi.waitFor(() => expect(guardados).toHaveLength(1))
+        await vi.waitFor(() => expect(guardados).toHaveLength(1), ESPERA_GUARDADO)
 
         cambiarEstado("op-eth-1", "Activo")
 

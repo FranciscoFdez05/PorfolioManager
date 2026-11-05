@@ -285,6 +285,9 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("proveedores", "cambio_obsoleto_max_segundos", ENTERO, 86400, env="PROVEEDORES_CAMBIO_OBSOLETO_MAX",
            minimo=0, maximo=604800,
            descripcion="Antigüedad máxima del último tipo de cambio conocido que se usa si el proveedor falla. 0 lo desactiva."),
+    Ajuste("proveedores", "aviso_margen_segundos", ENTERO, 900, env="PROVEEDORES_AVISO_MARGEN",
+           minimo=0, maximo=86400,
+           descripcion="Segundos que debe llevar fallando un proveedor, sin ningún acierto, antes de avisar por Telegram. 0 avisa al primer fallo."),
     Ajuste("proveedores", "user_agent", TEXTO, "PortfolioPython/1.0", env="PROVEEDORES_USER_AGENT",
            descripcion="Cabecera User-Agent con la que se identifica el cliente."),
 
@@ -676,6 +679,10 @@ def proveedorCambioVigencia() -> int:
 
 def proveedorCambioObsoletoMax() -> int:
     return obtener("proveedores.cambio_obsoleto_max_segundos")
+
+
+def proveedorAvisoMargenSegundos() -> int:
+    return obtener("proveedores.aviso_margen_segundos")
 
 
 def proveedorBackoffInicial() -> float:

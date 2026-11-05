@@ -310,7 +310,9 @@ async function buildMetricasPayload() {
     if (!window._cuentasDinero.length) await cargarCuentasDinero()
 
     const gastosYearsData = gastosYearsResp ? await gastosYearsResp.json().catch(() => ({ years: [] })) : { years: [] }
-    const gastosYearsList = Array.isArray(gastosYearsData.years) ? ordenarAniosRecientesPrimero(gastosYearsData.years) : []
+    const gastosYearsList = Array.isArray(gastosYearsData.years)
+        ? ordenarAniosRecientesPrimero(gastosYearsData.years)
+        : []
     // Si el usuario dejó seleccionado otro año, se carga ese en vez del último.
     const prefGastosYear = getChartPref("metricasGastosYear", null)
     const gastosYear = gastosYearsList.map(String).includes(String(prefGastosYear))
@@ -325,7 +327,9 @@ async function buildMetricasPayload() {
     const ingresosYearsData = ingresosYearsResp
         ? await ingresosYearsResp.json().catch(() => ({ years: [] }))
         : { years: [] }
-    const ingresosYearsList = Array.isArray(ingresosYearsData.years) ? ordenarAniosRecientesPrimero(ingresosYearsData.years) : []
+    const ingresosYearsList = Array.isArray(ingresosYearsData.years)
+        ? ordenarAniosRecientesPrimero(ingresosYearsData.years)
+        : []
     const prefIngresosYear = getChartPref("metricasIngresosYear", null)
     const ingresosYear = ingresosYearsList.map(String).includes(String(prefIngresosYear))
         ? prefIngresosYear

@@ -802,7 +802,12 @@ function bindTradingPersistenceGuards() {
     })
 
     document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState !== "hidden" || !document.getElementById("tradingBody") || !tradingHasPendingChanges) return
+        if (
+            document.visibilityState !== "hidden" ||
+            !document.getElementById("tradingBody") ||
+            !tradingHasPendingChanges
+        )
+            return
         persistTradingData({ keepalive: true }).catch(console.error)
     })
 }

@@ -263,6 +263,29 @@ def testElAvisoDeCuotaDeAlphaVantageLaDejaEnReposo(monkeypatch):
     assert len(llamadas) == 1
 
 
+@pytest.mark.parametrize(
+    ("error", "categoriaEsperada", "margenEsperado"),
+    [
+        ("No se pudo conectar con Finnhub: red inalcanzable", "no_responde", 900),
+        ("Finnhub devolvió HTTP 500", "fallo", 900),
+        ("Finnhub: HTTP 429, límite de peticiones", "cuota_agotada", 0),
+    ],
+)
+def testSoloLaCuotaAgotadaAvisaSinMargen(monkeypatch, error, categoriaEsperada, margenEsperado):
+    avisos = []
+    monkeypatch.setattr(settings, "ordenRespaldoProveedores", lambda: [])
+    monkeypatch.setattr(settings, "proveedorAvisoMargenSegundos", lambda: 900)
+    monkeypatch.setitem(market_data._FETCHERS, "finnhub", lambda symbol: (None, error))
+    monkeypatch.setattr(
+        market_data.telegram_notifier, "notificarProblema",
+        lambda categoria, sujeto, detalle, margenSegundos: avisos.append((categoria, margenSegundos)),
+    )
+
+    market_data.fetchAssetQuote("AAPL", "finnhub")
+
+    assert avisos == [(categoriaEsperada, margenEsperado)]
+
+
 def testOrdenDeRespaldoVacioEsSinRespaldo(monkeypatch):
     monkeypatch.setattr(settings, "ordenRespaldoProveedores", lambda: [])
 

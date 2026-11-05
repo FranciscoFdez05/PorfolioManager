@@ -2462,31 +2462,162 @@
     font-size: 1.05rem;
 }
 
-/* Una línea por wallet del seguimiento, con sus avisos y sus acciones. */
+/* Cada wallet del seguimiento es una tarjeta: arriba quién es y cuánto tiene,
+   en medio lo que le pasa y abajo lo que se puede hacer con ella. La separación
+   entre columnas es cero para que el filete del pie salga continuo. */
 .walletsSegMiembroFila {
-    flex-wrap: wrap;
-    gap: 6px 18px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px 0;
+    padding: 14px 16px;
+    border: 1px solid var(--border-mid);
+    border-radius: 12px;
+    background: var(--bg-surface);
 }
 
 .walletsSegMiembroFila > div:first-child {
-    flex: 1 1 220px;
+    gap: 4px;
+    padding-right: 18px;
 }
 
-.walletsSegMiembroFila .walletsSegAvisos {
-    justify-content: flex-start;
+.walletsSegMiembroFila > div:first-child > strong {
+    font-size: 0.92rem;
 }
 
-.walletsSegMiembroFila .walletsSegTarjetaAcciones {
+.walletsSegMiembroFila code {
+    padding: 1px 6px;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--bg-elevated);
+    color: var(--text-bright);
+    font-size: 0.72rem;
+}
+
+.walletsSegMiembroFila .walletsSegMiembroSaldo strong {
+    font-size: 0.95rem;
+}
+
+.walletsSegMiembroFila > .walletsSegAlerta {
+    grid-column: 1 / -1;
+    margin: 0;
+}
+
+.walletsSegMiembroFila > .walletsSegAvisos,
+.walletsSegMiembroFila > .walletsSegTarjetaAcciones {
+    align-self: stretch;
     margin-top: 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-soft);
 }
 
-/* «Todas las wallets»: aplica a la lista de abajo, así que se distingue de ella. */
+.walletsSegMiembroFila > .walletsSegAvisos {
+    justify-content: flex-start;
+    padding-right: 18px;
+}
+
+.walletsSegMiembroFila > .walletsSegTarjetaAcciones {
+    justify-content: flex-end;
+}
+
+/* «Todas las wallets»: aplica a las tarjetas de abajo, así que se distingue de
+   ellas. No lleva saldo, de modo que sus piezas van en una sola fila. */
 .walletsSegMiembroTodas {
-    margin-bottom: 4px;
-    padding: 8px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border-mid));
+    background: color-mix(in srgb, var(--accent) 7%, var(--bg-surface));
+}
+
+.walletsSegMiembroTodas > div:first-child {
+    flex: 1 1 220px;
+    padding-right: 0;
+}
+
+.walletsSegMiembroTodas > .walletsSegAvisos,
+.walletsSegMiembroTodas > .walletsSegTarjetaAcciones {
+    align-self: center;
+    padding: 0;
+    border-top: none;
+}
+
+/* Direcciones que salen de las claves públicas: son muchas y solo se leen, así
+   que van en rejilla compacta y sin aspecto de elemento pulsable. */
+.walletsSegDerivadas {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 6px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border-mid);
+}
+
+.walletsSegDerivadas > .walletsSegDato {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.walletsSegDerivadasLista {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr));
+    gap: 8px;
+    max-height: calc(45 * var(--vh));
+    margin: 4px 0 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+    counter-reset: walletsSegDerivada;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+}
+
+.walletsSegDerivada {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
     border: 1px solid var(--border-mid);
     border-radius: 10px;
+    background: var(--bg-surface);
+    counter-increment: walletsSegDerivada;
+}
+
+.walletsSegDerivada::before {
+    content: counter(walletsSegDerivada);
+    flex-shrink: 0;
+    min-width: 22px;
+    padding: 1px 5px;
+    border-radius: 6px;
     background: var(--bg-elevated);
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.walletsSegDerivadaValor {
+    min-width: 0;
+    color: var(--text-bright);
+    font-family: monospace;
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+    .walletsSegMiembroFila {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .walletsSegMiembroFila .walletsSegMiembroSaldo {
+        align-items: flex-start;
+    }
+
+    .walletsSegMiembroFila > .walletsSegTarjetaAcciones {
+        justify-content: flex-start;
+        padding-top: 0;
+        border-top: none;
+    }
 }
 
 .walletsSegFicha .walletsSegTarjetaAcciones .cancelButton,
@@ -2667,6 +2798,7 @@
 
 /* Bajo el título de la pestaña ya hay separación: el borde superior de la lista sobra. */
 .walletsSegPanel > .walletsSegDirecciones {
+    gap: 10px;
     border-top: none;
 }
 
@@ -3029,6 +3161,21 @@ a.walletsSegTokenContrato:hover {
     margin: 0;
 }
 
+.walletsSegComisionExchange {
+    grid-column: 1 / -1;
+}
+
+.walletsSegComisionExchangeFila {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+}
+
+.walletsSegComisionExchangeBtn {
+    white-space: nowrap;
+}
+
 .walletsSegMovSecciones .walletsSegContraBotones button {
     flex: 0 1 auto;
     min-width: 0;
@@ -3286,7 +3433,9 @@ a.walletsSegTokenContrato:hover {
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease;
 }
 
 .walletsSegDirAccion:hover {
@@ -3692,6 +3841,10 @@ a.walletsSegTokenContrato:hover {
 
     .walletsSegMovSecciones .walletsSegContraBotones {
         flex-wrap: wrap;
+    }
+
+    .walletsSegComisionExchangeFila {
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .walletsSegMovRutaFlecha {

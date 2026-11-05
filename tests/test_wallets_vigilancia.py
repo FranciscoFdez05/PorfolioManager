@@ -2,7 +2,7 @@
 
 import json
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -18,7 +18,7 @@ _DIRECCION = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
 
 
 def _mov(hash_, cantidad="0.5", tipo=RECIBIDA, minuto=0, contrato="", simbolo="BTC"):
-    return MovimientoWallet(red="btc", hash=hash_, fecha=datetime(2026, 5, 1, 10, minuto, tzinfo=timezone.utc),
+    return MovimientoWallet(red="btc", hash=hash_, fecha=datetime(2026, 5, 1, 10, minuto, tzinfo=UTC),
                             simbolo=simbolo, cantidad=Decimal(cantidad), comision=None, tipo=tipo,
                             contraparte="bc1qcontrapartecontrapartecontraparte", contrato=contrato)
 
@@ -221,7 +221,7 @@ def testElSaldoAvisaSoloAlCruzarElLimite(entorno):
 
 
 def testUnCruceConLosAvisosApagadosNoAvisaAlEncenderlos(entorno):
-    repositorio, lector, enviados, vigilante = entorno
+    repositorio, _, enviados, vigilante = entorno
     wallet = _enlazar(repositorio, avisos=False, avisosConfig={"saldoMaximo": "1"})
     vigilante.revisar(wallet.id)
     vigilante.revisar(wallet.id)
@@ -235,7 +235,7 @@ def testUnCruceConLosAvisosApagadosNoAvisaAlEncenderlos(entorno):
 def testLaWalletQueDespiertaAvisa(entorno):
     repositorio, lector, enviados, vigilante = entorno
     wallet = _enlazar(repositorio, avisosConfig={"despiertaDias": "365", "recibidas": False})
-    lector.movimientos = [replace(_mov("antiguo"), fecha=datetime(2020, 1, 1, tzinfo=timezone.utc))]
+    lector.movimientos = [replace(_mov("antiguo"), fecha=datetime(2020, 1, 1, tzinfo=UTC))]
     vigilante.revisar(wallet.id)
     lector.movimientos = [_mov("nuevo"), *lector.movimientos]
 
@@ -537,7 +537,7 @@ def fueraDePlan(tmp_path, monkeypatch):
     sana = _enlazar(repositorio)
     filas = {}
     bnb, btc = _LectorFueraDePlan(filas), Lector()
-    reloj = {"ahora": datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc)}
+    reloj = {"ahora": datetime(2026, 5, 1, 10, 0, tzinfo=UTC)}
     vigilante = wv.VigilanteWallets(
         repositorio=repositorio,
         fabricaLectores=lambda red: bnb if red == "bnb" else btc,

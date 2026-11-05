@@ -29,10 +29,10 @@ import json
 import logging
 import os
 import secrets
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, fields, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -373,7 +373,7 @@ def _nombreDeSeguimiento(wallets: list[Wallet], nombre: str) -> str:
 
 def ahoraIso() -> str:
     """Marca de tiempo UTC con segundos, la que se guarda en las wallets."""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def nuevoId() -> str:

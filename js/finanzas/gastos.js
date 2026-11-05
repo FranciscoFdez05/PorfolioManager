@@ -1279,7 +1279,9 @@ function bindGastosEvents() {
                 requireText: String(currentGastosYear),
                 onConfirm: async () => {
                     const response = await deleteGastosYearRequest(currentGastosYear)
-                    gastosYears = Array.isArray(response.years) ? ordenarAniosRecientesPrimero(response.years) : await loadGastosYears()
+                    gastosYears = Array.isArray(response.years)
+                        ? ordenarAniosRecientesPrimero(response.years)
+                        : await loadGastosYears()
                     currentGastosYear = gastosYears[0]
                     currentGastosView = "year"
                     currentGastosMonth = "enero"

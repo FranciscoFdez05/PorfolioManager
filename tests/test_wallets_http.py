@@ -4,13 +4,20 @@ Lo esencial: ninguna respuesta devuelve la dirección o la xpub completa, el
 fichero en disco no las lleva en claro y sin sesión o sin CSRF no se entra.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 
 from core.db import getDb
-from providers.blockchain_clients import ENVIADA, RECIBIDA, ErrorLecturaWallet, MovimientoWallet, SaldoToken, UtxoBitcoin
+from providers.blockchain_clients import (
+    ENVIADA,
+    RECIBIDA,
+    ErrorLecturaWallet,
+    MovimientoWallet,
+    SaldoToken,
+    UtxoBitcoin,
+)
 
 _ZPUB = "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs"
 
@@ -133,7 +140,7 @@ def testSincronizarImportaATransacciones(cliente, monkeypatch):
     from core import wallets_sync
 
     client, cabeceras, _ = cliente
-    movimiento = MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 1, 2, tzinfo=timezone.utc),
+    movimiento = MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 1, 2, tzinfo=UTC),
                                   simbolo="BTC", cantidad=Decimal("0.01"), comision=None, tipo=RECIBIDA,
                                   contraparte="bc1qorigen")
     monkeypatch.setattr(wallets_sync, "lectorPara", lambda red: _Lector([movimiento]))
@@ -476,7 +483,7 @@ def testGuardarIntervaloDeVigilancia(cliente, minutos, estado):
 
 
 def _movimientoBtc(indice):
-    return MovimientoWallet(red="btc", hash=f"{indice:064x}", fecha=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    return MovimientoWallet(red="btc", hash=f"{indice:064x}", fecha=datetime(2026, 1, 1, tzinfo=UTC),
                             simbolo="BTC", cantidad=Decimal("0.1"), comision=None, tipo=RECIBIDA,
                             contraparte="bc1qorigen")
 
@@ -512,7 +519,7 @@ def testHistorialRespetaElTope(cliente, monkeypatch, pedido, usado):
 
 class _LectorTokensEth:
     def leer(self, tipo, valor, limite):
-        fecha = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        fecha = datetime(2026, 1, 1, tzinfo=UTC)
         return [
             MovimientoWallet(red="eth", hash=f"0x{indice:064x}", fecha=fecha, simbolo="LINK", cantidad=Decimal("1"),
                              comision=None, tipo=RECIBIDA, contrato=contrato)
@@ -562,7 +569,7 @@ class _LectorUtxos:
     def utxos(self, tipo, valor):
         self.pedidos.append((tipo, valor))
         confirmado = UtxoBitcoin(txid="t1", vout=2, satoshis=150_000, direccion="bc1qpropia", altura=860_000,
-                                 fecha=datetime(2024, 9, 1, tzinfo=timezone.utc))
+                                 fecha=datetime(2024, 9, 1, tzinfo=UTC))
         pendiente = UtxoBitcoin(txid="t2", vout=0, satoshis=1_000, direccion="bc1qpropia", altura=None, fecha=None)
         return [confirmado, pendiente], 870_000
 
@@ -633,7 +640,7 @@ class _LectorTokens:
     def saldosTokens(self, valor, maximo, historial):
         self.pedidos.append(valor)
         return [SaldoToken(contrato="0xcspx", simbolo="CSPX", nombre="iShares S&P 500", cantidad=Decimal("3"),
-                           ultimoMovimiento=datetime(2026, 3, 1, tzinfo=timezone.utc))], 0
+                           ultimoMovimiento=datetime(2026, 3, 1, tzinfo=UTC))], 0
 
 
 def testTokensDeUnaWalletEthConUnEtfTokenizado(cliente, monkeypatch):
@@ -1174,7 +1181,7 @@ def testUnaFilaAntiguaDeBitcoinConOrigenPropioRecuperaLaComision(cliente):
 
     client, cabeceras, _ = cliente
     walletId = _walletPropia(client, cabeceras)
-    movimiento = MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 11, 1, tzinfo=timezone.utc), simbolo="BTC",
+    movimiento = MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 11, 1, tzinfo=UTC), simbolo="BTC",
                                   cantidad=Decimal("0.01355828"), comision=None, tipo=RECIBIDA, contraparte=_SATOSHI,
                                   comisionTx=Decimal("0.00000413"))
     rutasWallets._repositorio().actualizar(walletId, recientes=[movimientoComoDict(movimiento)])
@@ -1192,6 +1199,34 @@ def testUnaFilaAntiguaDeBitcoinConOrigenPropioRecuperaLaComision(cliente):
     assert respuesta["completadas"] == 1
     fila = client.get("/api/transacciones").get_json()["rows"][0]
     assert (fila["walletTipo"], fila["comisionRed"], fila["total"]) == ("entre_wallet", "0.00000413", "0.01355828")
+
+
+def testLaComisionDelExchangeSustituyeALaDeRedYSacaElOrigenDeLaLibreta(cliente):
+    from core.wallets_vigilancia import movimientoComoDict
+    from routes import wallets as rutasWallets
+
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+    movimiento = MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 11, 1, tzinfo=UTC), simbolo="BTC",
+                                  cantidad=Decimal("0.01355828"), comision=None, tipo=RECIBIDA, contraparte=_SATOSHI,
+                                  comisionTx=Decimal("0.00000413"))
+    rutasWallets._repositorio().actualizar(walletId, recientes=[movimientoComoDict(movimiento)])
+    filas = {"rows": [{"id": "wallet-antigua", "assetId": "btc", "assetName": "Bitcoin", "fechaOperacion": "01-11-2026",
+                       "total": "0.01355828", "comisionRed": "", "walletTipo": "recibida", "walletDesde": _SATOSHI,
+                       "walletDestino": "Cartera", "hashTransaccion": "abc123", "nota": ""}]}
+    assert client.post("/api/transacciones", json=filas, headers=cabeceras).status_code == 200
+    # El estado de partida: el origen, del exchange, dado por propio con la casilla.
+    assert _marcarMovimiento(client, cabeceras, walletId, comision="", direcciones=[_SATOSHI]).status_code == 200
+    assert client.post("/api/wallets/transacciones/completar-comisiones", headers=cabeceras).get_json()["completadas"] == 1
+
+    respuesta = _marcarMovimiento(client, cabeceras, walletId, comision="0,000018", direcciones=[]).get_json()
+
+    assert respuesta["marca"]["comision"] == "0.000018"
+    assert respuesta["efectivas"] == {_SATOSHI: None}
+    fila = client.get("/api/transacciones").get_json()["rows"][0]
+    assert (fila["walletTipo"], fila["comisionRed"], fila["total"]) == ("entre_wallet", "0.000018", "0.01355828")
+    # Y no se pisa después: ya tiene su comisión.
+    assert client.post("/api/wallets/transacciones/completar-comisiones", headers=cabeceras).get_json()["completadas"] == 0
 
 
 def testMarcarUnRetiroEntreWalletsCorrigeLoImportado(cliente):
@@ -1391,7 +1426,7 @@ def testMarcarUnaTransaccionExigeCsrf(cliente):
 def testElHistorialEnsenaLaMarca(cliente, monkeypatch):
     client, cabeceras, _ = cliente
     walletId = _walletPropia(client, cabeceras)
-    movimiento = MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 3, 1, tzinfo=timezone.utc), simbolo="BTC",
+    movimiento = MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 3, 1, tzinfo=UTC), simbolo="BTC",
                                   cantidad=Decimal("1"), comision=None, tipo=RECIBIDA, contraparte=_SATOSHI)
 
     class Lector:
@@ -1436,7 +1471,7 @@ def testMarcarUnaDireccionReetiquetaLoImportadoYElHistorial(cliente, monkeypatch
     from routes import wallets as rutasWallets
 
     client, cabeceras, _ = cliente
-    movimiento = MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 1, 2, tzinfo=timezone.utc),
+    movimiento = MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 1, 2, tzinfo=UTC),
                                   simbolo="BTC", cantidad=Decimal("0.01"), comision=None, tipo=RECIBIDA,
                                   contraparte=_BECH32)
     monkeypatch.setattr(wallets_sync, "lectorPara", lambda red: _Lector([movimiento]))
@@ -1464,7 +1499,7 @@ def testEnlazarUnaWalletPropiaReetiquetaLoQueIbaHaciaElla(cliente, monkeypatch):
     from core import wallets_sync
 
     client, cabeceras, _ = cliente
-    movimiento = MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 1, 2, tzinfo=timezone.utc),
+    movimiento = MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 1, 2, tzinfo=UTC),
                                   simbolo="BTC", cantidad=Decimal("0.01"), comision=None, tipo=ENVIADA,
                                   contraparte=_BECH32)
     monkeypatch.setattr(wallets_sync, "lectorPara", lambda red: _Lector([movimiento]))
@@ -1746,7 +1781,7 @@ class _LectorRevision(_Lector):
 
 
 def _movimientoEntrada(tipo=RECIBIDA, contraparte="bc1qorigen"):
-    return MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 1, 2, tzinfo=timezone.utc), simbolo="BTC",
+    return MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 1, 2, tzinfo=UTC), simbolo="BTC",
                             cantidad=Decimal("0.01"), comision=None, tipo=tipo, contraparte=contraparte)
 
 

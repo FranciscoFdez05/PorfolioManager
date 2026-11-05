@@ -5,7 +5,7 @@ devuelve respuestas con la forma documentada de cada API.
 """
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from urllib.error import HTTPError, URLError
 
@@ -58,7 +58,7 @@ def testBitcoinXpubExploraHastaElGapYClasificaLosMovimientos():
         bc.ENVIADA, Decimal("0.0006"), Decimal("0.000005"), _AJENA)
     assert (entrada.tipo, entrada.cantidad, entrada.comision, entrada.contraparte) == (
         bc.RECIBIDA, Decimal("0.001"), None, _AJENA)
-    assert entrada.fecha == datetime(1970, 1, 1, 0, 0, 1, tzinfo=timezone.utc)
+    assert entrada.fecha == datetime(1970, 1, 1, 0, 0, 1, tzinfo=UTC)
     # Una llamada por dirección: recepción 0 usada + 3 sin uso; cambio igual.
     assert len(esplora.consultadas) == 8
     assert esplora.consultadas.count(_AJENA) == 1
@@ -155,7 +155,7 @@ def testUtxosDeUnaDireccionOrdenadosConLosPendientes():
     assert [(u.txid, u.satoshis, u.altura) for u in utxos] == [("b", 50_000, 860_000), ("c", 7_000, None), ("a", 1_000, 800_000)]
     assert utxos[0].vout == 3
     assert utxos[0].cantidad == Decimal("0.0005")
-    assert utxos[0].fecha == datetime.fromtimestamp(1_700_000_000, timezone.utc)
+    assert utxos[0].fecha == datetime.fromtimestamp(1_700_000_000, UTC)
     assert utxos[1].fecha is None
     assert {u.direccion for u in utxos} == {_AJENA}
 
@@ -289,7 +289,7 @@ def testElPlazoCortaLasLlamadasSiguientes(monkeypatch):
 
 
 def testUnaUrlNoHttpSeRechaza():
-    with pytest.raises(bc.ErrorLecturaWallet, match="config.ini"):
+    with pytest.raises(bc.ErrorLecturaWallet, match=r"config\.ini"):
         bc.LectorBitcoin(baseUrl="file:///etc/passwd", obtenerJson=lambda *a, **k: {}).leer("direccion", _AJENA, 10)
 
 
@@ -452,7 +452,7 @@ def testXrpPagosYDescartes():
     assert [(m.tipo, m.cantidad, m.comision) for m in movimientos] == [
         (bc.ENVIADA, Decimal("1.5"), Decimal("0.000012")), (bc.RECIBIDA, Decimal("2"), None),
     ]
-    assert movimientos[0].fecha == datetime(2000, 1, 1, tzinfo=timezone.utc)
+    assert movimientos[0].fecha == datetime(2000, 1, 1, tzinfo=UTC)
 
 
 def testEvmComisionesSinMovimientoDeLaMoneda():

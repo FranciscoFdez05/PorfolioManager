@@ -1,6 +1,6 @@
 """Pruebas de las reglas de avisos de las wallets (core/wallets_avisos.py)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -11,7 +11,7 @@ from providers.blockchain_clients import ENTRE_WALLETS, ENVIADA, RECIBIDA, Movim
 
 
 def _mov(cantidad="1", tipo=RECIBIDA, contrato=""):
-    return MovimientoWallet(red="btc", hash="h", fecha=datetime(2026, 5, 1, tzinfo=timezone.utc), simbolo="BTC",
+    return MovimientoWallet(red="btc", hash="h", fecha=datetime(2026, 5, 1, tzinfo=UTC), simbolo="BTC",
                             cantidad=Decimal(cantidad), comision=None, tipo=tipo, contraparte="", contrato=contrato)
 
 
@@ -98,7 +98,7 @@ def testEstadoSaldo(saldo, esperado):
 
 
 def testDiasDormida():
-    siguiente = datetime(2026, 5, 31, tzinfo=timezone.utc)
+    siguiente = datetime(2026, 5, 31, tzinfo=UTC)
 
     assert wa.diasDormida("2026-05-01T00:00:00+00:00", siguiente) == 30
     assert wa.diasDormida("", siguiente) is None
@@ -233,7 +233,7 @@ def testRafaga():
     envios = [_mov(tipo=ENVIADA)] * wa.MIN_RAFAGA
 
     assert wa.enviosRafaga(_SOSPECHOSOS, envios) == wa.MIN_RAFAGA
-    assert wa.enviosRafaga(_SOSPECHOSOS, envios[1:] + [_mov(tipo=RECIBIDA)]) == 0
+    assert wa.enviosRafaga(_SOSPECHOSOS, [*envios[1:], _mov(tipo=RECIBIDA)]) == 0
     assert wa.enviosRafaga(ConfigAvisos(), envios) == 0
 
 

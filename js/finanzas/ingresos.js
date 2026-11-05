@@ -899,7 +899,9 @@ function bindIngresosEvents() {
                 requireText: String(currentIngresosYear),
                 onConfirm: async () => {
                     const response = await deleteIngresosYearRequest(currentIngresosYear)
-                    ingresosYears = Array.isArray(response.years) ? ordenarAniosRecientesPrimero(response.years) : await loadIngresosYears()
+                    ingresosYears = Array.isArray(response.years)
+                        ? ordenarAniosRecientesPrimero(response.years)
+                        : await loadIngresosYears()
                     currentIngresosYear = ingresosYears[0]
                     currentIngresosView = "year"
                     currentIngresosMonth = "enero"

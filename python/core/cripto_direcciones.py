@@ -346,7 +346,7 @@ def _convertirBits(datos, desde: int, hacia: int, rellenar: bool) -> list:
 
 def segwitCodificar(hrp: str, version: int, programa: bytes) -> str:
     """Dirección segwit (bech32 para v0, bech32m para v1+)."""
-    datos = [version] + _convertirBits(programa, 8, 5, True)
+    datos = [version, *_convertirBits(programa, 8, 5, True)]
     constante = _BECH32_CONSTANTE if version == 0 else _BECH32M_CONSTANTE
     polymod = _bech32Polymod(_bech32ExpandirHrp(hrp) + datos + [0] * 6) ^ constante
     suma = [(polymod >> 5 * (5 - i)) & 31 for i in range(6)]

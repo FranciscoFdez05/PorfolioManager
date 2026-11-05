@@ -33,9 +33,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from admin import avisos_scheduler, snapshot_scheduler, telegram_listener  # noqa: E402
-from admin.backup_manager import (
-    esperarCopiaEnCurso,  # noqa: E402
-    startScheduler as startBackupScheduler,  # noqa: E402
+from admin.backup_manager import (  # noqa: E402
+    esperarCopiaEnCurso,
+    startScheduler as startBackupScheduler,
 )
 from core import paths, pulso, settings  # noqa: E402
 

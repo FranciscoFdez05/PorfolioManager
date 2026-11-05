@@ -17,10 +17,11 @@ import hashlib
 import logging
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Callable, Protocol
+from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
 
@@ -220,7 +221,7 @@ def _unidades(entero: int, decimales: int) -> Decimal:
 
 
 def _fecha(segundos: int | float) -> datetime:
-    return datetime.fromtimestamp(int(segundos), timezone.utc)
+    return datetime.fromtimestamp(int(segundos), UTC)
 
 
 def _comprobarUrl(url: str, nombre: str) -> str:
@@ -1421,7 +1422,8 @@ class LectorSolana:
         if direccion not in claves:
             return None
         posicion = claves.index(direccion)
-        deltas = [post - pre for pre, post in zip(meta.get("preBalances", []), meta.get("postBalances", []))]
+        # Sin strict: si la API trae listas de distinta longitud, la comprobación de abajo lo resuelve.
+        deltas = [post - pre for pre, post in zip(meta.get("preBalances", []), meta.get("postBalances", []), strict=False)]
         if posicion >= len(deltas):
             return None
         pagaComision = posicion == 0

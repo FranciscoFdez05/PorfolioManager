@@ -3,7 +3,7 @@ name = "porfoliomanager"
 # La versión canónica está en python/core/version.py, que es de donde la lee la
 # aplicación. Aquí se repite porque las herramientas del ecosistema la esperan;
 # tests/test_version.py comprueba que las dos no se separen.
-version = "5.0.0"
+version = "5.0.1"
 description = "Seguimiento local de una cartera de inversión personal (Flask + SQLite)"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -114,8 +114,13 @@ ignore = [
     # niveles de decisión distintos; colapsarlos los hace ilegibles.
     "SIM102",
 ]
+# Tipografía deliberada en textos en español: «›» en las rutas de menú y «×» en
+# las multiplicaciones.
+allowed-confusables = ["›", "×"]
 
 [tool.ruff.lint.per-file-ignores]
+# Su docstring cita a propósito la «Е» cirílica como ejemplo de lo que no se detecta.
+"python/core/wallets_tokens.py" = ["RUF002"]
 # server.py registra los tipos MIME antes de importar Flask a propósito: si se
 # importa primero, Werkzeug cachea el mapa de mimetypes de Windows y sirve los
 # .js con el Content-Type equivocado.

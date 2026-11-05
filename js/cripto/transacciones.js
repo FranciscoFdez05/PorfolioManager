@@ -94,7 +94,9 @@ async function initTransaccionesLogic() {
         // La comisión baja la posición, y Activos tiene su propia copia de las filas.
         await refreshAssetsSidebar(currentAssetId, false)
     }
-    transaccionesRevision = Number.isInteger(currentTransaccionesData?.revision) ? currentTransaccionesData.revision : null
+    transaccionesRevision = Number.isInteger(currentTransaccionesData?.revision)
+        ? currentTransaccionesData.revision
+        : null
     transaccionesBaseRows = JSON.parse(JSON.stringify(currentTransaccionesData?.rows || []))
     await loadTransaccionesCryptoAssets()
     bindTransaccionesPersistenceGuards()
@@ -536,7 +538,10 @@ function handleTransaccionesClick(event) {
 function transaccionEsDeSuActivo(mov, wallet, row, asset) {
     if (!mov.contrato && wallet.assetId === row.assetId) return true
     const simbolo = String(mov.simbolo || "").toUpperCase()
-    return Boolean(simbolo) && [asset?.symbol, asset?.name, row.assetName].some((n) => String(n || "").toUpperCase() === simbolo)
+    return (
+        Boolean(simbolo) &&
+        [asset?.symbol, asset?.name, row.assetName].some((n) => String(n || "").toUpperCase() === simbolo)
+    )
 }
 
 // Si la transacción está en las dos wallets propias que la movieron, se prefiere
@@ -552,7 +557,10 @@ function buscarMovimientoDeFila(row, wallets, movimientosDe) {
     const asset = getTransaccionAsset(row.assetId)
     const encontrados = wallets.flatMap((wallet) =>
         movimientosDe(wallet)
-            .filter((mov) => String(mov.hash || "").toLowerCase() === hash && transaccionEsDeSuActivo(mov, wallet, row, asset))
+            .filter(
+                (mov) =>
+                    String(mov.hash || "").toLowerCase() === hash && transaccionEsDeSuActivo(mov, wallet, row, asset)
+            )
             .map((mov) => ({ mov, wallet }))
     )
     return encontrados.find(({ wallet }) => transaccionNombraWallet(wallet, row)) || encontrados[0] || null
@@ -576,7 +584,9 @@ async function leerHistorialesDeFila(row) {
     try {
         for (const wallet of wallets) {
             progreso.paso(walletsNombreCompleto(wallet))
-            const datos = await walletsPeticion(`/api/wallets/${encodeURIComponent(wallet.id)}/movimientos?limite=${TRANSACCIONES_LIMITE_HISTORIAL}`)
+            const datos = await walletsPeticion(
+                `/api/wallets/${encodeURIComponent(wallet.id)}/movimientos?limite=${TRANSACCIONES_LIMITE_HISTORIAL}`
+            )
             walletsSegAnotarPublicos(datos.tokensPublicos)
             transaccionesHistoriales.set(wallet.id, datos.movimientos || [])
         }
@@ -692,7 +702,10 @@ async function persistTransaccionesData(options = {}) {
         .catch(() => {})
         .then(() =>
             saveTransaccionesData(
-                { ...snapshot, ...(Number.isInteger(transaccionesRevision) ? { revision: transaccionesRevision } : {}) },
+                {
+                    ...snapshot,
+                    ...(Number.isInteger(transaccionesRevision) ? { revision: transaccionesRevision } : {})
+                },
                 options
             )
         )
@@ -844,7 +857,7 @@ function openTransaccionRowModal(rowId) {
             <input id="txModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="0,05" value="${escapeHtml(rowData.total)}">
         </div>
         <div class="assetRowModalField">
-            <label class="assetRowModalLabel">Comisión red</label>
+            <label class="assetRowModalLabel">Comisión (de red o del exchange)</label>
             <input id="txModalComision" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="0,0001" value="${escapeHtml(rowData.comisionRed)}">
         </div>
         <div class="assetRowModalField">

@@ -36,10 +36,10 @@ verificación (al quitar la marca) y las «recibida» de antes de existir la ver
 
 import hashlib
 import logging
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Callable, Iterable
 
 from core import settings
 from core.cripto_direcciones import REDES, TIPO_DIRECCION, DatoWalletInvalido, normalizarDatoWallet

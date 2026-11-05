@@ -231,7 +231,8 @@ body.money-hidden .assetCompletedOpsTable td:nth-child(8) {
    saber si es ganancia o pérdida. Todo lo oculto se pinta en gris (texto y
    descendientes, que suelen traer su propio verde o rojo) y la píldora del
    rendimiento del detalle pierde su fondo de color. */
-body.money-hidden :is(
+body.money-hidden
+    :is(
         .metricValue,
         #overviewTableBody td:not(.mTdRank):not(.mTdName):not(:nth-child(3)):not(:nth-child(6)),
         .overviewExtremeValue,
@@ -261,7 +262,8 @@ body.money-hidden :is(
         .pnMoney,
         .pinvMoney
     ),
-body.money-hidden :is(
+body.money-hidden
+    :is(
         .metricValue,
         #overviewTableBody td:not(.mTdRank):not(.mTdName):not(:nth-child(3)):not(:nth-child(6)),
         .overviewExtremeValue,

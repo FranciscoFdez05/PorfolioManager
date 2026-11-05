@@ -1,19 +1,26 @@
 """Pruebas del servicio que importa movimientos de wallets a Transacciones."""
 
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 
 from core import wallets_sync as wsync
 from core.wallets_vigilancia import movimientoComoDict
-from providers.blockchain_clients import ENTRE_WALLETS, ENVIADA, RECIBIDA, ComisionPagada, ErrorLecturaWallet, MovimientoWallet
+from providers.blockchain_clients import (
+    ENTRE_WALLETS,
+    ENVIADA,
+    RECIBIDA,
+    ComisionPagada,
+    ErrorLecturaWallet,
+    MovimientoWallet,
+)
 from providers.listas_tokens import TokenPublico
 from stores import revisiones
 from stores.wallets_store import DireccionMarcada, MovimientoMarcado, TokenMarcado, TokenVerificado, Wallet
 
-_FECHA = datetime(2026, 3, 9, 15, 30, tzinfo=timezone.utc)
+_FECHA = datetime(2026, 3, 9, 15, 30, tzinfo=UTC)
 _ACTIVOS = [
     {"id": "bitcoin", "name": "Bitcoin", "symbol": "BITCOIN", "marketSymbol": "BITVAVO:BTCEUR"},
     {"id": "ethereum", "name": "Ethereum", "symbol": "ETH", "marketSymbol": "ETH-EUR"},
@@ -703,7 +710,7 @@ def testReetiquetarReintentaSiTransaccionesCambia():
 # ── Importación limitada ──────────────────────────────────────────────────────
 
 def _servicioLimitado(movimientos, limite):
-    servicio, estado, repositorio = _servicio(movimientos)
+    servicio, _, _ = _servicio(movimientos)
     servicio._maxMovimientos = lambda: limite
     return servicio
 

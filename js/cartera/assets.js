@@ -461,8 +461,12 @@ async function _fusionarActivoTrasConflicto(local) {
     // contarían como si fueran de la nueva (100 $ pasarían a ser 100 €).
     // Convertirlas exigiría un tipo de cambio que aquí no hay, así que lo más
     // seguro es no guardar nada y pedir que se recargue.
-    const divisaLocal = String(local.currency || "").trim().toUpperCase()
-    const divisaServidor = String(servidor.currency || "").trim().toUpperCase()
+    const divisaLocal = String(local.currency || "")
+        .trim()
+        .toUpperCase()
+    const divisaServidor = String(servidor.currency || "")
+        .trim()
+        .toUpperCase()
     const hayFilasNuevas = ["rows", "operationRows", "conversionRows"].some(
         (campo) => JSON.stringify(local[campo] || []) !== JSON.stringify(base[campo] || [])
     )
@@ -1199,7 +1203,7 @@ function renderAssetTransaccionesSection(asset) {
                     <tr>
                         <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
                         <th class="mThSort" data-sortkey="1">Total<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="2">Comisión red<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="2">Comisión<span class="mSortArrow"></span></th>
                         <th class="mThSort" data-sortkey="3">Tipo<span class="mSortArrow"></span></th>
                         <th class="mThSort" data-sortkey="4">Wallet destino<span class="mSortArrow"></span></th>
                         <th class="mThSort" data-sortkey="5">Hash<span class="mSortArrow"></span></th>

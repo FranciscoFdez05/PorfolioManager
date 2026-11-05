@@ -5025,7 +5025,9 @@ function pnCargarMetricas() {
         almacen
             .querySelectorAll(".metricasKpiRow:not([data-pn-clave])")
             .forEach((k, i) => estado.piezas.set("kpi:" + i, k))
-        almacen.querySelectorAll(".metricasKpiRow[data-pn-clave]").forEach((k) => estado.piezas.set(k.dataset.pnClave, k))
+        almacen
+            .querySelectorAll(".metricasKpiRow[data-pn-clave]")
+            .forEach((k) => estado.piezas.set(k.dataset.pnClave, k))
     })().catch((error) => {
         if (_pnMetricas === estado) _pnMetricas = null
         almacen.remove()

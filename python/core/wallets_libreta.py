@@ -31,9 +31,9 @@ pantalla, los avisos y la importación.
 """
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from functools import lru_cache
-from typing import Iterable
 
 from core.cripto_direcciones import (
     TIPO_CLAVE_PUBLICA,

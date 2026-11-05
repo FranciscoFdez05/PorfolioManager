@@ -22,9 +22,9 @@ Cada lectura anota los tokens vistos (`anotarConocidos`) para la lista
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import asdict
 from decimal import Decimal
-from typing import Callable
 
 from core import settings
 from core.wallets_sync import resolverActivoToken, textoDecimal

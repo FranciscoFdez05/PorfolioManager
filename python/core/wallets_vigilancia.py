@@ -18,12 +18,12 @@ Esto no importa nada a Transacciones: eso sigue siendo manual (Sincronizar).
 
 import json
 import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Callable
 
 from core import dinero, paths, settings, telegram_notifier, wallets_avisos
 from core.cripto_direcciones import REDES, TIPO_XPUB
@@ -141,6 +141,7 @@ def precioEurDeMoneda(red: str, assetId: str, ticker: TokenPrecio | None = None)
 def precioEurDeActivo(assetId: str) -> Decimal | None:
     """Precio en euros del activo asociado a la wallet, o None si no se sabe."""
     from stores.asset_store import readAssetFile
+
     # La conversión es la de la valoración de la cartera: así el valor de la
     # wallet y el del activo en Activos salen con el mismo tipo de cambio.
     from stores.valoracion import _Cambios

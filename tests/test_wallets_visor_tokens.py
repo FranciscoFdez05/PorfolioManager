@@ -4,8 +4,9 @@ Ninguna prueba sale a la red: el lector recibe un `obtenerJson` falso con la
 forma documentada de Etherscan v2.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
+from itertools import pairwise
 
 import pytest
 
@@ -19,7 +20,7 @@ from stores.wallets_store import TokenConocido, TokenPrecio, TokenVerificado, Wa
 
 _EVM = "0x" + "a" * 40
 _OTRA_EVM = "0x" + "b" * 40
-_FECHA = datetime(2026, 3, 9, 15, 30, tzinfo=timezone.utc)
+_FECHA = datetime(2026, 3, 9, 15, 30, tzinfo=UTC)
 
 
 def _transferencia(contrato, simbolo, valor, recibida=True, tiempo=100, decimales=18, nombre=""):
@@ -88,7 +89,7 @@ def testConElHistorialCompletoSoloSePidenLosQueConservanAlgo():
     assert etherscan.consultados == ["0xusdc"]
     assert sinLeer == 0
     assert saldos == [bc.SaldoToken(contrato="0xusdc", simbolo="USDC", nombre="USD Coin", cantidad=Decimal("2.5"),
-                                    ultimoMovimiento=datetime.fromtimestamp(300, timezone.utc))]
+                                    ultimoMovimiento=datetime.fromtimestamp(300, UTC))]
 
 
 def testConElHistorialCortadoTambienSePidenLosDeNetoNegativo():
@@ -139,7 +140,7 @@ def testElRitmoSeComparteEntreLectoresYNoBajaDeTresPorSegundo():
                               obtenerJson=bc.conRitmoEtherscan(etherscan, ritmo=ritmo, dormir=reloj.dormir))
         lector.saldo("direccion", _EVM)
 
-    assert all(b - a >= 1 / 3 for a, b in zip(llamadas, llamadas[1:]))
+    assert all(b - a >= 1 / 3 for a, b in pairwise(llamadas))
 
 
 def testSiEtherscanCortaSeEsperaYSeRepite():

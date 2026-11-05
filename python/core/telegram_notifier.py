@@ -16,6 +16,11 @@ Un mismo aviso (misma categoría y mismo proveedor) no se repite antes de
 cada activo, y sin este margen cada refresco sería un aviso de Telegram por
 activo.
 
+Quien llama puede pedir además un margen (`margenSegundos`): el aviso solo sale
+si el proveedor lleva ese tiempo fallando sin una sola cotización buena. Un corte
+de red de segundos falla en un activo y acierta en el siguiente del mismo
+refresco, y sin margen cada uno de esos cortes eran dos avisos seguidos.
+
 Cuando un proveedor que estaba avisado como caído vuelve a dar una cotización
 válida, `notificarRecuperado` manda un aviso de vuelta y libera su cooldown:
 así, si vuelve a fallar justo después, se avisa sin esperar el margen entero.
@@ -109,8 +114,8 @@ PRESENTACION_AVISO = {
                                      "Cripto > Seguimiento. También monedas de Satoshi gastadas, si lo vigilas"),
     "resumen": ("Cartera y mercado", "Un mensaje al día con el valor, lo invertido, el resultado, la variación a "
                                      "24 h y las posiciones de cada cartera, más sus alertas de precio activas"),
-    "proveedores": ("Cartera y mercado", "Un proveedor agota la cuota, no responde o falla al pedir un precio, y "
-                                         "cuando vuelve a responder; el mismo problema no se repite en "
+    "proveedores": ("Cartera y mercado", "Un proveedor agota la cuota, o lleva un rato sin responder o fallando al "
+                                         "pedir precios, y cuando vuelve a responder; el mismo problema no se repite en "
                                          f"{_COOLDOWN_SEGUNDOS // 60} min. También si un activo lleva horas "
                                          "valorado con un valor de reserva"),
     "backup": ("Copias de seguridad", "Copia manual o automática creada (nombre, tamaño y copias guardadas), copia "
@@ -139,6 +144,8 @@ _MAX_TEXTO = 4000
 _lock = Lock()
 _ultimoAviso: dict = {}
 _proveedoresCaidos: set = set()
+# Proveedor -> instante del primer fallo desde su última cotización buena.
+_primerFallo: dict = {}
 
 
 def _archivoConfig():
@@ -285,11 +292,18 @@ def enviarPrueba():
         return False, str(error)[:200]
 
 
-def notificarProblema(categoria: str, sujeto: str, detalle: str = "") -> None:
+def notificarProblema(categoria: str, sujeto: str, detalle: str = "", *, margenSegundos: float = 0) -> None:
     """Manda un aviso si hay Telegram configurado y no se ha mandado ya hace poco.
 
     Nunca lanza: un fallo mandando el aviso no debe tumbar el refresco de
     cotizaciones que lo dispara.
+
+    Args:
+        categoria: Clave de `_PLANTILLAS`.
+        sujeto: Nombre del proveedor.
+        detalle: Texto que se añade bajo el título del aviso.
+        margenSegundos: Tiempo que debe llevar fallando, sin ningún acierto de
+            por medio, antes de avisar. 0 avisa al primer fallo.
     """
     plantilla = _PLANTILLAS.get(categoria)
     if plantilla is None:
@@ -305,6 +319,8 @@ def notificarProblema(categoria: str, sujeto: str, detalle: str = "") -> None:
     clave = (categoria, sujeto)
     ahora = time.monotonic()
     with _lock:
+        if margenSegundos > 0 and ahora - _primerFallo.setdefault(sujeto, ahora) < margenSegundos:
+            return
         _proveedoresCaidos.add(sujeto)
         anterior = _ultimoAviso.get(clave)
         if anterior is not None and ahora - anterior < _COOLDOWN_SEGUNDOS:
@@ -327,6 +343,11 @@ def notificarRecuperado(sujeto: str) -> None:
     Silencioso si nunca se avisó de que estuviera caído: no todo activo que se
     cotiza bien es un proveedor que se ha "recuperado" de nada.
     """
+    # Antes de mirar la configuración: el acierto corta la racha de fallos
+    # aunque no haya a quién avisar.
+    with _lock:
+        _primerFallo.pop(sujeto, None)
+
     token, chatId = leerConfig()
     if not token or not chatId:
         return
@@ -608,3 +629,4 @@ def reiniciarParaPruebas() -> None:
     with _lock:
         _ultimoAviso.clear()
         _proveedoresCaidos.clear()
+        _primerFallo.clear()

@@ -2462,16 +2462,34 @@
     font-size: 16px;
 }
 /* Los mismos colores que tools/generar_imagenes_avisos.py. */
-[data-aviso="precios"] > .ajustesTelegramAvisoIcono { --avisoColor: #0ea5e9; }
-[data-aviso="wallets"] > .ajustesTelegramAvisoIcono { --avisoColor: #f59e0b; }
-[data-aviso="resumen"] > .ajustesTelegramAvisoIcono { --avisoColor: #8b5cf6; }
-[data-aviso="proveedores"] > .ajustesTelegramAvisoIcono { --avisoColor: #06b6d4; }
+[data-aviso="precios"] > .ajustesTelegramAvisoIcono {
+    --avisoColor: #0ea5e9;
+}
+[data-aviso="wallets"] > .ajustesTelegramAvisoIcono {
+    --avisoColor: #f59e0b;
+}
+[data-aviso="resumen"] > .ajustesTelegramAvisoIcono {
+    --avisoColor: #8b5cf6;
+}
+[data-aviso="proveedores"] > .ajustesTelegramAvisoIcono {
+    --avisoColor: #06b6d4;
+}
 [data-aviso="backup"] > .ajustesTelegramAvisoIcono,
-[data-aviso="backupFichero"] > .ajustesTelegramAvisoIcono { --avisoColor: #818cf8; }
-[data-aviso="seguridad"] > .ajustesTelegramAvisoIcono { --avisoColor: #ec4899; }
-[data-aviso="sesion"] > .ajustesTelegramAvisoIcono { --avisoColor: #14b8a6; }
-[data-aviso="sistema"] > .ajustesTelegramAvisoIcono { --avisoColor: #94a3b8; }
-[data-aviso="version"] > .ajustesTelegramAvisoIcono { --avisoColor: #84cc16; }
+[data-aviso="backupFichero"] > .ajustesTelegramAvisoIcono {
+    --avisoColor: #818cf8;
+}
+[data-aviso="seguridad"] > .ajustesTelegramAvisoIcono {
+    --avisoColor: #ec4899;
+}
+[data-aviso="sesion"] > .ajustesTelegramAvisoIcono {
+    --avisoColor: #14b8a6;
+}
+[data-aviso="sistema"] > .ajustesTelegramAvisoIcono {
+    --avisoColor: #94a3b8;
+}
+[data-aviso="version"] > .ajustesTelegramAvisoIcono {
+    --avisoColor: #84cc16;
+}
 
 .ajustesTelegramVerificacion {
     margin: 16px 20px 0;

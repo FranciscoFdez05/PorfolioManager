@@ -155,7 +155,8 @@ function _initAjustesTelegram() {
             // El desplegable de Ajustes se construyó con el <select> aún vacío y
             // solo refresca su etiqueta con "change"; lanzarlo guardaría al abrir.
             const etiqueta = telegramResumenHora.closest(".ajustesDropWrapper")?.querySelector(".ajustesDropLabel")
-            if (etiqueta) etiqueta.textContent = telegramResumenHora.options[telegramResumenHora.selectedIndex]?.text || ""
+            if (etiqueta)
+                etiqueta.textContent = telegramResumenHora.options[telegramResumenHora.selectedIndex]?.text || ""
         }
     }
 
@@ -259,12 +260,7 @@ function _initAjustesTelegram() {
             )
         )
 
-        bloque.append(
-            titulo,
-            explicacion,
-            crearCampo("ajustesTelegramPwd2fa", "Contraseña actual", password),
-            opciones
-        )
+        bloque.append(titulo, explicacion, crearCampo("ajustesTelegramPwd2fa", "Contraseña actual", password), opciones)
         acciones.before(bloque)
 
         enviarCodigoBtn.addEventListener("click", async () => {

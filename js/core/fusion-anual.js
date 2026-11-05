@@ -182,9 +182,12 @@
             )
             return
         }
-        showToast(`${que[0].toUpperCase()}${que.slice(1)} habían cambiado desde otro sitio (otra pestaña, otro dispositivo). Se han combinado los cambios.`, {
-            type: "warning"
-        })
+        showToast(
+            `${que[0].toUpperCase()}${que.slice(1)} habían cambiado desde otro sitio (otra pestaña, otro dispositivo). Se han combinado los cambios.`,
+            {
+                type: "warning"
+            }
+        )
     }
 
     window.avisarFusion = avisarFusion

@@ -586,9 +586,7 @@ function normalizeOperationRow(row = {}, index = 0, conservarGuardado = false) {
     const defaultPair =
         stablecoinSymbol && asset ? `${asset.baseSymbol || asset.symbol}/${stablecoinSymbol}` : pairOptions[0] || ""
     const pair =
-        conservarGuardado && typeof row.par === "string"
-            ? row.par.trim()
-            : String(row.par || defaultPair || "").trim()
+        conservarGuardado && typeof row.par === "string" ? row.par.trim() : String(row.par || defaultPair || "").trim()
     const quoteSymbol = pair.includes("/") ? pair.split("/").pop() : ""
     const inferredCurrency = normalizeCurrencyCode(
         (conservarGuardado && row.currency) || quoteSymbol || stablecoinSymbol || "USD"
@@ -860,7 +858,6 @@ function bindOperationsToolbar() {
             if (event.key === "Escape") searchBtn.click()
         })
     }
-
 }
 
 function renderOperationsStablecoinPanel() {

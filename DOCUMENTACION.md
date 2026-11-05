@@ -626,7 +626,7 @@ Un bot de Telegram (lo creas con [@BotFather](https://t.me/BotFather) y pegas el
 
 | Tipo | Avisa de |
 |---|---|
-| Proveedores | cuota agotada, sin respuesta o fallo de un proveedor de cotizaciones (el mismo problema no se repite en 30 min), cuando vuelve a responder, y un activo que lleva más de 6 h valorado con un valor de reserva |
+| Proveedores | cuota agotada de un proveedor de cotizaciones, o sin respuesta o fallo mantenidos durante `[proveedores] aviso_margen_segundos` sin ninguna cotización buena (15 min de fábrica; el mismo problema no se repite en 30 min), cuando vuelve a responder, y un activo que lleva más de 6 h valorado con un valor de reserva |
 | Copias de seguridad | copia manual o automática creada (nombre, tamaño, cuántas hay), copia o restauración fallida, copia restaurada o eliminada |
 | Enviar el fichero de las copias automáticas y al actualizar | cada copia automática, y la que se hace al pulsar Actualizar, llega como ZIP, con las claves de API si se incluyen en las copias; si supera los 50 MB de Telegram solo llega un aviso (desactivado de fábrica). Las demás copias manuales no se envían |
 | Alertas de precio | un activo llega al precio fijado o se mueve en el día el % pedido; cada alerta salta una vez |
@@ -1212,7 +1212,7 @@ Después:
 
 ```bash
 pytest -m "not network" && npm test
-version=$(sed -n 's/^__version__ = "\(.*\)"//p' python/core/version.py)
+version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' python/core/version.py)
 git tag -a "v$version" -m "$version"
 git push && git push --tags
 ```

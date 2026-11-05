@@ -1698,7 +1698,11 @@ function _initAjustes2fa() {
     enviarCodigoBtn?.addEventListener("click", () =>
         conBoton(enviarCodigoBtn, async () => {
             const data = await enviar("/api/settings/2fa/codigo")
-            showMsg(msg, data.ok ? "Código enviado por Telegram" : data.error || "No se pudo enviar", data.ok ? "ok" : "error")
+            showMsg(
+                msg,
+                data.ok ? "Código enviado por Telegram" : data.error || "No se pudo enviar",
+                data.ok ? "ok" : "error"
+            )
         })
     )
 

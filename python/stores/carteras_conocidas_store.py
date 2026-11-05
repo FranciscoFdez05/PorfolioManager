@@ -22,10 +22,10 @@ inyectan las rutas y el proveedor de Fernet.
 
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Callable
 
 from cryptography.fernet import Fernet, InvalidToken
 
