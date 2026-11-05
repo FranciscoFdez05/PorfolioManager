@@ -1947,6 +1947,12 @@ function walletsSegComisionDetalle(mov, simbolo) {
     const entreWallets = mov.tipo === "entre_wallet"
     const importe = (valor, moneda) => `${walletsSegCantidadExacta(valor)} ${moneda}`.trim()
     const pagadaPorTi = "Pagada por ti: el origen y el destino son tuyos"
+    if (mov.comisionMarcada && mov.comisionExchange) {
+        return {
+            importe: importe(mov.comisionMarcada, mov.simbolo),
+            nota: `Incluye ${importe(mov.comisionExchange, mov.simbolo)} del exchange; se descuenta de la posición`
+        }
+    }
     if (mov.comisionMarcada) {
         return {
             importe: importe(mov.comisionMarcada, mov.simbolo),
@@ -2090,7 +2096,7 @@ function walletsSegMontarVentanaMovimiento(
             </div>
             <div class="assetRowModalFooter">
                 ${enlace ? `<a class="secondaryButton walletsSegMovExplorador" href="${escapeHtml(enlace)}" target="_blank" rel="noopener noreferrer">Ver en el explorador ↗</a>` : ""}
-                ${filaTransaccion ? `<button type="button" class="cancelButton walletsSegMovEditarBtn">Editar</button>` : ""}
+                ${filaTransaccion ? `<button type="button" class="cancelButton walletsSegMovEditarBtn">${escapeHtml(textoEditarFilaTransaccion(filaTransaccion))}</button>` : ""}
                 <button type="button" class="primaryButton walletsSegMovCerrarBtn">Cerrar</button>
             </div>
         </div>`
@@ -2136,7 +2142,7 @@ function abrirMovimientoSeguimiento(mov) {
     }
     walletsSegMontarVentanaMovimiento(ventana, (event) => {
         if (event.target.closest(".walletsSegComisionExchangeBtn") && wallet) {
-            marcarMovimientoSeguimiento(mov, wallet, true, { marcarOtra: false })
+            aplicarComisionExchange(mov, wallet)
             return
         }
         const marcarMovimiento = event.target.closest(".walletsSegMarcaMovBtn")
@@ -2233,21 +2239,62 @@ function walletsSegAdmiteComisionExchange(mov, wallet) {
     return Boolean(wallet) && wallet.propia !== false && (mov.sentido || mov.tipo) === "recibida"
 }
 
-function walletsSegComisionCampoHtml(mov, wallet, etiqueta, placeholder) {
+function walletsSegComisionCampoHtml(mov, etiqueta, placeholder, valor) {
     return `
         <label class="walletsSegContraApodo">
             <span>${escapeHtml(etiqueta)} (${escapeHtml(mov.simbolo)})</span>
             <input type="text" inputmode="decimal" class="assetRowModalInput walletsSegMarcaMovComision" maxlength="40" autocomplete="off"
-                placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(walletsSegComisionPropuesta(mov, wallet))}">
+                placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(valor)}">
         </label>`
+}
+
+// La parte de la red que se descuenta en un recibo. En Bitcoin con origen ajeno es
+// la de todo el lote del exchange, y en un token se paga en otra moneda: no suma.
+function walletsSegComisionRedQueCuenta(mov, wallet, origenPropio = walletsSegOrigenEsPropio(mov)) {
+    const leida = mov.comisionLeida ?? mov.comision ?? ""
+    if (leida) return leida
+    return !mov.contrato && (wallet.red !== "btc" || origenPropio) ? mov.comisionTx || "" : ""
+}
+
+// Lo que se envía al marcar: el servidor suma las dos partes, con decimales exactos.
+function walletsSegComisionesDeMarca(mov, wallet, valorCampo, marcarOtra) {
+    if (!walletsSegAdmiteComisionExchange(mov, wallet)) return { comision: valorCampo, comisionExchange: "" }
+    const origenPropio = walletsSegOrigenEsPropio(mov) || (marcarOtra && Boolean(mov.contraparte))
+    return { comision: walletsSegComisionRedQueCuenta(mov, wallet, origenPropio), comisionExchange: valorCampo }
+}
+
+// Vacío solo vale si ya había una que quitar; un número ilegible nunca.
+function walletsSegComisionExchangeEsAplicable(texto, mov) {
+    const limpio = String(texto).trim().replace(",", ".")
+    const numero = Number(limpio)
+    if (!Number.isFinite(numero) || numero < 0) return false
+    return numero > 0 || Boolean(mov.comisionExchange)
+}
+
+function aplicarComisionExchange(mov, wallet) {
+    const valor = document.querySelector("#walletsSegMovOverlay .walletsSegMarcaMovComision")?.value || ""
+    if (!walletsSegComisionExchangeEsAplicable(valor, mov)) {
+        showToast("Indica la comisión del exchange: tiene que ser mayor que cero", { type: "error" })
+        return
+    }
+    // Un origen ya propio sigue siéndolo: una dirección de exchange también puede serlo.
+    marcarMovimientoSeguimiento(mov, wallet, true, { marcarOtra: walletsSegOrigenEsPropio(mov) })
+}
+
+function walletsSegComisionRedDelApartadoHtml(mov, wallet) {
+    if (!mov.comisionTx) return ""
+    const simbolo = walletsSegRed(wallet)?.simbolo || ""
+    const cuenta = walletsSegComisionRedQueCuenta(mov, wallet)
+    const nota = cuenta ? "Fija; se suma a la del exchange" : "La pagó el remitente; no se suma"
+    return `<p class="walletsSegDato walletsSegComisionRedFija">Comisión de red: <strong>${escapeHtml(`${walletsSegCantidadExacta(mov.comisionTx)} ${simbolo}`.trim())}</strong> · ${nota}</p>`
 }
 
 /**
  * Pinta el apartado para indicar lo que cobró el exchange por una retirada.
  *
- * Esa comisión incluye la de la red, que el exchange paga de ella, así que la
- * sustituye en lugar de sumarse. El campo es el mismo que leen los botones de la
- * clasificación: solo hay uno en la ventana.
+ * La comisión de la red se enseña aparte y no se edita; la del exchange se suma a
+ * ella en el total. El campo es el mismo que leen los botones de la clasificación:
+ * solo hay uno en la ventana.
  *
  * @param {object} mov Movimiento con la libreta aplicada.
  * @param {object|undefined} wallet Wallet del movimiento.
@@ -2255,17 +2302,13 @@ function walletsSegComisionCampoHtml(mov, wallet, etiqueta, placeholder) {
  */
 function walletsSegComisionExchangeHtml(mov, wallet) {
     if (!walletsSegAdmiteComisionExchange(mov, wallet)) return ""
-    const avisoOrigen =
-        mov.contraparteMarca === "propia" && !mov.contraparteEnlazada
-            ? `<p class="walletsSegAlerta">La dirección de origen está marcada como tuya. Si es del exchange, quítale la marca en «${escapeHtml(walletsSegContraTitulo(mov))}».</p>`
-            : ""
     return `
         <section class="walletsSegContraparte walletsSegComisionExchange" aria-labelledby="walletsSegComisionExchangeTitulo">
             <h4 id="walletsSegComisionExchangeTitulo" class="walletsSegContraTitulo">Comisión del exchange</h4>
-            <p class="walletsSegDato">Si retiraste de un exchange, indica lo que te cobró: lo que salió de allí menos lo que llegó aquí. Sustituye a la comisión de red, que ya va incluida, y se resta de la posición. La transacción queda como «Entre mis wallets».</p>
-            ${avisoOrigen}
+            <p class="walletsSegDato">Si retiraste de un exchange, indica lo que te cobró aparte de la comisión de red. Se suma a ella en el total y se resta de la posición. La transacción queda como «Entre mis wallets».</p>
+            ${walletsSegComisionRedDelApartadoHtml(mov, wallet)}
             <div class="walletsSegComisionExchangeFila">
-                ${walletsSegComisionCampoHtml(mov, wallet, "Comisión cobrada", "Ej: 0,000018")}
+                ${walletsSegComisionCampoHtml(mov, "Comisión del exchange", "Ej: 0,000018", mov.comisionExchange || "")}
                 <button type="button" class="primaryButton walletsSegComisionExchangeBtn">Aplicar comisión</button>
             </div>
         </section>`
@@ -2299,7 +2342,7 @@ function walletsSegMarcaMovimientoHtml(mov, wallet) {
             ${avisoPendiente}
             <p class="walletsSegDato">Usa «Entre mis wallets» si mueves fondos entre direcciones tuyas o retiras de un exchange a tu wallet: la cantidad no vuelve a sumar a la posición y solo se descuenta la comisión.</p>
             ${avisoBtc}
-            ${walletsSegAdmiteComisionExchange(mov, wallet) ? "" : walletsSegComisionCampoHtml(mov, wallet, "Comisión a descontar", "Importe de la comisión")}
+            ${walletsSegAdmiteComisionExchange(mov, wallet) ? "" : walletsSegComisionCampoHtml(mov, "Comisión a descontar", "Importe de la comisión", walletsSegComisionPropuesta(mov, wallet))}
             ${casillaDirecciones}
             <div class="walletsSegContraBotones">
                 ${boton("true", "Entre mis wallets", marca === "propia")}
@@ -2326,6 +2369,7 @@ function walletsSegConMarca(mov, marca) {
     Object.assign(mov, {
         comisionLeida,
         comisionMarcada,
+        comisionExchange: marca?.propia ? marca.comisionExchange || "" : "",
         comision: comisionMarcada || comisionLeida || walletsSegComisionDeOrigenPropio(mov),
         tipo: walletsSegTipoEfectivo(sentido, marcaMovimiento, mov.contraparteMarca),
         // La marca es la verificación. Al quitarla, el servidor decide al volver a cargar.
@@ -2350,7 +2394,7 @@ function walletsSegAplicarMarca(mov, red, marca) {
 }
 
 async function marcarMovimientoSeguimiento(mov, wallet, propia, { marcarOtra: forzarOtra } = {}) {
-    const comision = document.querySelector("#walletsSegMovOverlay .walletsSegMarcaMovComision")?.value || ""
+    const valorCampo = document.querySelector("#walletsSegMovOverlay .walletsSegMarcaMovComision")?.value || ""
     const marcarOtra =
         forzarOtra ?? document.querySelector("#walletsSegMovOverlay .walletsSegMarcaMovOtra")?.checked ?? true
     let datos
@@ -2361,7 +2405,7 @@ async function marcarMovimientoSeguimiento(mov, wallet, propia, { marcarOtra: fo
             simbolo: mov.simbolo,
             sentido: mov.sentido || mov.tipo,
             propia,
-            comision,
+            ...walletsSegComisionesDeMarca(mov, wallet, valorCampo, marcarOtra),
             comisionLeida: mov.comisionLeida ?? mov.comision ?? "",
             direcciones: walletsSegDireccionesDeMarca(mov, propia, marcarOtra)
         })

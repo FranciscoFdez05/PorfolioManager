@@ -22,6 +22,44 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.1.0] — 2026-11-05
+
+**Esquema de base de datos:** no lo toca (sigue en la **27**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+### Añadido
+
+- **Gráfico de cada activo.** La ficha tiene una pestaña «Gráfico» con el precio o el
+  rendimiento de la posición, en euros o en %, con un punto verde en cada compra y uno
+  rojo en cada venta. Rangos de 1 día, 7 días, 30 días, 1 año y todo el histórico, con
+  los datos de cada punto al pasar el cursor. Sale de las valoraciones que guarda la
+  aplicación, así que empieza en la primera guardada del activo y va en euros.
+- **Sincronizar desde Transacciones.** Una opción del menú «···» importa de una vez los
+  movimientos nuevos de todas tus wallets, sin abrir «Wallets enlazadas». Si una falla,
+  las demás siguen y lo ya importado se conserva.
+
+### Cambiado
+
+- **Comisión del exchange.** Ya no sustituye a la de red. La comisión de red se muestra
+  fija y la del exchange va en su propio campo: se suman en el total, que se resta de
+  la posición. La de red no suma en Bitcoin con origen ajeno (es la de todo el lote) ni
+  en tokens (se paga en otra moneda). También se puede indicar si el origen ya estaba
+  marcado como tuyo: una dirección de exchange también puede serlo.
+- **Transacciones bloqueadas.** Las filas importadas vienen de la blockchain: solo se
+  les cambia la nota y, desde su detalle, la comisión del exchange y la clasificación.
+  El servidor lo impone aunque llegue otra cosa. Solo se pueden eliminar si ya no queda
+  una wallet propia enlazada de su red. Desaparece «Añadir transacción»; las filas
+  escritas a mano que ya existan se siguen pudiendo editar o eliminar.
+- **Direcciones en Transacciones.** «Wallet origen» y «Wallet destino» enseñan la
+  dirección abreviada en lugar del nombre de la wallet, para que quepan junto al hash.
+  El nombre y la dirección quedan en la información al pasar el ratón.
+- **«Operaciones Spot» en todas las fichas.** La pestaña se ve siempre en la ficha de
+  cualquier activo, aunque no tenga operaciones: en ese caso lo indica en lugar de
+  desaparecer.
+- **Menú Cripto.** «Conversiones» pasa a ir justo después de «Operaciones».
+
+---
+
 ## [5.0.1] — 2026-11-05
 
 **Esquema de base de datos:** no lo toca (sigue en la **27**). Para deshacer la

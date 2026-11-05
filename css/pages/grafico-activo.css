@@ -1,0 +1,137 @@
+/* Pestaña «Gráfico» de la ficha del activo. */
+
+.assetGrafico {
+    /* Tonos intermedios: se distinguen sobre el fondo oscuro y sobre el claro, y el
+       canvas los lee de aquí para no tener los colores repetidos en el JS. */
+    --graficoCompra: #16a34a;
+    --graficoVenta: #dc2626;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    color: var(--text-primary);
+}
+
+.assetGraficoCabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.assetGraficoResumen {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.assetGraficoEtiqueta,
+.assetGraficoFecha,
+.assetGraficoNota {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.assetGraficoCifras {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.assetGraficoValor {
+    font-size: 1.6rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-bright);
+}
+
+.assetGraficoCambio {
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.assetGraficoCambioPositivo {
+    color: var(--graficoCompra);
+}
+
+.assetGraficoCambioNegativo {
+    color: var(--graficoVenta);
+}
+
+.assetGraficoControles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Altura fija: Chart.js dibuja dentro y, al ser responsive, sin una altura concreta
+   el lienzo crecería sin freno. Se usa --vh y no vh por el zoom de pantallas grandes. */
+.assetGraficoLienzo {
+    position: relative;
+    height: calc(var(--vh, 1vh) * 48);
+    min-height: 280px;
+}
+
+.assetGraficoLienzo.hidden {
+    display: none;
+}
+
+.assetGraficoVacio {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+    margin: 0;
+    padding: 0 16px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.assetGraficoVacio.hidden {
+    display: none;
+}
+
+/* A la derecha: abajo a la izquierda queda fijo el botón «Añadir compra». */
+.assetGraficoLeyenda {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 14px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.assetGraficoLeyendaItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.assetGraficoPunto {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.assetGraficoPuntoCompra {
+    background: var(--graficoCompra);
+}
+
+.assetGraficoPuntoVenta {
+    background: var(--graficoVenta);
+}
+
+.assetGraficoNota {
+    margin: 0;
+    line-height: 1.4;
+}
+
+.assetGraficoNota:empty {
+    display: none;
+}

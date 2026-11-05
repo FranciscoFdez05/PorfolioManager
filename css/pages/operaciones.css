@@ -996,6 +996,11 @@
     margin-left: auto;
 }
 
+#transaccionesSincronizarBtn:disabled {
+    cursor: progress;
+    opacity: 0.6;
+}
+
 .transaccionesFilters {
     display: flex;
     gap: 6px;

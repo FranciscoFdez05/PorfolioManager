@@ -339,6 +339,7 @@ def anotar(movimiento: dict, red: str, libreta: Libreta) -> dict:
         "comision": comisionMarcada(marca) or comisionLeida or comisionOrigenPropio,
         "comisionLeida": comisionLeida,
         "comisionMarcada": comisionMarcada(marca),
+        "comisionExchange": marca.comisionExchange if marca is not None and marca.propia else "",
         "marcaMovimiento": ("" if marca is None else MARCA_PROPIA if marca.propia else MARCA_AJENA),
         "contraparteClave": canonica(red, contraparte) if contraparte else "",
         "contraparteApodo": entrada.apodo if entrada is not None else "",

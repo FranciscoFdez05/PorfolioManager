@@ -832,7 +832,6 @@
     flex-direction: column;
     gap: 16px;
     padding: 20px 22px 24px;
-    max-width: 980px;
 }
 
 /* Formulario: una tarjeta con los campos en rejilla y el botón alineado abajo. */

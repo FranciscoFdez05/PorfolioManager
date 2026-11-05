@@ -127,10 +127,79 @@ describe("comisión del exchange", () => {
         expect(html({}, AJENA)).toBe("")
     })
 
-    it("avisa si el origen sigue marcado como tuyo, salvo que sea una wallet enlazada", () => {
-        expect(html({ contraparteMarca: "propia" })).toContain("marcada como tuya")
-        expect(html({ contraparteMarca: "propia", contraparteEnlazada: true })).not.toContain("marcada como tuya")
-        expect(html()).not.toContain("marcada como tuya")
+    it("no pone pegas si el origen está marcado como tuyo: una dirección de exchange puede serlo", () => {
+        const conOrigenPropio = html({ contraparteMarca: "propia" })
+        expect(conOrigenPropio).toContain("Aplicar comisión")
+        expect(conOrigenPropio).not.toContain("marcada como tuya")
+    })
+
+    it("la comisión de red se enseña fija y el campo del exchange sale vacío para escribir", () => {
+        const conOrigenPropio = html({ contraparteMarca: "propia", comisionTx: "0.00000413" })
+        expect(conOrigenPropio).toContain("Comisión de red")
+        expect(conOrigenPropio).toContain("se suma a la del exchange")
+        document.body.innerHTML = conOrigenPropio
+        const campo = document.querySelector(".walletsSegMarcaMovComision")
+        expect(campo.value).toBe("")
+        expect(campo.readOnly).toBe(false)
+        document.body.innerHTML = ""
+    })
+
+    it("el campo trae lo ya indicado del exchange, no el total", () => {
+        document.body.innerHTML = html({ comisionMarcada: "0.00001413", comisionExchange: "0.00001" })
+        expect(document.querySelector(".walletsSegMarcaMovComision").value).toBe("0.00001")
+        document.body.innerHTML = ""
+    })
+
+    it("en Bitcoin con origen ajeno la de red no se suma: es la de todo el lote", () => {
+        expect(html()).toContain("no se suma")
+    })
+
+    it("sin comisión de red leída no enseña esa línea", () => {
+        expect(html({ comisionTx: "" })).not.toContain("Comisión de red")
+    })
+
+    it("al marcar envía la de red como base y lo escrito como comisión del exchange", () => {
+        const mov = { ...RECIBIDA, simbolo: "BTC", contraparte: "bc1otra", contraparteMarca: "propia" }
+        expect(window.walletsSegComisionesDeMarca(mov, PROPIA_BTC, "0.00001", true)).toEqual({ comision: "0.00002", comisionExchange: "0.00001" })
+    })
+
+    it("con origen ajeno en Bitcoin la base va vacía, salvo si se marca también la otra dirección", () => {
+        const mov = { ...RECIBIDA, simbolo: "BTC", contraparte: "bc1otra" }
+        expect(window.walletsSegComisionesDeMarca(mov, PROPIA_BTC, "0.00001", false)).toEqual({ comision: "", comisionExchange: "0.00001" })
+        expect(window.walletsSegComisionesDeMarca(mov, PROPIA_BTC, "0.00001", true).comision).toBe("0.00002")
+    })
+
+    it("un token no suma la de red, que se paga en otra moneda", () => {
+        const mov = { ...RECIBIDA, simbolo: "USDC", contrato: "0xusdc" }
+        expect(window.walletsSegComisionesDeMarca(mov, PROPIA_ETH, "2", false)).toEqual({ comision: "", comisionExchange: "2" })
+    })
+
+    it("un envío manda su campo como comisión, sin parte de exchange", () => {
+        const mov = { ...RECIBIDA, tipo: "enviada", sentido: "enviada" }
+        expect(window.walletsSegComisionesDeMarca(mov, PROPIA_ETH, "0.5", true)).toEqual({ comision: "0.5", comisionExchange: "" })
+    })
+
+    it.each(["", "   ", "0", "0,000", "abc", "-1", "Infinity"])("sin comisión previa no aplica %j", (valor) => {
+        expect(window.walletsSegComisionExchangeEsAplicable(valor, RECIBIDA)).toBe(false)
+    })
+
+    it.each(["0.00000413", "0,000018", " 1 "])("aplica %j", (valor) => {
+        expect(window.walletsSegComisionExchangeEsAplicable(valor, RECIBIDA)).toBe(true)
+    })
+
+    it("con una comisión previa, vaciar el campo la quita; un texto ilegible sigue sin valer", () => {
+        const mov = { ...RECIBIDA, comisionExchange: "0.00001" }
+        expect(window.walletsSegComisionExchangeEsAplicable("", mov)).toBe(true)
+        expect(window.walletsSegComisionExchangeEsAplicable("abc", mov)).toBe(false)
+    })
+
+    it("el detalle enseña el total y cuánto es del exchange", () => {
+        const { importe, nota } = window.walletsSegComisionDetalle(
+            { ...RECIBIDA, tipo: "entre_wallet", simbolo: "BTC", comisionTx: "0.00000413", comisionMarcada: "0.00001413", comisionExchange: "0.00001", contraparteMarca: "propia" },
+            "BTC"
+        )
+        expect(importe).toContain("0,00001413")
+        expect(nota).toContain("del exchange")
     })
 
     it("en un recibo solo hay un campo de comisión, el de este apartado", () => {

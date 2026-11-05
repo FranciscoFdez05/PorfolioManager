@@ -116,16 +116,20 @@ function renderAssetTablePage(asset) {
                 <div class="assetTabsNav">
                     <button class="assetTabBtn assetTabActive" id="todosTabBtn" data-tab="todos">Todos</button>
                     <button class="assetTabBtn" id="spotTabBtn" data-tab="spot">Compras spot</button>
-                    <button class="assetTabBtn hidden" id="completadasTabBtn" data-tab="completadas">Operaciones Spot</button>
+                    <button class="assetTabBtn" id="completadasTabBtn" data-tab="completadas">Operaciones Spot</button>
                     <button class="assetTabBtn hidden" id="transaccionesTabBtn" data-tab="transacciones">Transacciones</button>
                     <button class="assetTabBtn" id="ventasTabBtn" data-tab="ventas">Ventas</button>
                     <button class="assetTabBtn" id="planesTabBtn" data-tab="planes">Planes</button>
                     <button class="assetTabBtn" id="alertasTabBtn" data-tab="alertas">Alertas</button>
+                    <button class="assetTabBtn" id="graficoTabBtn" data-tab="grafico">Gráfico</button>
                     <button class="assetTabsNavAction hidden" id="assetAddVentaNavBtn" type="button"><span class="assetBtnIcon">+</span> Añadir venta</button>
                     <button class="assetTabsNavAction hidden" id="assetAddPlanNavBtn" type="button"><span class="assetBtnIcon">+</span> Nuevo plan</button>
                 </div>
                 <div class="assetTabPanel" data-tab="todos">
                     <div id="assetTodosSection"></div>
+                </div>
+                <div class="assetTabPanel hidden" data-tab="grafico">
+                    <div id="assetGraficoSection"></div>
                 </div>
                 <div class="assetTabPanel hidden" data-tab="spot">
                     <div class="assetTableWrapper">
@@ -236,6 +240,7 @@ function setActiveAssetTab(tab) {
     document.getElementById("assetTodosChartsCol")?.classList.toggle("hidden", tab !== "todos")
     document.getElementById("assetTodosLayout")?.classList.toggle("assetTodosLayoutFull", tab !== "todos")
     document.querySelector(".assetPageHeader")?.classList.toggle("assetPageHeaderFull", tab !== "todos")
+    if (tab === "grafico") renderAssetGraficoSection()
 }
 
 function setupAssetTabs(asset) {

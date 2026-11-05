@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, request
 from core import dinero, pnl_divisa
 from core.db import getActiveDbPath, getDb
 from providers.finnhub_client import convertAmount, fetchExchangeRate
-from stores import alertas_store, rendimiento_activo, revisiones
+from stores import alertas_store, grafico_activo, rendimiento_activo, revisiones
 from stores.asset_store import (
     deleteAssetFile,
     getAssetFile,
@@ -283,6 +283,18 @@ def getActivo(assetId):
         return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
 
     return jsonify(data)
+
+
+@activosBp.route("/api/activos/<assetId>/grafico", methods=["GET"])
+def getActivoGrafico(assetId):
+    """Serie e históricos de compras y ventas para el gráfico de la ficha."""
+    try:
+        datos = grafico_activo.datosDelGrafico(slugify(assetId), request.args.get("rango", "30D").strip().upper())
+    except grafico_activo.RangoInvalido as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
+    except grafico_activo.ActivoNoEncontrado:
+        return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
+    return jsonify({"ok": True, **datos})
 
 
 # Tope de ids por lote: el frontend los parte en trozos de 50, y sin tope una

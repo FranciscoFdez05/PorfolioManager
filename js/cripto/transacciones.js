@@ -17,7 +17,11 @@ let transaccionesPersistChain = Promise.resolve()
 let transaccionesWalletsCargadas = false
 const transaccionesHistoriales = new Map()
 let transaccionesAbriendoDetalle = false
+// Filas importadas que el servidor no deja borrar: aún hay una wallet propia en su red.
+let transaccionesFilasProtegidas = null
 const TRANSACCIONES_LIMITE_HISTORIAL = 500
+// Ninguna dirección de las redes admitidas baja de aquí: un nombre corto no se abrevia.
+const TRANSACCIONES_LARGO_MINIMO_DIRECCION = 25
 const TRANSACCION_WALLET_OPTIONS = [
     { value: "entre_wallet", label: "Entre wallet" },
     { value: "recibida", label: "Recibida" },
@@ -27,13 +31,15 @@ const TRANSACCION_WALLET_OPTIONS = [
 ]
 
 async function loadTransaccionesData() {
-    const response = await fetch("/api/transacciones")
+    const response = await fetch("/api/transacciones?conProteccion=1")
 
     if (!response.ok) {
         throw new Error("No se pudieron cargar las transacciones")
     }
 
-    return await response.json()
+    const datos = await response.json()
+    transaccionesFilasProtegidas = new Set(datos.filasProtegidas || [])
+    return datos
 }
 
 async function saveTransaccionesData(payload, options = {}) {
@@ -104,6 +110,27 @@ async function initTransaccionesLogic() {
     renderTransaccionesAssetMenu()
     renderTransaccionesTable()
     bindTransaccionesEvents()
+    // Sincronizar cambia las wallets después de releer las filas: hay que repintar.
+    window.alCambiarWallets = () => renderTransaccionesTable()
+    cargarWalletsDeLaTabla()
+}
+
+/**
+ * Lee las wallets y repinta la tabla con sus direcciones.
+ *
+ * No se espera: `/api/wallets` calcula precios y la tabla no debe tardar por ello.
+ * Un fallo deja a la vista los nombres guardados en las filas.
+ *
+ * @returns {Promise<void>}
+ */
+async function cargarWalletsDeLaTabla() {
+    if (!(currentTransaccionesData?.rows || []).some(transaccionEsImportada)) return
+    try {
+        await asegurarWalletsDeTransacciones()
+        renderTransaccionesTable()
+    } catch (error) {
+        console.warn("No se pudieron leer las direcciones de las wallets.", error)
+    }
 }
 
 async function loadTransaccionesCryptoAssets() {
@@ -173,7 +200,6 @@ async function loadTransaccionesCryptoAssets() {
 
 function bindTransaccionesEvents() {
     const body = document.getElementById("transaccionesBody")
-    const addButton = document.getElementById("addTransaccionRowBtn")
     const saveButton = document.getElementById("saveTransaccionesBtn")
     const filtersEl = document.getElementById("transaccionesAssetMenu")
     if (filtersEl && !filtersEl.dataset.bound) {
@@ -187,12 +213,10 @@ function bindTransaccionesEvents() {
         body.addEventListener("click", handleTransaccionesDeleteClick)
     }
 
-    if (addButton && !addButton.dataset.bound) {
-        addButton.dataset.bound = "true"
-        addButton.addEventListener("click", () => {
-            if (!transaccionesCryptoAssets.length) return
-            openTransaccionRowModal("")
-        })
+    const syncButton = document.getElementById("transaccionesSincronizarBtn")
+    if (syncButton && !syncButton.dataset.bound) {
+        syncButton.dataset.bound = "true"
+        syncButton.addEventListener("click", () => sincronizarWalletsPropias(syncButton))
     }
 
     const menuTrigger = document.querySelector("#transaccionesActionsMenu .pageActionsMenuTrigger")
@@ -232,33 +256,18 @@ function bindTransaccionesEvents() {
     }
 }
 
-function createEmptyTransaccionRow() {
-    const defaultAsset = getDefaultTransaccionAsset()
+// Las filas importadas salen de la blockchain: de ellas solo se edita la nota. El
+// servidor lo impone igualmente (protegerFilasImportadas en core/wallets_sync.py).
+function esTransaccionImportada(row) {
+    return String(row?.id || "").startsWith("wallet-")
+}
 
-    return {
-        id: `transaccion-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-        assetId: defaultAsset?.id || "",
-        assetName: defaultAsset?.name || "",
-        fechaOperacion: "",
-        total: "",
-        comisionRed: "",
-        walletTipo: "entre_wallet",
-        walletDesde: "",
-        walletDestino: "",
-        hashTransaccion: "",
-        nota: ""
-    }
+function esTransaccionEliminable(row) {
+    return !esTransaccionImportada(row) || !transaccionesFilasProtegidas?.has(row.id)
 }
 
 function getTransaccionAsset(assetId) {
     return transaccionesCryptoAssets.find((asset) => asset.id === assetId) || null
-}
-
-// La cripto que propone «Añadir transacción»: la única filtrada si hay una,
-// si no la primera de la lista.
-function getDefaultTransaccionAsset() {
-    if (transaccionesFilter?.size === 1) return getTransaccionAsset([...transaccionesFilter][0])
-    return transaccionesCryptoAssets[0] || null
 }
 
 // Color del activo tal y como está en Activos, ajustado para que se lea sobre el
@@ -283,14 +292,12 @@ function buildTransaccionesFilterChip(value, text, color, checked) {
 
 function renderTransaccionesAssetMenu() {
     const menu = document.getElementById("transaccionesAssetMenu")
-    const addButton = document.getElementById("addTransaccionRowBtn")
 
-    if (!menu || !addButton) {
+    if (!menu) {
         return
     }
 
     menu.innerHTML = ""
-    addButton.disabled = !transaccionesCryptoAssets.length
 
     if (!transaccionesCryptoAssets.length) {
         refrescarTiraPestanas(menu)
@@ -420,6 +427,80 @@ function normalizeTransaccionWalletTipo(value) {
     return "entre_wallet"
 }
 
+/**
+ * Pinta las acciones del menú ··· de una fila.
+ *
+ * Una fila importada no tiene «Editar» completo: su comisión y su clasificación se
+ * cambian en el detalle, y «Eliminar» solo sale si el servidor va a aceptarlo.
+ *
+ * @param {object} row Fila de la tabla.
+ * @returns {string} El HTML de las acciones.
+ */
+function transaccionAccionesHtml(row) {
+    const id = escapeHtml(row.id)
+    const claseItem = "rowMenuItem assetRowEditBtn avActionBtn avEditBtn"
+    const editar = esTransaccionImportada(row)
+        ? `<button type="button" class="${claseItem} transaccionRowDetalleBtn" data-row-id="${id}">Comisión y clasificación</button>
+                    <button type="button" class="${claseItem} transaccionRowEditBtn" data-row-id="${id}">Editar nota</button>`
+        : `<button type="button" class="${claseItem} transaccionRowEditBtn" data-row-id="${id}">Editar</button>`
+    if (!esTransaccionEliminable(row)) return editar
+    return `${editar}
+                    <hr>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn transaccionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${id}">Eliminar</button>`
+}
+
+function transaccionEsImportada(row) {
+    return String(row?.id || "").startsWith("wallet-")
+}
+
+/**
+ * Abrevia una dirección con el formato de `enmascarar` del servidor.
+ *
+ * @param {string} valor Dirección, o el texto que tenga la fila.
+ * @returns {string} La dirección abreviada; un nombre o un texto corto, tal cual.
+ */
+function abreviarDireccionTransaccion(valor) {
+    if (valor.length < TRANSACCIONES_LARGO_MINIMO_DIRECCION || /\s/.test(valor)) return valor
+    return `${valor.slice(0, 8)}…${valor.slice(-4)}`
+}
+
+function transaccionWalletsConNombre(nombre) {
+    const clave = nombre.toLowerCase()
+    const wallets = typeof walletsEstado === "undefined" ? [] : walletsEstado.wallets
+    return wallets.filter(
+        (wallet) =>
+            wallet.propia !== false &&
+            (wallet.seguimientoClave === clave || String(wallet.alias || "").toLowerCase() === clave)
+    )
+}
+
+/**
+ * La dirección de la wallet propia que una fila importada guarda por su nombre.
+ *
+ * El movimiento dice la dirección exacta, pero solo se guardan los recientes de
+ * cada wallet. Para los anteriores vale la wallet de ese activo si no hay duda:
+ * con varias, se deja el nombre antes que enseñar una dirección que no es.
+ *
+ * @param {string} nombre Nombre que guarda la fila en origen o destino.
+ * @param {object} row Fila de Transacciones.
+ * @returns {string} Dirección completa o enmascarada; vacío si no se sabe cuál es.
+ */
+function direccionPropiaDeFila(nombre, row) {
+    if (!transaccionEsImportada(row)) return ""
+    const wallets = transaccionWalletsConNombre(nombre)
+    const direccion = buscarMovimientoDeFila(row, wallets, (wallet) => wallet.recientes || [])?.mov.propia
+    if (direccion) return direccion
+    const candidatas = wallets.length === 1 ? wallets : wallets.filter((wallet) => wallet.assetId === row.assetId)
+    return candidatas.length === 1 ? candidatas[0].valorEnmascarado || "" : ""
+}
+
+function transaccionCeldaWalletHtml(valor, row) {
+    const texto = String(valor || "").trim()
+    const direccion = texto ? direccionPropiaDeFila(texto, row) : ""
+    const titulo = direccion ? `${texto}: ${direccion}` : texto
+    return `<td title="${escapeHtml(titulo)}">${escapeHtml(abreviarDireccionTransaccion(direccion || texto))}</td>`
+}
+
 function buildTransaccionRow(row) {
     const tr = document.createElement("tr")
     const hashTransaccion = normalizeHashTransaccionValue(row.hashTransaccion || row.walletOrigen || "")
@@ -437,17 +518,15 @@ function buildTransaccionRow(row) {
         <td>${formatTransaccionesNumber(row.total)}</td>
         <td>${formatTransaccionesNumber(row.comisionRed)}</td>
         <td>${walletLabel}</td>
-        <td>${escapeHtml(row.walletDesde || "")}</td>
-        <td>${escapeHtml(row.walletDestino || "")}</td>
+        ${transaccionCeldaWalletHtml(row.walletDesde, row)}
+        ${transaccionCeldaWalletHtml(row.walletDestino, row)}
         <td class="transaccionHashCell" data-full-value="${escapeHtml(hashTransaccion)}" title="Haz clic para copiar el hash completo">${escapeHtml(formatHashTransaccionDisplay(hashTransaccion))}</td>
         <td>${escapeHtml(row.nota || "")}</td>
         <td class="rowActionsCell">
             <div class="rowMenu">
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                 <div class="rowMenuDropdown">
-                    <button type="button" class="rowMenuItem assetRowEditBtn transaccionRowEditBtn avActionBtn avEditBtn" data-row-id="${escapeHtml(row.id)}">Editar</button>
-                    <hr>
-                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn transaccionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${escapeHtml(row.id)}">Eliminar</button>
+                    ${transaccionAccionesHtml(row)}
                 </div>
             </div>
         </td>
@@ -492,6 +571,12 @@ async function copyHashTransaccionToClipboard(cell) {
 }
 
 function handleTransaccionesDeleteClick(event) {
+    const detalleButton = event.target.closest(".transaccionRowDetalleBtn")
+    if (detalleButton) {
+        abrirDetalleTransaccion(detalleButton.dataset.rowId)
+        return
+    }
+
     const editButton = event.target.closest(".transaccionRowEditBtn")
     if (editButton) {
         openTransaccionRowModal(editButton.dataset.rowId)
@@ -646,6 +731,10 @@ function abrirFilaSinMovimiento(row) {
         tipo,
         resumenHtml: transaccionResumenHtml(row),
         datosHtml: transaccionDatosHtml(row),
+        // La comisión del exchange se apunta en el movimiento: sin él no hay dónde.
+        seccionesHtml: esTransaccionImportada(row)
+            ? `<p class="walletsSegDato">No se ha podido leer este movimiento de la red. La comisión del exchange y la clasificación se podrán cambiar cuando se pueda leer.</p>`
+            : "",
         filaTransaccion: row.id
     })
 }
@@ -722,6 +811,7 @@ async function persistTransaccionesData(options = {}) {
         }
         if (Number.isInteger(respuesta?.revision)) transaccionesRevision = respuesta.revision
         transaccionesBaseRows = JSON.parse(JSON.stringify(currentTransaccionesData.rows || []))
+        if (respuesta?.conservadas > 0 && !options.keepalive) await avisarFilasConservadas()
     } catch (error) {
         transaccionesHasPendingChanges = true
         throw error
@@ -730,6 +820,13 @@ async function persistTransaccionesData(options = {}) {
     if (!options.keepalive) {
         await refreshAssetsSidebar(currentAssetId, false)
     }
+}
+
+// Esta pestaña creía poder borrarlas, pero entretanto se ha enlazado una wallet de
+// su red: la tabla vuelve a lo que de verdad hay guardado.
+async function avisarFilasConservadas() {
+    await repintarTransaccionesDesdeServidor()
+    showToast("No se ha eliminado: esa transacción sigue llegando de una wallet enlazada", { type: "error" })
 }
 
 // Otra pestaña u otro dispositivo guardó las transacciones entretanto: se
@@ -822,12 +919,57 @@ function bindTransaccionesPersistenceGuards() {
     })
 }
 
+// El texto del botón que lleva, desde el detalle, al formulario de esa fila.
+function textoEditarFilaTransaccion(rowId) {
+    const row = (currentTransaccionesData.rows || []).find((r) => r.id === rowId)
+    return esTransaccionImportada(row) ? "Editar nota" : "Editar"
+}
+
+/**
+ * Abre la ventana de la única parte editable de una fila importada: su nota.
+ *
+ * @param {object} row Fila importada de la blockchain.
+ */
+function openTransaccionNotaModal(row) {
+    const overlay = document.createElement("div")
+    overlay.id = "transaccionRowModalOverlay"
+    overlay.className = "modalOverlay assetRowModalOverlay"
+    overlay.innerHTML = `
+        <div class="assetModal assetRowModal">
+            <h3 class="assetModalTitle assetRowModalTitle">Editar nota</h3>
+            <div class="assetRowModalFields">
+                <p class="walletsSegDato">Los datos de esta transacción vienen de la blockchain y no se editan.</p>
+                <div class="assetRowModalField">
+                    <label class="assetRowModalLabel" for="txModalNota">Nota</label>
+                    <input id="txModalNota" class="assetRowModalInput" type="text" placeholder="Opcional: motivo del envío…" value="${escapeHtml(row.nota || "")}">
+                </div>
+            </div>
+            <div class="assetRowModalFooter">
+                <button type="button" id="txRowModalCancelBtn" class="cancelButton">Cancelar</button>
+                <button type="button" id="txRowModalSaveBtn" class="primaryButton" data-no-autohide="true">Guardar</button>
+            </div>
+        </div>`
+    overlay.querySelector("#txRowModalCancelBtn").addEventListener("click", closeTransaccionRowModal)
+    overlay.querySelector("#txRowModalSaveBtn").addEventListener("click", () => {
+        row.nota = overlay.querySelector("#txModalNota").value.trim()
+        renderTransaccionesTable()
+        scheduleTransaccionesAutosave()
+        closeTransaccionRowModal()
+    })
+    document.body.appendChild(overlay)
+    overlay.querySelector("#txModalNota").focus()
+}
+
 function openTransaccionRowModal(rowId) {
     document.getElementById("transaccionRowModalOverlay")?.remove()
 
     const rowIndex = (currentTransaccionesData.rows || []).findIndex((r) => r.id === rowId)
-    const isEdit = rowIndex >= 0
-    const rowData = isEdit ? { ...currentTransaccionesData.rows[rowIndex] } : createEmptyTransaccionRow()
+    if (rowIndex < 0) return
+    if (esTransaccionImportada(currentTransaccionesData.rows[rowIndex])) {
+        openTransaccionNotaModal(currentTransaccionesData.rows[rowIndex])
+        return
+    }
+    const rowData = { ...currentTransaccionesData.rows[rowIndex] }
 
     const walletOptions = TRANSACCION_WALLET_OPTIONS.map(
         (opt) =>
@@ -894,7 +1036,7 @@ function openTransaccionRowModal(rowId) {
 
     const titleEl = document.createElement("h3")
     titleEl.className = "assetModalTitle assetRowModalTitle"
-    titleEl.textContent = isEdit ? "Editar transacción" : "Añadir transacción"
+    titleEl.textContent = "Editar transacción"
 
     const fields = document.createElement("div")
     fields.className = "assetRowModalFields"
@@ -903,7 +1045,7 @@ function openTransaccionRowModal(rowId) {
     const footer = document.createElement("div")
     footer.className = "assetRowModalFooter"
     footer.innerHTML = `
-        ${isEdit ? `<button type="button" id="txRowModalDeleteBtn" class="dangerButton assetRowModalDeleteBtn">Eliminar</button>` : ""}
+        <button type="button" id="txRowModalDeleteBtn" class="dangerButton assetRowModalDeleteBtn">Eliminar</button>
         <button type="button" id="txRowModalCancelBtn" class="cancelButton">Cancelar</button>
         <button type="button" id="txRowModalSaveBtn" class="primaryButton" data-no-autohide="true">Guardar</button>
     `
@@ -911,21 +1053,19 @@ function openTransaccionRowModal(rowId) {
     footer.querySelector("#txRowModalSaveBtn").addEventListener("click", saveTransaccionRowFromModal)
     footer.querySelector("#txRowModalCancelBtn").addEventListener("click", closeTransaccionRowModal)
 
-    if (isEdit) {
-        footer.querySelector("#txRowModalDeleteBtn").addEventListener("click", () => {
-            openConfirmModal({
-                title: "Eliminar fila",
-                message: "¿Quieres eliminar esta transacción?",
-                confirmLabel: "Eliminar",
-                onConfirm: () => {
-                    currentTransaccionesData.rows = (currentTransaccionesData.rows || []).filter((r) => r.id !== rowId)
-                    renderTransaccionesTable()
-                    scheduleTransaccionesAutosave()
-                }
-            })
-            closeTransaccionRowModal()
+    footer.querySelector("#txRowModalDeleteBtn").addEventListener("click", () => {
+        openConfirmModal({
+            title: "Eliminar fila",
+            message: "¿Quieres eliminar esta transacción?",
+            confirmLabel: "Eliminar",
+            onConfirm: () => {
+                currentTransaccionesData.rows = (currentTransaccionesData.rows || []).filter((r) => r.id !== rowId)
+                renderTransaccionesTable()
+                scheduleTransaccionesAutosave()
+            }
         })
-    }
+        closeTransaccionRowModal()
+    })
 
     modal.appendChild(titleEl)
     modal.appendChild(fields)
@@ -978,11 +1118,13 @@ function closeTransaccionRowModal() {
 function saveTransaccionRowFromModal() {
     const overlay = document.getElementById("transaccionRowModalOverlay")
     const rowId = overlay?.dataset.rowId || ""
+    const rowIndex = (currentTransaccionesData.rows || []).findIndex((r) => r.id === rowId)
+    if (rowIndex < 0) return
     const g = (id) => document.getElementById(id)?.value ?? ""
     const selectedAsset = getTransaccionAsset(g("txModalAsset"))
 
     const rowData = {
-        id: rowId || `transaccion-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        id: rowId,
         assetId: selectedAsset?.id || "",
         assetName: selectedAsset?.name || "",
         fechaOperacion: g("txModalFecha"),
@@ -995,12 +1137,7 @@ function saveTransaccionRowFromModal() {
         nota: g("txModalNota")
     }
 
-    const rowIndex = (currentTransaccionesData.rows || []).findIndex((r) => r.id === rowId)
-    if (rowIndex >= 0) {
-        currentTransaccionesData.rows[rowIndex] = rowData
-    } else {
-        currentTransaccionesData.rows.push(rowData)
-    }
+    currentTransaccionesData.rows[rowIndex] = rowData
 
     renderTransaccionesAssetMenu()
     renderTransaccionesTable()

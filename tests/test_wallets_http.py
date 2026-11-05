@@ -1164,6 +1164,43 @@ def _walletPropia(client, cabeceras):
     return _enlazar(client, cabeceras, tipo="direccion", valor=_BECH32).get_json()["wallet"]["id"]
 
 
+def testLaComisionDelExchangeSeSumaALaDeRedConDecimalesExactos(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+
+    marca = _marcarMovimiento(client, cabeceras, walletId, comision="0.00000413",
+                              comisionExchange="0,00001").get_json()["marca"]
+
+    assert (marca["comision"], marca["comisionExchange"]) == ("0.00001413", "0.00001")
+
+
+def testSinComisionDelExchangeQuedaSoloLaDeRed(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+
+    for exchange in ("", "0"):
+        marca = _marcarMovimiento(client, cabeceras, walletId, comision="0.00000413",
+                                  comisionExchange=exchange).get_json()["marca"]
+        assert (marca["comision"], marca["comisionExchange"]) == ("0.00000413", "")
+
+
+def testUnaComisionDelExchangeNoNumericaSeRechaza(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+
+    assert _marcarMovimiento(client, cabeceras, walletId, comisionExchange="abc").status_code == 400
+
+
+def testMarcarComoAjenaDescartaLaComisionDelExchange(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+
+    marca = _marcarMovimiento(client, cabeceras, walletId, propia=False, comision="0.00000413",
+                              comisionExchange="0.00001").get_json()["marca"]
+
+    assert (marca["comision"], marca["comisionExchange"]) == ("", "")
+
+
 def testCompletarComisionesExigeCsrfYSinNadaQueHacerDevuelveCero(cliente):
     client, cabeceras, _ = cliente
     url = "/api/wallets/transacciones/completar-comisiones"

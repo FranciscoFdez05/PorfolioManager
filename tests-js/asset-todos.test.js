@@ -134,6 +134,40 @@ describe("compras spot", () => {
     })
 })
 
+describe("pestaña Operaciones Spot", () => {
+    const pestana = () => document.getElementById("completadasTabBtn")
+    const seccion = () => document.getElementById("assetCompletedOperationsSection")
+
+    it("con operaciones las cuenta y las lista", () => {
+        expect(pestana().classList.contains("hidden")).toBe(false)
+        expect(pestana().textContent).toBe("Operaciones Spot (1)")
+        expect(seccion().querySelectorAll("tbody tr")).toHaveLength(1)
+    })
+
+    it("sin operaciones sigue visible y lo dice", async () => {
+        await montar({ ...ACTIVO, operationRows: [] })
+
+        expect(pestana().classList.contains("hidden")).toBe(false)
+        expect(pestana().textContent).toBe("Operaciones Spot")
+        expect(seccion().textContent).toContain("No hay operaciones spot registradas")
+    })
+
+    // Lo que se ve en la ficha no depende del tipo: una comodity vacía también la enseña.
+    it("también sale en activos que no son cripto", async () => {
+        await montar({ ...ACTIVO, id: "xag", name: "XAG", symbol: "XAG", type: "comoditis", operationRows: [] })
+
+        expect(pestana().classList.contains("hidden")).toBe(false)
+    })
+
+    // Al quedarse sin filas con la ficha abierta no puede seguir la tabla anterior.
+    it("al quedarse sin operaciones se vacía la tabla", () => {
+        renderAssetCompletedOperationsSection({ ...ACTIVO, operationRows: [] })
+
+        expect(seccion().querySelector("table")).toBeNull()
+        expect(pestana().textContent).toBe("Operaciones Spot")
+    })
+})
+
 describe("pestaña Todos", () => {
     it("junta los dos orígenes y los ordena de más reciente a más antiguo", () => {
         expect(origenesPintados()).toEqual(["Operación spot", "Compra spot"])

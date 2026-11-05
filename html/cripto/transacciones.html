@@ -9,10 +9,10 @@
         <div class="overviewDivider tablaBusquedaDivisor"></div>
         <div id="transaccionesAssetMenu" class="transaccionesFilters"></div>
         <div class="transaccionesToolbarRight">
-            <button id="addTransaccionRowBtn" class="primaryButton" type="button">Añadir transacción</button>
             <div class="pageActionsMenu" id="transaccionesActionsMenu">
                 <button class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true">···</button>
                 <div class="pageActionsDropdown" id="transaccionesActionsDropdown">
+                    <button id="transaccionesSincronizarBtn" class="pageActionsItem" type="button" title="Lee la red e importa aquí los movimientos nuevos de todas tus wallets">Sincronizar</button>
                     <button id="transaccionesGrafoBtn" class="pageActionsItem" type="button">Ver movimientos en gráfico</button>
                     <button id="transaccionesWalletsBtn" class="pageActionsItem" type="button">Wallets enlazadas</button>
                     <button id="saveTransaccionesBtn" class="pageActionsItem" type="button">Guardar</button>
@@ -41,6 +41,6 @@
         </table>
     </div>
     <p class="overviewEmpty hidden" id="transaccionesNoAssetMsg">No hay criptos creadas en Activos para registrar transacciones.</p>
-    <p class="overviewEmpty hidden" id="transaccionesEmptyMsg">No hay transacciones registradas.</p>
+    <p class="overviewEmpty hidden" id="transaccionesEmptyMsg">No hay transacciones. Se importan de la blockchain: enlaza una wallet y sincronízala desde el menú ···.</p>
 
 </section>

@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from core.validation import primerIdDuplicado
+from core.wallets_sync import filaProtegidaDeBorrado, protegerFilasImportadas, redesConWalletPropia
 from stores import revisiones
 from stores.app_data import (
     readBonosFile,
@@ -149,7 +150,14 @@ def saveDividendoCalendar():
 
 @registrosBp.route("/api/transacciones", methods=["GET"])
 def getTransacciones():
-    return jsonify({**readTransaccionesFile(), "revision": revisiones.actual("transacciones", revisiones.CLAVE_UNICA)})
+    datos = readTransaccionesFile()
+    respuesta = {**datos, "revision": revisiones.actual("transacciones", revisiones.CLAVE_UNICA)}
+    # A petición: otras páginas leen esta lista para la posición y descifrar las
+    # wallets en cada lectura solo le hace falta a la tabla de Transacciones.
+    if request.args.get("conProteccion"):
+        redes = redesConWalletPropia()
+        respuesta["filasProtegidas"] = [fila["id"] for fila in datos["rows"] if filaProtegidaDeBorrado(fila, redes)]
+    return jsonify(respuesta)
 
 
 @registrosBp.route("/api/transacciones", methods=["POST"])
@@ -192,10 +200,12 @@ def saveTransacciones():
         return jsonify({"ok": False, "error": str(e)}), 400
 
     try:
-        nueva = writeTransaccionesFile({"rows": sanitizedRows}, revisionEsperada=esperada)
+        filas, conservadas = protegerFilasImportadas(sanitizedRows, readTransaccionesFile()["rows"],
+                                                     redesConWalletPropia())
+        nueva = writeTransaccionesFile({"rows": filas}, revisionEsperada=esperada)
     except revisiones.ConflictoRevision as conflicto:
         return revisiones.respuestaConflicto(conflicto, "Las transacciones han cambiado desde otro sitio (otra pestaña u otro dispositivo)")
-    return jsonify({"ok": True, "revision": nueva})
+    return jsonify({"ok": True, "revision": nueva, "conservadas": conservadas})
 
 
 @registrosBp.route("/api/bonos", methods=["GET"])

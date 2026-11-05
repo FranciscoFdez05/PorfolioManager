@@ -1076,6 +1076,96 @@ async function sincronizarWallet(boton) {
     }
 }
 
+function walletsAcumularSincronizacion(total, resultado) {
+    total.anadidas += resultado.anadidas || 0
+    total.yaImportadas += resultado.yaImportadas || 0
+    total.pendientes += resultado.pendientes || 0
+    for (const [simbolo, n] of Object.entries(resultado.sinActivo || {})) {
+        total.sinActivo[simbolo] = (total.sinActivo[simbolo] || 0) + n
+    }
+}
+
+/**
+ * Importa varias wallets a Transacciones, una petición por wallet.
+ *
+ * Cada lectura de la red tiene que caber en el timeout de su petición, y una xpub
+ * son decenas de llamadas: juntarlas en una sola petición podría no acabar nunca.
+ * Una wallet que falla no impide importar las demás.
+ *
+ * @param {Array<object>} wallets Wallets propias que importar.
+ * @returns {Promise<{total: object, truncadas: string[], fallos: string[]}>} Lo importado
+ *     en conjunto y los avisos de las wallets limitadas o fallidas.
+ */
+async function walletsSincronizarLista(wallets) {
+    const resumen = {
+        total: { anadidas: 0, yaImportadas: 0, pendientes: 0, sinActivo: {} },
+        truncadas: [],
+        fallos: []
+    }
+    const progreso = iniciarProgreso("Sincronizando wallets", wallets.length)
+    try {
+        for (const wallet of wallets) {
+            const nombre = walletsNombreCompleto(wallet)
+            progreso.paso(nombre)
+            try {
+                const resultado = await walletsPost(`/api/wallets/${encodeURIComponent(wallet.id)}/sincronizar`)
+                walletsAcumularSincronizacion(resumen.total, resultado)
+                if (resultado.truncada) resumen.truncadas.push(walletsAvisoTruncada(resultado, nombre))
+            } catch (error) {
+                resumen.fallos.push(`${nombre}: ${error.message}`)
+            }
+        }
+    } finally {
+        progreso.terminar()
+    }
+    return resumen
+}
+
+function walletsAvisarSincronizacion({ total, truncadas, fallos }, numeroWallets) {
+    // Lo importado de las que sí funcionaron se cuenta aunque otra fallase.
+    if (fallos.length < numeroWallets) {
+        showToast(walletsResumenSincronizacion(total), { type: "success", duration: 6000 })
+    }
+    if (truncadas.length) showToast(truncadas.join(" · "), { type: "warning", duration: 12000 })
+    if (fallos.length) showToast(fallos.join(" · "), { type: "error", duration: 8000 })
+}
+
+/**
+ * Importa a Transacciones los movimientos nuevos de todas las wallets propias.
+ *
+ * @param {HTMLButtonElement} boton Botón que lo lanza; queda desactivado mientras dura.
+ * @returns {Promise<void>}
+ */
+async function sincronizarWalletsPropias(boton) {
+    const textoOriginal = boton.textContent
+    boton.disabled = true
+    boton.textContent = "Sincronizando…"
+    try {
+        // Lo que hubiera sin guardar en la tabla va antes: la importación escribe
+        // sobre la última revisión del servidor.
+        if (typeof flushTransaccionesPendingChanges === "function") await flushTransaccionesPendingChanges()
+        walletsEstado = await walletsPeticion("/api/wallets")
+        const propias = walletsEstado.wallets.filter((wallet) => wallet.propia !== false)
+        if (!propias.length) {
+            showToast("No hay wallets propias enlazadas: añádelas en ··· › Wallets enlazadas", { type: "warning" })
+            return
+        }
+        const resumen = await walletsSincronizarLista(propias)
+        if (typeof recargarTransaccionesDesdeServidor === "function") await recargarTransaccionesDesdeServidor()
+        walletsEstado = await walletsPeticion("/api/wallets")
+        if (document.getElementById("walletsModalOverlay")) renderWalletsModal()
+        walletsAvisarSincronizacion(resumen, propias.length)
+        avisarCambioWallets()
+    } catch (error) {
+        showToast(error.message || "No se pudieron sincronizar las wallets", { type: "error" })
+    } finally {
+        if (boton.isConnected) {
+            boton.disabled = false
+            boton.textContent = textoOriginal
+        }
+    }
+}
+
 function confirmarDesenlazarWallet(walletId) {
     const wallet = walletsEstado.wallets.find((w) => w.id === walletId)
     if (!wallet) return

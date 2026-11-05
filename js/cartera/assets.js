@@ -1089,15 +1089,17 @@ function renderAssetCompletedOperationsSection(asset) {
     const completedOps = getCompletedOperationsCryptoImpact(asset)
     const rows = completedOps.rows || []
 
-    if (!rows.length) {
-        section.innerHTML = ""
-        if (tabBtn) tabBtn.classList.add("hidden")
-        return
+    if (tabBtn) {
+        tabBtn.textContent = rows.length ? `Operaciones Spot (${rows.length})` : "Operaciones Spot"
     }
 
-    if (tabBtn) {
-        tabBtn.classList.remove("hidden")
-        tabBtn.textContent = `Operaciones Spot (${rows.length})`
+    if (!rows.length) {
+        section.innerHTML = `
+            <div class="assetVentasEmpty">
+                <p class="assetVentasEmptyText">No hay operaciones spot registradas para este activo.</p>
+            </div>
+        `
+        return
     }
 
     const currency = normalizeCurrencyCode(asset.currency || "EUR")

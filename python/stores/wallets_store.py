@@ -297,7 +297,8 @@ class MovimientoMarcado:
     fila en Transacciones, que no guarda el contrato. `direccionesAnadidas` son las
     que esta marca dio de alta en la libreta como propias: sin recordarlas, quitar
     la marca no devolvería la transacción a su estado, porque su dirección seguiría
-    haciéndola «entre wallets».
+    haciéndola «entre wallets». `comisionExchange` es la parte de `comision` que
+    cobró el exchange aparte de la red: se guarda para poder enseñarla y corregirla.
     """
 
     red: str
@@ -307,6 +308,7 @@ class MovimientoMarcado:
     comision: str = ""
     assetId: str = ""
     direccionesAnadidas: tuple[str, ...] = ()
+    comisionExchange: str = ""
 
 
 # Lo que guarda el fichero de wallets además de las propias wallets.

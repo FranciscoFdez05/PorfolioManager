@@ -18,6 +18,9 @@ contrato que dan por auténtico las listas públicas de tokens.
 La escritura usa la misma revisión que la pantalla de Transacciones: si otra
 pestaña guarda entre la lectura y la escritura, se relee y se repite.
 
+Desde la pantalla, de una fila importada solo se cambia la nota, y solo se borra
+si ya no queda una wallet propia en su red (`protegerFilasImportadas`).
+
 La libreta de direcciones (`core.wallets_libreta`) decide si un envío o un
 recibo es en realidad entre wallets propias y qué nombre lleva la contraparte.
 Cada fila importada deja apuntada su contraparte en el fichero de wallets: así,
@@ -280,6 +283,84 @@ def hashesImportados(filas: list[dict]) -> set[str]:
     """
     return {str(fila.get("hashTransaccion", "")).lower() for fila in filas
             if fila.get("hashTransaccion") and fila.get("walletTipo") != PENDIENTE}
+
+
+def esFilaImportada(fila: dict) -> bool:
+    """Si la fila salió de la blockchain y no la escribió el usuario."""
+    return str(fila.get("id", "")).startswith(_PREFIJO_FILA)
+
+
+def redesConWalletPropia(repositorio: WalletsRepository | None = None) -> set[str]:
+    """Las redes en las que queda alguna wallet propia enlazada.
+
+    Sin poder leer las wallets (otra `SECRET_KEY`, fichero dañado) se devuelven
+    todas: es preferible no dejar borrar a borrar lo que la red no devolvería.
+
+    Args:
+        repositorio: Repositorio de wallets; por defecto, el real.
+
+    Returns:
+        Los identificadores de esas redes.
+    """
+    try:
+        wallets = (repositorio or WalletsRepository()).listar()
+    except WalletError as error:
+        log.warning("[wallets] No se pudieron leer las wallets para proteger Transacciones: %s", error)
+        return set(REDES)
+    return {wallet.red for wallet in wallets if wallet.propia}
+
+
+def filaProtegidaDeBorrado(fila: dict, redesEnlazadas: set[str]) -> bool:
+    """Si una fila importada no se puede borrar porque aún se lee de una wallet enlazada.
+
+    Borrarla no serviría: la siguiente sincronización la trae de vuelta, o cambia la
+    posición para siempre si la red ya no la devuelve. Sin wallet en su red sí se
+    puede: es la salida cuando se enlazó una wallet por error, y desenlazarla deja
+    aquí sus filas.
+
+    La red sale de la huella del id. Una fila cuyo hash se editó antes de existir esta
+    protección ya no la revela, y se protege mientras quede alguna wallet.
+
+    Args:
+        fila: Fila de Transacciones.
+        redesEnlazadas: Resultado de `redesConWalletPropia`.
+
+    Returns:
+        True si hay que conservarla; False si se puede borrar o no es importada.
+    """
+    if not esFilaImportada(fila):
+        return False
+    huella = str(fila.get("id", ""))[len(_PREFIJO_FILA):]
+    hashTx, assetId = str(fila.get("hashTransaccion", "")), str(fila.get("assetId", ""))
+    red = next((r for r in REDES if _huella(r, hashTx, assetId) == huella), None)
+    return bool(redesEnlazadas) if red is None else red in redesEnlazadas
+
+
+def protegerFilasImportadas(pedidas: list[dict], actuales: list[dict],
+                            redesEnlazadas: set[str]) -> tuple[list[dict], int]:
+    """Lo que se puede guardar de una lista de filas enviada desde la pantalla.
+
+    De una fila importada que ya existe solo se acepta la nota: lo demás lo dice la
+    blockchain, y la comisión del exchange y la clasificación se cambian marcando la
+    transacción (`POST /api/wallets/<id>/movimientos/marcar`), que deja constancia.
+    Una pestaña desfasada tampoco puede así deshacer una marca hecha desde otro sitio.
+
+    Args:
+        pedidas: Filas ya saneadas de la petición.
+        actuales: Filas guardadas ahora mismo.
+        redesEnlazadas: Resultado de `redesConWalletPropia`.
+
+    Returns:
+        Las filas a guardar y cuántas importadas se han conservado aunque faltaban
+        en la petición, que van al final.
+    """
+    importadas = {fila["id"]: fila for fila in actuales if esFilaImportada(fila)}
+    pedidasIds = {fila["id"] for fila in pedidas}
+    filas = [{**importadas[fila["id"]], "nota": fila.get("nota", "")} if fila["id"] in importadas else fila
+             for fila in pedidas]
+    conservadas = [fila for filaId, fila in importadas.items()
+                   if filaId not in pedidasIds and filaProtegidaDeBorrado(fila, redesEnlazadas)]
+    return [*filas, *conservadas], len(conservadas)
 
 
 def _tipoSegunVerificacion(tipo: str, sentido: str, marca, verificarEntradas: bool, tipoActual: str = "") -> str:

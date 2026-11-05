@@ -667,6 +667,28 @@ def _comisionDePeticion(valor, campo: str) -> str:
     return textoDecimal(numero)
 
 
+def _comisionesDePeticion(datos: dict) -> tuple[str, str]:
+    """(total a descontar, parte del exchange) de una marca «entre wallets».
+
+    `comision` es lo que ya se descontaba y `comisionExchange` se le suma. Una
+    comisión de exchange a cero es lo mismo que no indicarla.
+
+    Args:
+        datos: Cuerpo de la petición.
+
+    Returns:
+        El total y la parte del exchange, ambos como texto decimal; vacíos si no hay.
+
+    Raises:
+        ValidationError: si alguna no es un número no negativo.
+    """
+    comision = _comisionDePeticion(datos.get("comision"), "comision")
+    exchange = _comisionDePeticion(datos.get("comisionExchange"), "comisionExchange")
+    if not exchange or Decimal(exchange) == 0:
+        return comision, ""
+    return textoDecimal(Decimal(comision or "0") + Decimal(exchange)), exchange
+
+
 def _marcaDePeticion(datos: dict) -> tuple[str, str, str, bool | None]:
     """(hash, contrato, símbolo, propia) validados; `propia` None es quitar la marca."""
     hashTx = asText(datos.get("hash"), "hash", maxLength=130, required=True)
@@ -793,7 +815,8 @@ def marcarMovimiento(walletId):
 
     Cuerpo: `hash`, `contrato` ("" en la moneda de la red), `simbolo`, `sentido`
     (`enviada` o `recibida`, lo que leyó la red), `propia` (true, false o null
-    para quitar la marca), `comision` (la que se descuenta), `comisionLeida` (la
+    para quitar la marca), `comision` (la que se descuenta), `comisionExchange`
+    (lo cobrado por el exchange, que se suma a `comision`), `comisionLeida` (la
     de la red, a la que vuelve la fila sin esa marca) y `direcciones` (las que
     pasan a ser propias con `propia` true; se deshace al cambiar o quitar la marca).
     Una dirección propia afecta a todos sus movimientos, no solo a este: lo ya
@@ -804,7 +827,7 @@ def marcarMovimiento(walletId):
     sentido = asText(datos.get("sentido"), "sentido", maxLength=20, required=True)
     if sentido not in SENTIDOS:
         raise ValidationError("Solo se marcan los envíos y los recibos", field="sentido")
-    comision = _comisionDePeticion(datos.get("comision"), "comision") if propia else ""
+    comision, comisionExchange = _comisionesDePeticion(datos) if propia else ("", "")
     comisionLeida = _comisionDePeticion(datos.get("comisionLeida"), "comisionLeida")
     repositorio = _repositorio()
     sincronizador = SincronizadorWallets(repositorio)
@@ -823,7 +846,7 @@ def marcarMovimiento(walletId):
             repositorio.desmarcarMovimiento(wallet.red, hashTx, contrato)
         else:
             marca = MovimientoMarcado(red=wallet.red, hash=hashTx, contrato=contrato, propia=propia,
-                                      comision=comision, assetId=assetId,
+                                      comision=comision, comisionExchange=comisionExchange, assetId=assetId,
                                       direccionesAnadidas=tuple(dict.fromkeys(
                                           [*(d for d in previas if d in pedidas), *nuevas])))
             repositorio.marcarMovimiento(marca)
