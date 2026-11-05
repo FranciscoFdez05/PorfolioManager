@@ -234,6 +234,64 @@ class TestOperaciones:
         assert all(date.fromtimestamp(puntos[o["indice"]]["ts"]).strftime("%d-%m-%Y") == o["fecha"]
                    for o in operaciones)
 
+    def testSeColocaEnElSnapshotDelDiaConPrecioMasParecido(self):
+        # Sin hora, a mediodía quedaría antes de la caída en la que se compró.
+        dia = HOY - timedelta(days=2)
+        crearActivo([compra(dia, 1, 100)])
+        snapshot(marca(dia, 9), 130, 100)
+        snapshot(marca(dia, 12), 128, 100)
+        snapshot(marca(dia, 17), 101, 100)
+
+        datos = grafico()
+
+        operacion = datos["operaciones"][0]
+        assert operacion["precioEur"] == 100
+        assert datos["puntos"][operacion["indice"]]["ts"] == marca(dia, 17)
+
+    def testNoSaleDelDiaAunqueOtroDiaTengaUnPrecioMasParecido(self):
+        dia = HOY - timedelta(days=2)
+        crearActivo([compra(HOY - timedelta(days=3), 1, 100), compra(dia, 1, 100)])
+        snapshot(marca(HOY - timedelta(days=3)), 100, 100)
+        snapshot(marca(dia), 300, 200)
+
+        datos = grafico()
+
+        assert datos["puntos"][datos["operaciones"][1]["indice"]]["ts"] == marca(dia)
+
+    def testPrecioEnOtraDivisaUsaElCambioDeHoySiNoHayElDeSuFecha(self):
+        dia = HOY - timedelta(days=2)
+        crearActivo([compra(dia, 10, 20)], currency="USD")
+        snapshot(marca(dia), 100, 100)
+
+        operacion = grafico()["operaciones"][0]
+
+        assert (operacion["precio"], operacion["divisa"], operacion["precioEur"]) == (20, "USD", 10)
+
+    def testPrecioEnOtraDivisaPrefiereElCambioDeSuFecha(self):
+        dia = HOY - timedelta(days=2)
+        crearActivo([compra(dia, 10, 20)], currency="USD")
+        conn = getDb()
+        conn.execute(
+            "INSERT INTO fx_rates (par, fecha, rate, origen, obtenido_en) VALUES ('USD/EUR', ?, '0.8', 'yahoo', '')",
+            (dia.isoformat(),),
+        )
+        conn.commit()
+        snapshot(marca(dia), 100, 100)
+
+        assert grafico()["operaciones"][0]["precioEur"] == 16
+
+    def testSinTipoDeCambioSeColocaPorCercaniaYSinPrecioEnEuros(self):
+        dia = HOY - timedelta(days=2)
+        crearActivo([compra(dia, 1, 100)], currency="GBP")
+        snapshot(marca(dia, 9), 100, 100)
+        snapshot(marca(dia, 12), 130, 100)
+
+        datos = grafico()
+
+        operacion = datos["operaciones"][0]
+        assert operacion["precioEur"] is None
+        assert datos["puntos"][operacion["indice"]]["ts"] == marca(dia, 12)
+
     def testOperacionConAperturaIlegibleSeColocaPorSuCierre(self):
         cierre = HOY - timedelta(days=3)
         crearActivo()

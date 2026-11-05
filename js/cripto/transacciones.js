@@ -386,7 +386,10 @@ function renderTransaccionesTable() {
         body.appendChild(buildTransaccionRow(row))
     })
 
-    bindTableSort(body.closest("table"), "transacciones")
+    const table = body.closest("table")
+    bindTableSort(table, "transacciones")
+    // bindTableSort solo ordena la primera vez: cada repintado parte del orden del servidor.
+    table?._reSort?.()
 }
 
 function normalizeHashTransaccionValue(value) {

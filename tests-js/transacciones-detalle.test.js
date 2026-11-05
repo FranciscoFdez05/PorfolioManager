@@ -46,6 +46,35 @@ describe("buscar el movimiento de una fila", () => {
     })
 })
 
+describe("orden de la tabla al repintar", () => {
+    const FILAS = [
+        { id: "a", assetId: "bitcoin", fechaOperacion: "01-01-2026" },
+        { id: "b", assetId: "bitcoin", fechaOperacion: "03-01-2026" },
+        { id: "c", assetId: "bitcoin", fechaOperacion: "02-01-2026" }
+    ]
+    const ordenVisible = () => [...document.querySelectorAll("#transaccionesBody tr")].map((tr) => tr.dataset.transaccionId)
+
+    it("conserva el orden elegido cuando las filas vuelven del servidor", () => {
+        document.body.innerHTML = `<table>
+            <thead><tr><th></th><th class="mThSort" data-sortkey="1">Fecha<span class="mSortArrow"></span></th></tr></thead>
+            <tbody id="transaccionesBody"></tbody>
+        </table>`
+        localStorage.setItem("tableSort_transacciones", JSON.stringify({ key: "1", dir: "desc" }))
+        window.__filas = { rows: FILAS }
+        window.__activos = [{ id: "bitcoin", name: "Bitcoin" }]
+        window.eval("currentTransaccionesData = window.__filas; transaccionesCryptoAssets = window.__activos")
+
+        window.renderTransaccionesTable()
+        expect(ordenVisible()).toEqual(["b", "c", "a"])
+
+        window.renderTransaccionesTable()
+        expect(ordenVisible()).toEqual(["b", "c", "a"])
+
+        localStorage.removeItem("tableSort_transacciones")
+        document.body.innerHTML = ""
+    })
+})
+
 describe("clic en la celda del hash", () => {
     const pulsarHash = (hash) => {
         const copiar = vi.fn().mockResolvedValue()

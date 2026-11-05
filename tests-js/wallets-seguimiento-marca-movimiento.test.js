@@ -150,6 +150,36 @@ describe("comisión del exchange", () => {
         document.body.innerHTML = ""
     })
 
+    it("sin comisión aplicada el campo se escribe y el botón aplica", () => {
+        document.body.innerHTML = html()
+        expect(document.querySelector(".walletsSegMarcaMovComision").readOnly).toBe(false)
+        expect(document.querySelector(".walletsSegComisionExchangeBtn").textContent).toBe("Aplicar comisión")
+        expect(document.querySelector(".walletsSegComisionExchangeEditarBtn")).toBeNull()
+        document.body.innerHTML = ""
+    })
+
+    it("una comisión aplicada queda fija y solo se ofrece editarla", () => {
+        document.body.innerHTML = html({ comisionExchange: "0.000018" })
+        expect(document.querySelector(".walletsSegMarcaMovComision").readOnly).toBe(true)
+        expect(document.querySelector(".walletsSegComisionExchangeEditarBtn").textContent).toBe("Editar")
+        expect(document.querySelector(".walletsSegComisionExchangeBtn")).toBeNull()
+        document.body.innerHTML = ""
+    })
+
+    it("«Editar» abre el campo con su valor y vuelve a ofrecer aplicar", () => {
+        document.body.innerHTML = `<div id="walletsSegMovOverlay">${html({ comisionExchange: "0.000018" })}</div>`
+
+        window.editarComisionExchange()
+
+        const campo = document.querySelector(".walletsSegMarcaMovComision")
+        expect(campo.readOnly).toBe(false)
+        expect(campo.value).toBe("0.000018")
+        expect(document.activeElement).toBe(campo)
+        expect(document.querySelector(".walletsSegComisionExchangeBtn").textContent).toBe("Aplicar comisión")
+        expect(document.querySelector(".walletsSegComisionExchangeEditarBtn")).toBeNull()
+        document.body.innerHTML = ""
+    })
+
     it("en Bitcoin con origen ajeno la de red no se suma: es la de todo el lote", () => {
         expect(html()).toContain("no se suma")
     })

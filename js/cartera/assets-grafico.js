@@ -63,6 +63,15 @@ function assetGraficoValorDelPunto(punto, vista, unidad, precioBase) {
     return punto.coste > 0 ? (ganancia / punto.coste) * 100 : null
 }
 
+// Altura de la marca de una operación. En la vista de precio es lo que se pagó o
+// cobró; la línea solo da la cotización de un momento de ese día. En la de posición
+// la operación no tiene un valor propio, así que se apoya en la línea.
+function assetGraficoValorDeMarca(operacion, valorLinea, vista, unidad, precioBase) {
+    if (vista !== "precio" || !Number.isFinite(operacion.precioEur)) return valorLinea
+    if (unidad === "eur") return operacion.precioEur
+    return precioBase ? (operacion.precioEur / precioBase - 1) * 100 : valorLinea
+}
+
 // Prepara lo que pinta Chart.js: la línea, con cortes en los huecos largos, y un
 // punto por cada día y tipo de operación. Varias compras del mismo día comparten
 // punto: sus posiciones serían idénticas y una taparía a la otra.
@@ -92,15 +101,18 @@ function assetGraficoSeries(datos, vista, unidad) {
             sinValor += 1
             return
         }
-        if (!grupo.has(operacion.indice)) {
-            grupo.set(operacion.indice, {
+        const y = assetGraficoValorDeMarca(operacion, valor, vista, unidad, precioBase)
+        // Dos compras del mismo día a precios distintos ya no coinciden en altura.
+        const clave = `${operacion.indice}|${y}`
+        if (!grupo.has(clave)) {
+            grupo.set(clave, {
                 x: puntos[operacion.indice].ts,
-                y: valor,
+                y,
                 indiceLinea: indiceEnLinea[operacion.indice],
                 operaciones: []
             })
         }
-        grupo.get(operacion.indice).operaciones.push(operacion)
+        grupo.get(clave).operaciones.push(operacion)
     })
 
     return {

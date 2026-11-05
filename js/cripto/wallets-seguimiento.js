@@ -2145,6 +2145,10 @@ function abrirMovimientoSeguimiento(mov) {
             aplicarComisionExchange(mov, wallet)
             return
         }
+        if (event.target.closest(".walletsSegComisionExchangeEditarBtn")) {
+            editarComisionExchange()
+            return
+        }
         const marcarMovimiento = event.target.closest(".walletsSegMarcaMovBtn")
         if (marcarMovimiento && wallet) {
             const { propia } = marcarMovimiento.dataset
@@ -2239,12 +2243,12 @@ function walletsSegAdmiteComisionExchange(mov, wallet) {
     return Boolean(wallet) && wallet.propia !== false && (mov.sentido || mov.tipo) === "recibida"
 }
 
-function walletsSegComisionCampoHtml(mov, etiqueta, placeholder, valor) {
+function walletsSegComisionCampoHtml(mov, etiqueta, placeholder, valor, soloLectura = false) {
     return `
         <label class="walletsSegContraApodo">
             <span>${escapeHtml(etiqueta)} (${escapeHtml(mov.simbolo)})</span>
             <input type="text" inputmode="decimal" class="assetRowModalInput walletsSegMarcaMovComision" maxlength="40" autocomplete="off"
-                placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(valor)}">
+                placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(valor)}"${soloLectura ? " readonly" : ""}>
         </label>`
 }
 
@@ -2281,6 +2285,24 @@ function aplicarComisionExchange(mov, wallet) {
     marcarMovimientoSeguimiento(mov, wallet, true, { marcarOtra: walletsSegOrigenEsPropio(mov) })
 }
 
+function walletsSegComisionExchangeBotonHtml(fija) {
+    return fija
+        ? `<button type="button" class="cancelButton walletsSegComisionExchangeEditarBtn">Editar</button>`
+        : `<button type="button" class="primaryButton walletsSegComisionExchangeBtn">Aplicar comisión</button>`
+}
+
+// Sin repintar la ventana: se perdería lo que haya en la casilla y el apodo sin guardar.
+function editarComisionExchange() {
+    const overlay = document.getElementById("walletsSegMovOverlay")
+    const campo = overlay?.querySelector(".walletsSegMarcaMovComision")
+    const boton = overlay?.querySelector(".walletsSegComisionExchangeEditarBtn")
+    if (!campo || !boton) return
+    campo.readOnly = false
+    boton.outerHTML = walletsSegComisionExchangeBotonHtml(false)
+    campo.focus()
+    campo.select()
+}
+
 function walletsSegComisionRedDelApartadoHtml(mov, wallet) {
     if (!mov.comisionTx) return ""
     const simbolo = walletsSegRed(wallet)?.simbolo || ""
@@ -2294,7 +2316,8 @@ function walletsSegComisionRedDelApartadoHtml(mov, wallet) {
  *
  * La comisión de la red se enseña aparte y no se edita; la del exchange se suma a
  * ella en el total. El campo es el mismo que leen los botones de la clasificación:
- * solo hay uno en la ventana.
+ * solo hay uno en la ventana. Una comisión ya aplicada queda en solo lectura hasta
+ * pulsar «Editar»; se mantiene el campo para que esos botones sigan leyendo su valor.
  *
  * @param {object} mov Movimiento con la libreta aplicada.
  * @param {object|undefined} wallet Wallet del movimiento.
@@ -2302,14 +2325,15 @@ function walletsSegComisionRedDelApartadoHtml(mov, wallet) {
  */
 function walletsSegComisionExchangeHtml(mov, wallet) {
     if (!walletsSegAdmiteComisionExchange(mov, wallet)) return ""
+    const fija = Boolean(mov.comisionExchange)
     return `
         <section class="walletsSegContraparte walletsSegComisionExchange" aria-labelledby="walletsSegComisionExchangeTitulo">
             <h4 id="walletsSegComisionExchangeTitulo" class="walletsSegContraTitulo">Comisión del exchange</h4>
             <p class="walletsSegDato">Si retiraste de un exchange, indica lo que te cobró aparte de la comisión de red. Se suma a ella en el total y se resta de la posición. La transacción queda como «Entre mis wallets».</p>
             ${walletsSegComisionRedDelApartadoHtml(mov, wallet)}
             <div class="walletsSegComisionExchangeFila">
-                ${walletsSegComisionCampoHtml(mov, "Comisión del exchange", "Ej: 0,000018", mov.comisionExchange || "")}
-                <button type="button" class="primaryButton walletsSegComisionExchangeBtn">Aplicar comisión</button>
+                ${walletsSegComisionCampoHtml(mov, "Comisión del exchange", "Ej: 0,000018", mov.comisionExchange || "", fija)}
+                ${walletsSegComisionExchangeBotonHtml(fija)}
             </div>
         </section>`
 }

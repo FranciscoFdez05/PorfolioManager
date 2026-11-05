@@ -22,6 +22,28 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.1.1] — 2026-11-05
+
+**Esquema de base de datos:** no lo toca (sigue en la **27**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+### Corregido
+
+- **Puntos de compra y venta del gráfico.** Salían a la altura de la línea y a mediodía,
+  así que una compra a 67.558 € podía verse en 71.702 € si el precio se movió ese día.
+  En la vista de precio ahora salen al precio de la operación, convertido a euros si se
+  hizo en otra divisa, y en el momento del día cuyo precio guardado más se le acerca. Dos
+  operaciones del mismo día a precios distintos ya no comparten punto.
+- **Orden de Transacciones.** Se perdía al repintar la tabla: cada repintado volvía al
+  orden del servidor en vez de mantener el elegido.
+
+### Cambiado
+
+- **Comisión del exchange ya aplicada.** En el detalle del movimiento queda en solo
+  lectura hasta pulsar «Editar», para no cambiarla sin querer.
+
+---
+
 ## [5.1.0] — 2026-11-05
 
 **Esquema de base de datos:** no lo toca (sigue en la **27**). Para deshacer la

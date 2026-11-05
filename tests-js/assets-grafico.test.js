@@ -106,6 +106,51 @@ describe("puntos de compra y venta", () => {
         expect(series.linea[series.ventas[0].indiceLinea].y).toBe(2)
     })
 
+    it("en la vista de precio la marca sale al precio de la operación, no al de la línea", () => {
+        const series = window.assetGraficoSeries(
+            datos(serie, [operacion("compra", 1, { precioEur: 22 })]),
+            "precio",
+            "eur"
+        )
+        expect(series.compras[0]).toMatchObject({ x: 200, y: 22, indiceLinea: 1 })
+    })
+
+    it("en precio y % la marca usa la misma base que la línea", () => {
+        const series = window.assetGraficoSeries(
+            datos(serie, [operacion("compra", 1, { precioEur: 22 })]),
+            "precio",
+            "pct"
+        )
+        expect(series.compras[0].y).toBeCloseTo(10)
+    })
+
+    it("en la vista de posición la marca sigue sobre la línea", () => {
+        const series = window.assetGraficoSeries(
+            datos(serie, [operacion("compra", 1, { precioEur: 22 })]),
+            "posicion",
+            "eur"
+        )
+        expect(series.compras[0].y).toBe(150)
+    })
+
+    it("sin precio en euros la marca se apoya en la línea", () => {
+        const series = window.assetGraficoSeries(
+            datos(serie, [operacion("compra", 1, { precioEur: null })]),
+            "precio",
+            "eur"
+        )
+        expect(series.compras[0].y).toBe(25)
+    })
+
+    it("dos compras del mismo punto a precios distintos no comparten marca", () => {
+        const series = window.assetGraficoSeries(
+            datos(serie, [operacion("compra", 1, { precioEur: 22 }), operacion("compra", 1, { precioEur: 24 })]),
+            "precio",
+            "eur"
+        )
+        expect(series.compras.map((marca) => marca.y)).toEqual([22, 24])
+    })
+
     it("sin valor en esa vista no pinta la marca, pero la cuenta para avisar", () => {
         const puntos = [punto(100, 1, 1, null), punto(200, 2, 1, 2)]
         const series = window.assetGraficoSeries(datos(puntos, [operacion("compra", 0)]), "precio", "eur")

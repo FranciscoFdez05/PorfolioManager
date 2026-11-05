@@ -3181,6 +3181,11 @@ a.walletsSegTokenContrato:hover {
     white-space: nowrap;
 }
 
+.walletsSegMarcaMovComision[readonly] {
+    cursor: default;
+    opacity: 0.7;
+}
+
 .walletsSegMovSecciones .walletsSegContraBotones button {
     flex: 0 1 auto;
     min-width: 0;

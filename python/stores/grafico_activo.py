@@ -22,7 +22,7 @@ from core import dinero
 from core.db import getDb
 from core.fifo import FifoError, parseFecha
 from stores import rendimiento_activo
-from stores.fx_historico import tipoActualConMemo
+from stores.fx_historico import tasa, tipoActualConMemo
 
 _DIA = 86400
 _HORA = 3600
@@ -259,8 +259,58 @@ def _ventasRegistradas(conn, assetId: str, moneda: str) -> list[dict | None]:
     ]
 
 
+def _precioEnEuros(operacion: dict, tipo) -> float | None:
+    """Precio de una operación en euros, la unidad de la línea del gráfico.
+
+    Args:
+        operacion: Resultado de `_operacion`.
+        tipo: Función `(desde, hacia) -> Decimal | None` con el cambio de hoy.
+
+    Returns:
+        El precio convertido, o None si no hay precio o tipo de cambio.
+    """
+    if operacion["precio"] is None:
+        return None
+    # Sin descarga: una petición a Yahoo por operación bloquearía el gráfico. Si la
+    # fecha no está en caché, el cambio de hoy solo desplaza un poco la marca.
+    cambio, _origen, _fecha = tasa(operacion["divisa"], operacion["fecha"], permitirDescarga=False)
+    if cambio is None:
+        cambio = tipo(operacion["divisa"], "EUR")
+    if cambio is None:
+        return None
+    return float(dinero.redondear(dinero.aDecimal(operacion["precio"]) * cambio, 8))
+
+
+def _puntoMasParecidoDelDia(operacion: dict, puntos: list[dict], marcas: list[int], cercano: int) -> int:
+    """Snapshot del día de la operación cuyo precio se parece más al suyo.
+
+    Las operaciones no tienen hora: a mediodía, una compra hecha por la tarde caería
+    antes de un movimiento que ya había ocurrido cuando se ejecutó.
+
+    Args:
+        operacion: Operación con `precioEur`.
+        puntos: Puntos del gráfico, ordenados por `ts`.
+        marcas: El `ts` de cada punto.
+        cercano: Índice del punto más cercano en el tiempo, por si no se puede elegir.
+
+    Returns:
+        El índice elegido en `puntos`.
+    """
+    precio = operacion.get("precioEur")
+    if precio is None:
+        return cercano
+    dia = date.fromtimestamp(operacion["ts"])
+    inicio = bisect.bisect_left(marcas, int(datetime.combine(dia, time.min).timestamp()))
+    fin = bisect.bisect_right(marcas, int(datetime.combine(dia, time.max).timestamp()))
+    delDia = [i for i in range(inicio, fin) if puntos[i]["precio"] is not None]
+    return min(delDia, key=lambda i: abs(puntos[i]["precio"] - precio), default=cercano)
+
+
 def colocarOperaciones(operaciones: list[dict], puntos: list[dict]) -> tuple[list[dict], int]:
-    """Asigna a cada operación el punto más cercano del gráfico.
+    """Asigna a cada operación su punto del gráfico.
+
+    Es el punto más cercano o, si la operación tiene `precioEur` y hay snapshots de
+    ese día, el de precio más parecido.
 
     Args:
         operaciones: Operaciones del tramo pedido.
@@ -280,7 +330,7 @@ def colocarOperaciones(operaciones: list[dict], puntos: list[dict]) -> tuple[lis
         if indice is None or abs(marcas[indice] - operacion["ts"]) > _TOLERANCIA_OPERACION:
             sinPunto += 1
             continue
-        colocadas.append({**operacion, "indice": indice})
+        colocadas.append({**operacion, "indice": _puntoMasParecidoDelDia(operacion, puntos, marcas, indice)})
     return colocadas, sinPunto
 
 
@@ -303,7 +353,9 @@ def datosDelGrafico(assetId: str, rango: str, ahora: float | None = None) -> dic
     Returns:
         `{"rango", "moneda", "segundosHueco", "inicioHistorico", "puntos",
         "operaciones", "operacionesSinPunto"}`. Los importes de `puntos` van en
-        euros, y el precio de cada operación en la divisa en que se hizo.
+        euros, y el precio de cada operación en la divisa en que se hizo. Cada
+        operación lleva además `precioEur`, la altura de su marca en la vista de
+        precio, o None si no se puede convertir.
 
     Raises:
         RangoInvalido: Si `rango` no existe.
@@ -326,7 +378,8 @@ def datosDelGrafico(assetId: str, rango: str, ahora: float | None = None) -> dic
         "filas": [], "operaciones": [], "ventas": [], "transacciones": [], "conversiones": [],
     }
 
-    tramos = construirTramos(datos, esCripto, moneda, tipoActualConMemo())
+    tipo = tipoActualConMemo()
+    tramos = construirTramos(datos, esCripto, moneda, tipo)
     puntos = construirPuntos(_leerSnapshots(conn, assetId, desdeTs, ajustes["cubeta"]), tramos, moneda)
 
     # Se compara por día: la operación de ayer cae dentro de «las últimas 24 h» si
@@ -338,7 +391,11 @@ def datosDelGrafico(assetId: str, rango: str, ahora: float | None = None) -> dic
         + _ventasRegistradas(conn, assetId, moneda)
     )
     enRango = sorted(
-        (op for op in candidatas if op and date.fromtimestamp(op["ts"]) >= diaInicial),
+        (
+            {**op, "precioEur": _precioEnEuros(op, tipo)}
+            for op in candidatas
+            if op and date.fromtimestamp(op["ts"]) >= diaInicial
+        ),
         key=lambda op: op["ts"],
     )
     operaciones, sinPunto = colocarOperaciones(enRango, puntos)
