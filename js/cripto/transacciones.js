@@ -91,6 +91,23 @@ async function completarComisionesDeTransacciones(rows) {
     }
 }
 
+/**
+ * Pide al servidor que alinee las filas con el total del exchange de sus marcas.
+ *
+ * Se llama al arrancar, antes de calcular posiciones. Un fallo no impide usar la
+ * aplicación: las filas siguen como estaban y se reintenta en el siguiente arranque.
+ *
+ * @returns {Promise<void>}
+ */
+async function corregirComisionesDeExchange() {
+    try {
+        const response = await fetch("/api/wallets/transacciones/corregir-comisiones-exchange", { method: "POST" })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    } catch (error) {
+        console.warn("No se pudieron corregir las comisiones del exchange.", error)
+    }
+}
+
 async function initTransaccionesLogic() {
     transaccionesWalletsCargadas = false
     transaccionesHistoriales.clear()

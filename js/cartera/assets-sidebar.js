@@ -349,6 +349,8 @@ function resetAssetDetailView() {
         detFees.textContent = "0,00 €"
     }
 
+    pintarComisionCripto("")
+
     if (detStatus) {
         detStatus.textContent = "Sin datos de mercado"
     }

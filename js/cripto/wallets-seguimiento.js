@@ -1950,7 +1950,7 @@ function walletsSegComisionDetalle(mov, simbolo) {
     if (mov.comisionMarcada && mov.comisionExchange) {
         return {
             importe: importe(mov.comisionMarcada, mov.simbolo),
-            nota: `Incluye ${importe(mov.comisionExchange, mov.simbolo)} del exchange; se descuenta de la posición`
+            nota: "Total del exchange, con la comisión de red incluida; se descuenta de la posición"
         }
     }
     if (mov.comisionMarcada) {
@@ -2103,8 +2103,9 @@ function walletsSegMontarVentanaMovimiento(
     document.body.appendChild(overlay)
 
     overlay.addEventListener("click", (event) => {
-        // Fuera de la ventana cierra; dentro, solo el botón.
-        if (event.target === overlay || event.target.closest(".walletsSegMovCerrarBtn")) {
+        // Solo cierra el botón (o Escape): la ventana tiene campos y pinchar fuera
+        // sin querer perdía lo escrito.
+        if (event.target.closest(".walletsSegMovCerrarBtn")) {
             cerrarMovimientoSeguimiento()
             return
         }
@@ -2164,6 +2165,7 @@ function abrirMovimientoSeguimiento(mov) {
             olvidarContraparteMovimiento(mov, wallet)
         }
     })
+    walletsSegEnlazarCasillaOtra(mov, wallet)
 }
 
 function walletsSegTeclaMovimiento(event) {
@@ -2225,10 +2227,39 @@ function walletsSegComisionPropuesta(mov, wallet) {
     return !mov.contrato && (wallet.red !== "btc" || walletsSegOrigenEsPropio(mov)) ? mov.comisionTx || "" : ""
 }
 
-// Por defecto se marcan las dos; una transacción ya marcada conserva lo que se
-// eligió, para que al cambiar su comisión no se dé de alta la dirección del exchange.
+// Refleja lo guardado: marcada solo si la dirección ya es tuya. Darla de alta afecta a
+// todos sus movimientos y puede ser la de un exchange, así que hay que pedirlo.
 function walletsSegMarcarOtraPorDefecto(mov) {
-    return mov.marcaMovimiento !== "propia" || mov.contraparteMarca === "propia"
+    return mov.contraparteMarca === "propia"
+}
+
+// La comisión ya guardada en la marca, no la del campo: cambiar la casilla no debe
+// aplicar lo que se esté escribiendo en él.
+function walletsSegComisionGuardada(mov, wallet) {
+    const guardada = walletsSegAdmiteComisionExchange(mov, wallet) ? mov.comisionExchange : mov.comisionMarcada
+    return guardada || ""
+}
+
+/**
+ * Guarda el cambio de la casilla en una transacción que ya es «Entre mis wallets».
+ *
+ * Sin esa marca la casilla es solo una elección para el botón que se pulse: no hay
+ * nada que actualizar. Si el servidor rechaza el cambio, vuelve a como estaba.
+ *
+ * @param {object} mov Movimiento abierto en la ventana.
+ * @param {object|undefined} wallet Wallet del movimiento.
+ * @returns {void}
+ */
+function walletsSegEnlazarCasillaOtra(mov, wallet) {
+    if (!wallet || mov.marcaMovimiento !== "propia") return
+    const casilla = document.querySelector("#walletsSegMovOverlay .walletsSegMarcaMovOtra")
+    casilla?.addEventListener("change", async () => {
+        casilla.disabled = true
+        const valorComision = walletsSegComisionGuardada(mov, wallet)
+        if (await marcarMovimientoSeguimiento(mov, wallet, true, { valorComision })) return
+        casilla.checked = !casilla.checked
+        casilla.disabled = false
+    })
 }
 
 // Las direcciones que «Entre mis wallets» da por propias: la de la wallet siempre,
@@ -2260,7 +2291,8 @@ function walletsSegComisionRedQueCuenta(mov, wallet, origenPropio = walletsSegOr
     return !mov.contrato && (wallet.red !== "btc" || origenPropio) ? mov.comisionTx || "" : ""
 }
 
-// Lo que se envía al marcar: el servidor suma las dos partes, con decimales exactos.
+// Lo que se envía al marcar. Si hay total del exchange, el servidor usa ese; la de red
+// solo queda si el campo se vacía.
 function walletsSegComisionesDeMarca(mov, wallet, valorCampo, marcarOtra) {
     if (!walletsSegAdmiteComisionExchange(mov, wallet)) return { comision: valorCampo, comisionExchange: "" }
     const origenPropio = walletsSegOrigenEsPropio(mov) || (marcarOtra && Boolean(mov.contraparte))
@@ -2281,8 +2313,7 @@ function aplicarComisionExchange(mov, wallet) {
         showToast("Indica la comisión del exchange: tiene que ser mayor que cero", { type: "error" })
         return
     }
-    // Un origen ya propio sigue siéndolo: una dirección de exchange también puede serlo.
-    marcarMovimientoSeguimiento(mov, wallet, true, { marcarOtra: walletsSegOrigenEsPropio(mov) })
+    marcarMovimientoSeguimiento(mov, wallet, true)
 }
 
 function walletsSegComisionExchangeBotonHtml(fija) {
@@ -2303,19 +2334,44 @@ function editarComisionExchange() {
     campo.select()
 }
 
+// Resta exacta de dos decimales en texto: con Number, los 18 decimales de ETH se redondean.
+// Vacía si alguno no es un decimal o si la parte es mayor que el total.
+function walletsSegRestoDecimal(total, parte) {
+    const patron = /^\d+(\.\d+)?$/
+    if (!patron.test(total) || !patron.test(parte)) return ""
+    const decimalesDe = (valor) => valor.split(".")[1]?.length || 0
+    const decimales = Math.max(decimalesDe(total), decimalesDe(parte))
+    const escalado = (valor) => {
+        const [entero, fraccion = ""] = valor.split(".")
+        return BigInt(entero + fraccion.padEnd(decimales, "0"))
+    }
+    const resto = escalado(total) - escalado(parte)
+    if (resto < 0n) return ""
+    const digitos = resto.toString().padStart(decimales + 1, "0")
+    return decimales ? `${digitos.slice(0, -decimales)}.${digitos.slice(-decimales)}` : digitos
+}
+
+function walletsSegComisionRepartoHtml(mov, simbolo, redQueCuenta) {
+    const resto = redQueCuenta && mov.comisionExchange ? walletsSegRestoDecimal(mov.comisionExchange, redQueCuenta) : ""
+    if (!resto) return ""
+    const importe = (valor) => escapeHtml(`${walletsSegCantidadExacta(valor)} ${simbolo}`.trim())
+    return `<p class="walletsSegDato walletsSegComisionReparto">Resto del exchange: <strong>${importe(resto)}</strong> · Total restado: <strong>${importe(mov.comisionExchange)}</strong></p>`
+}
+
 function walletsSegComisionRedDelApartadoHtml(mov, wallet) {
     if (!mov.comisionTx) return ""
     const simbolo = walletsSegRed(wallet)?.simbolo || ""
     const cuenta = walletsSegComisionRedQueCuenta(mov, wallet)
-    const nota = cuenta ? "Fija; se suma a la del exchange" : "La pagó el remitente; no se suma"
-    return `<p class="walletsSegDato walletsSegComisionRedFija">Comisión de red: <strong>${escapeHtml(`${walletsSegCantidadExacta(mov.comisionTx)} ${simbolo}`.trim())}</strong> · ${nota}</p>`
+    const nota = cuenta ? "Va dentro del total del exchange" : "La pagó el remitente; no se suma"
+    return `<p class="walletsSegDato walletsSegComisionRedFija">Comisión de red: <strong>${escapeHtml(`${walletsSegCantidadExacta(mov.comisionTx)} ${simbolo}`.trim())}</strong> · ${nota}</p>
+            ${walletsSegComisionRepartoHtml(mov, simbolo, cuenta)}`
 }
 
 /**
  * Pinta el apartado para indicar lo que cobró el exchange por una retirada.
  *
- * La comisión de la red se enseña aparte y no se edita; la del exchange se suma a
- * ella en el total. El campo es el mismo que leen los botones de la clasificación:
+ * La comisión de la red se enseña aparte y no se edita; va dentro del total que
+ * indica el exchange. El campo es el mismo que leen los botones de la clasificación:
  * solo hay uno en la ventana. Una comisión ya aplicada queda en solo lectura hasta
  * pulsar «Editar»; se mantiene el campo para que esos botones sigan leyendo su valor.
  *
@@ -2329,7 +2385,7 @@ function walletsSegComisionExchangeHtml(mov, wallet) {
     return `
         <section class="walletsSegContraparte walletsSegComisionExchange" aria-labelledby="walletsSegComisionExchangeTitulo">
             <h4 id="walletsSegComisionExchangeTitulo" class="walletsSegContraTitulo">Comisión del exchange</h4>
-            <p class="walletsSegDato">Si retiraste de un exchange, indica lo que te cobró aparte de la comisión de red. Se suma a ella en el total y se resta de la posición. La transacción queda como «Entre mis wallets».</p>
+            <p class="walletsSegDato">Si retiraste de un exchange, indica la comisión que te muestra: lo retirado menos lo enviado. La aplicación la reparte entre la comisión de red y el resto del exchange, y resta de la posición ese total. La transacción queda como «Entre mis wallets».</p>
             ${walletsSegComisionRedDelApartadoHtml(mov, wallet)}
             <div class="walletsSegComisionExchangeFila">
                 ${walletsSegComisionCampoHtml(mov, "Comisión del exchange", "Ej: 0,000018", mov.comisionExchange || "", fija)}
@@ -2357,7 +2413,7 @@ function walletsSegMarcaMovimientoHtml(mov, wallet) {
             ? `<label class="walletsSegMarcaMovDirecciones">
                 <input type="checkbox" class="walletsSegMarcaMovOtra"${walletsSegMarcarOtraPorDefecto(mov) ? " checked" : ""}>
                 <span>Marcar también la otra dirección como mía</span>
-                <span class="walletsSegDato">Desmárcala si pertenece a un exchange. Si queda como tuya, todos sus movimientos, pasados y futuros, contarán como «entre wallets» sin verificación y asumirás su comisión de red.</span>
+                <span class="walletsSegDato">Márcala solo si es tuya, no si pertenece a un exchange. Si queda como tuya, todos sus movimientos, pasados y futuros, contarán como «entre wallets» sin verificación y asumirás su comisión de red.</span>
             </label>`
             : ""
     return `
@@ -2417,10 +2473,10 @@ function walletsSegAplicarMarca(mov, red, marca) {
     walletsSegConMarca(mov, marca)
 }
 
-async function marcarMovimientoSeguimiento(mov, wallet, propia, { marcarOtra: forzarOtra } = {}) {
-    const valorCampo = document.querySelector("#walletsSegMovOverlay .walletsSegMarcaMovComision")?.value || ""
-    const marcarOtra =
-        forzarOtra ?? document.querySelector("#walletsSegMovOverlay .walletsSegMarcaMovOtra")?.checked ?? true
+async function marcarMovimientoSeguimiento(mov, wallet, propia, { valorComision } = {}) {
+    const valorCampo =
+        valorComision ?? (document.querySelector("#walletsSegMovOverlay .walletsSegMarcaMovComision")?.value || "")
+    const marcarOtra = document.querySelector("#walletsSegMovOverlay .walletsSegMarcaMovOtra")?.checked ?? true
     let datos
     try {
         datos = await walletsPost(`/api/wallets/${encodeURIComponent(wallet.id)}/movimientos/marcar`, {
@@ -2435,26 +2491,27 @@ async function marcarMovimientoSeguimiento(mov, wallet, propia, { marcarOtra: fo
         })
     } catch (error) {
         showToast(error.message || "No se pudo marcar la transacción", { type: "error" })
-        return
+        return false
     }
-    walletsSegAplicarLibretaDeMarca(wallet.red, datos)
+    walletsSegAplicarLibretaDeMarca(wallet.red, datos, mov)
     walletsSegAplicarMarca(mov, wallet.red, datos.marca)
     await walletsSegRepintarTrasMarcar()
     abrirMovimientoSeguimiento(mov)
     if (datos.avisoReetiquetado) {
         showToast(datos.avisoReetiquetado, { type: "error", duration: 8000 })
-        return
+        return true
     }
     showToast(walletsSegTextoMarcada(datos), { type: "success" })
+    return true
 }
 
 // La marca puede haber dado de alta o sacado direcciones de la libreta.
-function walletsSegAplicarLibretaDeMarca(red, datos) {
+function walletsSegAplicarLibretaDeMarca(red, datos, movAbierto) {
     if (!datos.efectivas) return
     walletsEstado.direcciones = datos.direcciones || []
     walletsEstado.direccionesEnlazadas = datos.direccionesEnlazadas || []
     for (const [direccion, efectiva] of Object.entries(datos.efectivas))
-        walletsSegAplicarLibreta(red, direccion, efectiva)
+        walletsSegAplicarLibreta(red, direccion, efectiva, movAbierto)
 }
 
 // La ventana también se abre desde Transacciones: cada página repinta solo si está
@@ -2482,26 +2539,35 @@ function walletsSegContraTitulo(mov) {
 
 async function marcarContraparteMovimiento(mov, wallet, propia) {
     const apodo = document.querySelector("#walletsSegMovOverlay .walletsSegContraApodoInput")?.value || ""
-    const datos = await guardarDireccionLibreta("/api/wallets/direcciones/guardar", {
-        red: wallet.red,
-        direccion: mov.contraparte,
-        apodo,
-        propia
-    })
+    const datos = await guardarDireccionLibreta(
+        "/api/wallets/direcciones/guardar",
+        {
+            red: wallet.red,
+            direccion: mov.contraparte,
+            apodo,
+            propia
+        },
+        mov
+    )
     if (datos) abrirMovimientoSeguimiento(mov)
 }
 
 async function olvidarContraparteMovimiento(mov, wallet) {
-    const datos = await guardarDireccionLibreta("/api/wallets/direcciones/olvidar", {
-        red: wallet.red,
-        direccion: mov.contraparteClave || mov.contraparte
-    })
+    const datos = await guardarDireccionLibreta(
+        "/api/wallets/direcciones/olvidar",
+        {
+            red: wallet.red,
+            direccion: mov.contraparteClave || mov.contraparte
+        },
+        mov
+    )
     if (datos) abrirMovimientoSeguimiento(mov)
 }
 
 // Repinta sin volver a leer la red: aplica a los movimientos ya leídos de esa
-// dirección lo mismo que wallets_libreta.anotar() en el servidor.
-function walletsSegAplicarLibreta(red, direccion, efectiva) {
+// dirección lo mismo que wallets_libreta.anotar() en el servidor. `movAbierto` es el de
+// la ventana: desde Transacciones puede venir de un historial que no está en estas listas.
+function walletsSegAplicarLibreta(red, direccion, efectiva, movAbierto) {
     const aplicar = (mov) => {
         if (mov.contraparteClave !== direccion) return
         const sentido = mov.sentido || mov.tipo
@@ -2522,9 +2588,10 @@ function walletsSegAplicarLibreta(red, direccion, efectiva) {
         const wallet = walletsEstado.wallets.find((w) => w.id === walletId)
         if (wallet?.red === red) historial.movimientos.forEach(aplicar)
     }
+    if (movAbierto) aplicar(movAbierto)
 }
 
-async function guardarDireccionLibreta(url, cuerpo) {
+async function guardarDireccionLibreta(url, cuerpo, movAbierto) {
     let datos
     try {
         datos = await walletsPost(url, cuerpo)
@@ -2534,7 +2601,7 @@ async function guardarDireccionLibreta(url, cuerpo) {
     }
     walletsEstado.direcciones = datos.direcciones || []
     walletsEstado.direccionesEnlazadas = datos.direccionesEnlazadas || []
-    walletsSegAplicarLibreta(datos.red, datos.direccion, datos.efectiva)
+    walletsSegAplicarLibreta(datos.red, datos.direccion, datos.efectiva, movAbierto)
     await walletsSegRepintarTrasMarcar()
     renderLibretaSeguimiento()
     if (datos.avisoReetiquetado) {

@@ -675,6 +675,43 @@ class SincronizadorWallets:
                 log.info("[wallets] Transacciones cambiadas al completar comisiones; reintento %d", intento + 1)
         raise ErrorLecturaWallet("Las transacciones cambian continuamente desde otro sitio; vuelve a intentarlo")
 
+    def corregirComisionesDeExchange(self) -> int:
+        """Alinea las filas «entre wallets» con el total del exchange de su marca.
+
+        Las marcas son comunes y las filas son de cada portfolio, y la 5.1.x guardó en
+        ellas la suma de la comisión del exchange y la de red. Hay que comprobarlo en
+        cada portfolio que se abre, también en una copia restaurada. No lee la red.
+
+        Returns:
+            Cuántas filas han cambiado.
+
+        Raises:
+            ErrorLecturaWallet: si Transacciones cambia continuamente desde otro sitio.
+        """
+        comisiones = {(m.hash.lower(), m.assetId): m.comisionExchange
+                      for m in self._repositorio.movimientosMarcados()
+                      if m.propia and m.comisionExchange and m.assetId}
+        if not comisiones:
+            return 0
+        for intento in range(_INTENTOS_ESCRITURA):
+            revision = self._revisionActual()
+            filas, cambiadas = [], 0
+            for fila in self._leerTransacciones().get("rows", []):
+                comision = comisiones.get((str(fila.get("hashTransaccion", "")).lower(), fila.get("assetId", "")))
+                if comision and fila.get("walletTipo") == ENTRE_WALLETS and fila.get("comisionRed") != comision:
+                    fila = {**fila, "comisionRed": comision}
+                    cambiadas += 1
+                filas.append(fila)
+            if not cambiadas:
+                return 0
+            try:
+                self._escribirTransacciones({"rows": filas}, revisionEsperada=revision)
+                log.info("[wallets] Corregida la comisión del exchange de %d filas de Transacciones", cambiadas)
+                return cambiadas
+            except revisiones.ConflictoRevision:
+                log.info("[wallets] Transacciones cambiadas al corregir comisiones; reintento %d", intento + 1)
+        raise ErrorLecturaWallet("Las transacciones cambian continuamente desde otro sitio; vuelve a intentarlo")
+
     def _comisionesDeRecientes(self) -> dict[tuple[str, str], dict]:
         """(hash en minúsculas, activo) → contraparte con `comisionTx`, de los recibos con origen propio."""
         libreta = self._leerLibreta()

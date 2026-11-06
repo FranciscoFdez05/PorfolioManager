@@ -68,7 +68,7 @@ function renderAssetTablePage(asset) {
                             : ""
                     }
                     <div class="assetStatCard assetStatCardPnL">
-                        <span class="assetStatLabel">Ganancia / Pérdida Total</span>
+                        <span class="assetStatLabel">G/P sin comisiones</span>
                         <div class="assetStatValueRow">
                             <span class="assetStatValue" id="assetStatPnL">—</span>
                             <span class="assetStatSub" id="assetStatPnLPct">—</span>

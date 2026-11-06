@@ -1,7 +1,9 @@
 // Detalle de un movimiento: una transacción se marca «entre mis wallets» para que
 // lo comprado en un exchange y pasado a la wallet no cuente dos veces. La comisión
 // se propone donde la de la red sirve (no en Bitcoin ni en tokens).
-import { beforeAll, describe, expect, it } from "vitest"
+import { runInThisContext } from "node:vm"
+
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { cargarScript } from "./cargar.js"
 
@@ -33,9 +35,10 @@ describe("direcciones de la marca", () => {
         expect(window.walletsSegDireccionesDeMarca(MOV, null, true)).toEqual([])
     })
 
-    it("la casilla sale marcada salvo si la marca ya se hizo sin la otra", () => {
+    it("la casilla solo sale marcada si la otra dirección ya es propia", () => {
         const html = (mov) => window.walletsSegMarcaMovimientoHtml(mov, PROPIA_ETH)
-        expect(html(MOV)).toMatch(/walletsSegMarcaMovOtra" checked/)
+        expect(html(MOV)).not.toMatch(/walletsSegMarcaMovOtra" checked/)
+        expect(html({ ...MOV, contraparteMarca: "propia" })).toMatch(/walletsSegMarcaMovOtra" checked/)
         expect(html({ ...MOV, marcaMovimiento: "propia" })).not.toMatch(/walletsSegMarcaMovOtra" checked/)
         expect(html({ ...MOV, marcaMovimiento: "propia", contraparteMarca: "propia" })).toMatch(/walletsSegMarcaMovOtra" checked/)
     })
@@ -136,7 +139,7 @@ describe("comisión del exchange", () => {
     it("la comisión de red se enseña fija y el campo del exchange sale vacío para escribir", () => {
         const conOrigenPropio = html({ contraparteMarca: "propia", comisionTx: "0.00000413" })
         expect(conOrigenPropio).toContain("Comisión de red")
-        expect(conOrigenPropio).toContain("se suma a la del exchange")
+        expect(conOrigenPropio).toContain("Va dentro del total del exchange")
         document.body.innerHTML = conOrigenPropio
         const campo = document.querySelector(".walletsSegMarcaMovComision")
         expect(campo.value).toBe("")
@@ -223,13 +226,33 @@ describe("comisión del exchange", () => {
         expect(window.walletsSegComisionExchangeEsAplicable("abc", mov)).toBe(false)
     })
 
-    it("el detalle enseña el total y cuánto es del exchange", () => {
+    it("el detalle enseña el total del exchange, con la de red dentro", () => {
         const { importe, nota } = window.walletsSegComisionDetalle(
-            { ...RECIBIDA, tipo: "entre_wallet", simbolo: "BTC", comisionTx: "0.00000413", comisionMarcada: "0.00001413", comisionExchange: "0.00001", contraparteMarca: "propia" },
+            { ...RECIBIDA, tipo: "entre_wallet", simbolo: "BTC", comisionTx: "0.00000413", comisionMarcada: "0.00001", comisionExchange: "0.00001", contraparteMarca: "propia" },
             "BTC"
         )
-        expect(importe).toContain("0,00001413")
-        expect(nota).toContain("del exchange")
+        expect(importe).toBe("0,00001 BTC")
+        expect(nota).toContain("Total del exchange")
+    })
+
+    it("reparte el total con decimales exactos: red + resto del exchange", () => {
+        expect(window.walletsSegRestoDecimal("0.00035", "0.000011551996827")).toBe("0.000338448003173")
+        expect(window.walletsSegRestoDecimal("0.00035", "0.000007553883834")).toBe("0.000342446116166")
+        expect(window.walletsSegRestoDecimal("2", "1")).toBe("1")
+    })
+
+    it("no reparte si la de red supera el total o un valor no es un decimal", () => {
+        expect(window.walletsSegRestoDecimal("0.00001", "0.00002")).toBe("")
+        expect(window.walletsSegRestoDecimal("abc", "0.1")).toBe("")
+    })
+
+    it("el apartado enseña el resto y el total restado", () => {
+        const apartado = window.walletsSegComisionExchangeHtml(
+            { ...RECIBIDA, simbolo: "ETH", propia: "0xmia", contraparte: "0xotra", contraparteMarca: "propia", comisionTx: "0.000011551996827", comisionMarcada: "0.00035", comisionExchange: "0.00035" },
+            PROPIA_ETH
+        )
+        expect(apartado).toContain("Resto del exchange: <strong>0,000338448003173")
+        expect(apartado).toContain("Total restado: <strong>0,00035")
     })
 
     it("en un recibo solo hay un campo de comisión, el de este apartado", () => {
@@ -366,5 +389,136 @@ describe("entradas por verificar", () => {
         const texto = window.walletsResumenSincronizacion({ anadidas: 0, pendientes: 2 })
 
         expect(texto).toContain("2 entradas por verificar")
+    })
+})
+
+describe("casilla de la otra dirección", () => {
+    const WALLET = { id: "w-sol", red: "sol", propia: true }
+    const MOV_SOL = {
+        hash: "tx1",
+        simbolo: "SOL",
+        tipo: "recibida",
+        sentido: "recibida",
+        comision: "",
+        comisionLeida: "",
+        comisionTx: "0.00001",
+        propia: "Mia1",
+        contraparte: "Otra1",
+        contraparteClave: "Otra1",
+        contraparteMarca: ""
+    }
+    const MARCA = { propia: true, comision: "0.00001", comisionExchange: "0.0064" }
+    const respuesta = (efectiva) => ({ marca: MARCA, efectivas: { Otra1: efectiva } })
+    const casilla = () => document.querySelector("#walletsSegMovOverlay .walletsSegMarcaMovOtra")
+    const cuerpoEnviado = () => window.walletsPost.mock.calls[0][1]
+    // Un movimiento fuera de los recientes, como los que Transacciones lee del historial.
+    const abrir = (extra = {}) => {
+        const mov = { ...MOV_SOL, ...extra }
+        window.abrirMovimientoSeguimiento({ ...mov, walletId: WALLET.id })
+    }
+    const movAbierto = (extra = {}) => ({ ...MOV_SOL, walletId: WALLET.id, ...extra })
+
+    beforeEach(() => {
+        // Es un `let` del script: no cuelga de window.
+        runInThisContext(`walletsEstado.wallets = ${JSON.stringify([WALLET])}`)
+        window.showToast = vi.fn()
+        window.walletsPost = vi.fn()
+    })
+
+    afterEach(() => {
+        window.cerrarMovimientoSeguimiento()
+    })
+
+    it("«Aplicar comisión» respeta la casilla marcada", async () => {
+        const mov = movAbierto()
+        window.walletsPost.mockResolvedValue(respuesta({ apodo: "", marca: "propia", enlazada: false }))
+        window.abrirMovimientoSeguimiento(mov)
+        casilla().checked = true
+        document.querySelector(".walletsSegMarcaMovComision").value = "0.0064"
+        document.querySelector(".walletsSegComisionExchangeBtn").click()
+        await vi.waitFor(() => expect(casilla().checked).toBe(true))
+
+        expect(cuerpoEnviado().direcciones).toEqual(["Mia1", "Otra1"])
+        expect(mov.contraparteMarca).toBe("propia")
+    })
+
+    it("«Aplicar comisión» con la casilla sin marcar no da de alta la otra dirección", async () => {
+        window.walletsPost.mockResolvedValue({ marca: MARCA })
+        abrir()
+        document.querySelector(".walletsSegMarcaMovComision").value = "0.0064"
+        document.querySelector(".walletsSegComisionExchangeBtn").click()
+        await vi.waitFor(() => expect(window.walletsPost).toHaveBeenCalled())
+
+        expect(cuerpoEnviado().direcciones).toEqual(["Mia1"])
+    })
+
+    it("en una transacción ya marcada, cambiarla se guarda sin pulsar nada más", async () => {
+        const mov = movAbierto({ marcaMovimiento: "propia", comisionExchange: "0.0064", comisionMarcada: "0.0064" })
+        window.walletsPost.mockResolvedValue(respuesta({ apodo: "", marca: "propia", enlazada: false }))
+        window.abrirMovimientoSeguimiento(mov)
+        document.querySelector(".walletsSegMarcaMovComision").value = "9"
+        casilla().click()
+        await vi.waitFor(() => expect(mov.contraparteMarca).toBe("propia"))
+
+        expect(cuerpoEnviado().direcciones).toEqual(["Mia1", "Otra1"])
+        expect(cuerpoEnviado().comisionExchange).toBe("0.0064")
+        await vi.waitFor(() => expect(casilla().checked).toBe(true))
+    })
+
+    it("sin marca todavía, cambiarla no guarda nada", () => {
+        abrir()
+        casilla().click()
+
+        expect(window.walletsPost).not.toHaveBeenCalled()
+    })
+
+    it("si el servidor rechaza el cambio, vuelve a como estaba", async () => {
+        window.walletsPost.mockRejectedValue(new Error("fallo"))
+        window.abrirMovimientoSeguimiento(movAbierto({ marcaMovimiento: "propia", comisionExchange: "0.0064" }))
+        const elemento = casilla()
+        elemento.click()
+        await vi.waitFor(() => expect(elemento.disabled).toBe(false))
+
+        expect(elemento.checked).toBe(false)
+    })
+
+    it("«Es mía» actualiza también el movimiento abierto fuera de los recientes", async () => {
+        const mov = movAbierto()
+        window.walletsPost.mockResolvedValue({ red: "sol", direccion: "Otra1", efectiva: { apodo: "", marca: "propia", enlazada: false } })
+        window.abrirMovimientoSeguimiento(mov)
+        document.querySelector('.walletsSegContraMarcarBtn[data-propia="true"]').click()
+        await vi.waitFor(() => expect(casilla().checked).toBe(true))
+
+        expect(mov.contraparteMarca).toBe("propia")
+    })
+})
+
+describe("cierre de la ventana de detalle", () => {
+    const abrir = () => {
+        window.walletsSegMontarVentanaMovimiento(
+            { titulo: "Detalle", tipo: "recibida", resumenHtml: "", datosHtml: "", seccionesHtml: "" },
+            () => {}
+        )
+        return document.getElementById("walletsSegMovOverlay")
+    }
+
+    it("pinchar fuera de la ventana no la cierra", () => {
+        abrir().click()
+
+        expect(document.getElementById("walletsSegMovOverlay")).not.toBeNull()
+        window.cerrarMovimientoSeguimiento()
+    })
+
+    it("el botón Cerrar la cierra", () => {
+        abrir().querySelector(".walletsSegMovCerrarBtn").click()
+
+        expect(document.getElementById("walletsSegMovOverlay")).toBeNull()
+    })
+
+    it("Escape la cierra", () => {
+        abrir()
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
+
+        expect(document.getElementById("walletsSegMovOverlay")).toBeNull()
     })
 })

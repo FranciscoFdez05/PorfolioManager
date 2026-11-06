@@ -122,6 +122,14 @@ describe("comisión de las filas importadas", () => {
         vi.restoreAllMocks()
     })
 
+    it("corregir las comisiones del exchange avisa de un fallo y no rompe el arranque", async () => {
+        const aviso = vi.spyOn(console, "warn").mockImplementation(() => {})
+        vi.spyOn(window, "fetch").mockRejectedValueOnce(new Error("sin red"))
+        await expect(window.corregirComisionesDeExchange()).resolves.toBeUndefined()
+        expect(aviso).toHaveBeenCalled()
+        vi.restoreAllMocks()
+    })
+
     it("un fallo no impide ver la tabla", async () => {
         const aviso = vi.spyOn(console, "warn").mockImplementation(() => {})
         vi.spyOn(window, "fetch").mockRejectedValueOnce(new Error("sin red"))

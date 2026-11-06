@@ -670,8 +670,10 @@ def _comisionDePeticion(valor, campo: str) -> str:
 def _comisionesDePeticion(datos: dict) -> tuple[str, str]:
     """(total a descontar, parte del exchange) de una marca «entre wallets».
 
-    `comision` es lo que ya se descontaba y `comisionExchange` se le suma. Una
-    comisión de exchange a cero es lo mismo que no indicarla.
+    `comisionExchange` es el total que indica el exchange (lo retirado menos lo
+    enviado). Ya cubre el gas, que paga él desde su dirección, así que la comisión
+    de red va dentro de ese total y no se le añade: sumarla descontaría el gas dos
+    veces. Una comisión de exchange a cero es lo mismo que no indicarla.
 
     Args:
         datos: Cuerpo de la petición.
@@ -686,7 +688,7 @@ def _comisionesDePeticion(datos: dict) -> tuple[str, str]:
     exchange = _comisionDePeticion(datos.get("comisionExchange"), "comisionExchange")
     if not exchange or Decimal(exchange) == 0:
         return comision, ""
-    return textoDecimal(Decimal(comision or "0") + Decimal(exchange)), exchange
+    return exchange, exchange
 
 
 def _marcaDePeticion(datos: dict) -> tuple[str, str, str, bool | None]:
@@ -816,7 +818,7 @@ def marcarMovimiento(walletId):
     Cuerpo: `hash`, `contrato` ("" en la moneda de la red), `simbolo`, `sentido`
     (`enviada` o `recibida`, lo que leyó la red), `propia` (true, false o null
     para quitar la marca), `comision` (la que se descuenta), `comisionExchange`
-    (lo cobrado por el exchange, que se suma a `comision`), `comisionLeida` (la
+    (el total del exchange, con la red incluida: sustituye a `comision`), `comisionLeida` (la
     de la red, a la que vuelve la fila sin esa marca) y `direcciones` (las que
     pasan a ser propias con `propia` true; se deshace al cambiar o quitar la marca).
     Una dirección propia afecta a todos sus movimientos, no solo a este: lo ya
@@ -933,6 +935,19 @@ def completarComisionesTransacciones():
     except (WalletError, ErrorLecturaWallet) as error:
         raise _errorDeDominio(error) from error
     return jsonify({"ok": True, "completadas": completadas})
+
+
+@walletsBp.route("/api/wallets/transacciones/corregir-comisiones-exchange", methods=["POST"])
+def corregirComisionesExchangeTransacciones():
+    """Alinea las filas del portfolio activo con la comisión del exchange de sus marcas.
+
+    Lo pide la aplicación al arrancar, también tras cambiar de portfolio. No lee la red.
+    """
+    try:
+        corregidas = SincronizadorWallets(_repositorio()).corregirComisionesDeExchange()
+    except (WalletError, ErrorLecturaWallet) as error:
+        raise _errorDeDominio(error) from error
+    return jsonify({"ok": True, "corregidas": corregidas})
 
 
 def _tokenDePeticion(datos: dict) -> tuple[str, str]:

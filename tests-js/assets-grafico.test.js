@@ -76,6 +76,59 @@ describe("línea", () => {
     })
 })
 
+describe("eje horizontal", () => {
+    it("abarca solo los puntos con valor en esa vista", () => {
+        const puntos = [punto(100, 200, 100, null), punto(200, 300, 150, 25), punto(300, 300, 150, 26)]
+        expect(window.assetGraficoSeries(datos(puntos), "precio", "eur").limitesX).toEqual({ min: 200, max: 300 })
+        expect(window.assetGraficoSeries(datos(puntos), "posicion", "eur").limitesX).toEqual({ min: 100, max: 300 })
+    })
+
+    it("un punto suelto antes del trazo no estira el eje ni cuenta como extremo", () => {
+        const puntos = [
+            punto(100, 1, 1, 90),
+            punto(200, 1, 1, null),
+            punto(300, 1, 1, 20),
+            punto(400, 1, 1, 25)
+        ]
+        const series = window.assetGraficoSeries(datos(puntos), "precio", "eur")
+        expect(series.limitesX).toEqual({ min: 300, max: 400 })
+        expect(series.extremos.maximo.y).toBe(25)
+    })
+
+    it("el % de precio tampoco parte de un punto suelto", () => {
+        const puntos = [
+            punto(100, 1, 1, 90),
+            punto(200, 1, 1, null),
+            punto(300, 1, 1, 20),
+            punto(400, 1, 1, 25)
+        ]
+        const { linea } = window.assetGraficoSeries(datos(puntos), "precio", "pct")
+        expect(linea.map((p) => p.y)).toEqual([350, null, 0, 25])
+    })
+
+    it("con un único punto suelto ese es el inicio", () => {
+        const puntos = [punto(100, 1, 1, null), punto(200, 1, 1, 20), punto(300, 1, 1, null)]
+        expect(window.assetGraficoSeries(datos(puntos), "precio", "eur").limitesX).toEqual({ min: 200, max: 200 })
+    })
+
+    it("no tiene límites si no hay nada que pintar", () => {
+        const puntos = [punto(100, 200, 100, null)]
+        expect(window.assetGraficoSeries(datos(puntos), "precio", "eur").limitesX).toBeNull()
+    })
+
+    it("escribe la hora, el día o el mes según el tramo visible", () => {
+        const ts = Date.UTC(2026, 9, 15, 12) / 1000
+        const dia = 86400
+        const conHora = window.assetGraficoFormatearEje(ts, dia)
+        const conDia = window.assetGraficoFormatearEje(ts, 30 * dia)
+        const conMes = window.assetGraficoFormatearEje(ts, 365 * dia)
+        expect(conHora).toMatch(/\d{2}:\d{2}/)
+        expect(conDia).toContain("15")
+        expect(conMes).toContain("26")
+        expect(conMes).not.toContain("15")
+    })
+})
+
 describe("puntos de compra y venta", () => {
     const serie = [punto(100, 200, 100, 20), punto(200, 300, 150, 25)]
 

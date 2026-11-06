@@ -35,7 +35,9 @@ RANGOS = {
     "1D": {"segundos": _DIA, "cubeta": 300, "hueco": 6 * _HORA},
     "7D": {"segundos": 7 * _DIA, "cubeta": 1800, "hueco": _DIA},
     "30D": {"segundos": 30 * _DIA, "cubeta": 4 * _HORA, "hueco": 2 * _DIA},
-    "1A": {"segundos": 365 * _DIA, "cubeta": _DIA, "hueco": 7 * _DIA},
+    # Sin `segundos` fijos: su inicio depende de la fecha (ver `_inicioDelRango`).
+    "YTD": {"segundos": None, "cubeta": _DIA, "hueco": 7 * _DIA},
+    "1A":{"segundos": 365 * _DIA, "cubeta": _DIA, "hueco": 7 * _DIA},
     "TODO": {"segundos": None, "cubeta": _DIA, "hueco": 7 * _DIA},
 }
 
@@ -306,6 +308,57 @@ def _puntoMasParecidoDelDia(operacion: dict, puntos: list[dict], marcas: list[in
     return min(delDia, key=lambda i: abs(puntos[i]["precio"] - precio), default=cercano)
 
 
+def _leerSnapshotsDelDia(conn, assetId: str, dia: date, desdeTs: int) -> list:
+    inicio = max(desdeTs, int(datetime.combine(dia, time.min).timestamp()))
+    fin = int(datetime.combine(dia, time.max).timestamp())
+    return conn.execute(
+        "SELECT ts, price_eur, cost_eur FROM asset_snapshots "
+        "WHERE asset_id = ? AND ts BETWEEN ? AND ? AND price_eur > 0 ORDER BY ts",
+        (assetId, inicio, fin),
+    ).fetchall()
+
+
+def puntosDeOperaciones(
+    conn, assetId: str, operaciones: list[dict], desdeTs: int, tramos: list[_Tramo], moneda: str
+) -> list[dict]:
+    """Snapshot del día de cada operación con el precio más parecido al suyo.
+
+    Cada cubeta conserva solo su último snapshot, así que la línea casi nunca pasa
+    por el precio al que se operó y la marca quedaría flotando. Añadir estos puntos
+    a la línea la hace pasar por ese momento.
+
+    Args:
+        conn: Conexión a la base del portfolio.
+        assetId: Id del activo.
+        operaciones: Operaciones del rango, con `precioEur`.
+        desdeTs: Inicio del rango; un día a medias no aporta nada anterior.
+        tramos: Resultado de `construirTramos`.
+        moneda: Divisa del activo.
+
+    Returns:
+        Los puntos, sin repetir, en el mismo formato que `construirPuntos`.
+    """
+    porDia = {}
+    elegidos = {}
+    for operacion in operaciones:
+        if operacion["precioEur"] is None:
+            continue
+        dia = date.fromtimestamp(operacion["ts"])
+        if dia not in porDia:
+            filas = _leerSnapshotsDelDia(conn, assetId, dia, desdeTs)
+            porDia[dia] = [p for p in construirPuntos(filas, tramos, moneda) if p["precio"] is not None]
+        mejor = min(porDia[dia], key=lambda p: abs(p["precio"] - operacion["precioEur"]), default=None)
+        if mejor is not None:
+            elegidos[mejor["ts"]] = mejor
+    return list(elegidos.values())
+
+
+def _inicioDelRango(rango: str, ajustes: dict, ahora: float) -> int:
+    if rango == "YTD":
+        return int(datetime(datetime.fromtimestamp(ahora).year, 1, 1).timestamp())
+    return int(ahora - ajustes["segundos"]) if ajustes["segundos"] else 0
+
+
 def colocarOperaciones(operaciones: list[dict], puntos: list[dict]) -> tuple[list[dict], int]:
     """Asigna a cada operación su punto del gráfico.
 
@@ -371,7 +424,7 @@ def datosDelGrafico(assetId: str, rango: str, ahora: float | None = None) -> dic
         raise ActivoNoEncontrado(assetId)
 
     ahora = datetime.now().timestamp() if ahora is None else ahora
-    desdeTs = int(ahora - ajustes["segundos"]) if ajustes["segundos"] else 0
+    desdeTs = _inicioDelRango(rango, ajustes, ahora)
     esCripto = str(activo["type"] or "").strip().lower() == "cripto"
     moneda = str(activo["currency"] or "EUR").strip().upper() or "EUR"
     datos = rendimiento_activo.cargarPosiciones(conn).get(assetId) or {
@@ -398,6 +451,8 @@ def datosDelGrafico(assetId: str, rango: str, ahora: float | None = None) -> dic
         ),
         key=lambda op: op["ts"],
     )
+    extras = puntosDeOperaciones(conn, assetId, enRango, desdeTs, tramos, moneda)
+    puntos = sorted({punto["ts"]: punto for punto in [*puntos, *extras]}.values(), key=lambda punto: punto["ts"])
     operaciones, sinPunto = colocarOperaciones(enRango, puntos)
 
     return {

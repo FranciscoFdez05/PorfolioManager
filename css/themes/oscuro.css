@@ -1011,7 +1011,8 @@ html[data-theme="black"] .detailSub,
 html[data-theme="black"] .detailPrice,
 html[data-theme="black"] .detailMeta,
 html[data-theme="black"] .detailStatLabel,
-html[data-theme="black"] .detailStatValue {
+html[data-theme="black"] .detailStatValue,
+html[data-theme="black"] .detailStatSub {
     color: var(--text-subtle);
 }
 

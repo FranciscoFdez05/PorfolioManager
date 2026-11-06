@@ -1164,14 +1164,58 @@ def _walletPropia(client, cabeceras):
     return _enlazar(client, cabeceras, tipo="direccion", valor=_BECH32).get_json()["wallet"]["id"]
 
 
-def testLaComisionDelExchangeSeSumaALaDeRedConDecimalesExactos(cliente):
+def testElTotalDelExchangeLlevaDentroLaComisionDeRed(cliente):
     client, cabeceras, _ = cliente
     walletId = _walletPropia(client, cabeceras)
 
     marca = _marcarMovimiento(client, cabeceras, walletId, comision="0.00000413",
                               comisionExchange="0,00001").get_json()["marca"]
 
-    assert (marca["comision"], marca["comisionExchange"]) == ("0.00001413", "0.00001")
+    assert (marca["comision"], marca["comisionExchange"]) == ("0.00001", "0.00001")
+
+
+def testLaPosicionCuadraConLoRecibidoTrasUnRetiroDeExchange(cliente):
+    """Caso real: se compra 0,04972755, el exchange cobra 0,00035 y llegan 0,04937755."""
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+    filas = {"rows": [{"id": "manual", "assetId": "btc", "assetName": "Bitcoin", "fechaOperacion": "05-11-2026",
+                       "total": "0.04937755", "comisionRed": "", "walletTipo": "recibida", "walletDesde": "Exchange",
+                       "walletDestino": "Fria", "hashTransaccion": "ABC123", "nota": ""}]}
+    assert client.post("/api/transacciones", json=filas, headers=cabeceras).status_code == 200
+
+    respuesta = _marcarMovimiento(client, cabeceras, walletId, comision="0.000011551996827", comisionExchange="0.00035")
+
+    assert respuesta.status_code == 200
+    comisionRed = client.get("/api/transacciones").get_json()["rows"][0]["comisionRed"]
+    assert Decimal("0.04972755") - Decimal(comisionRed) == Decimal("0.04937755")
+
+
+def testAlArrancarSeCorrigeLaFilaConLaSumaAntiguaSinPasosManuales(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+    url = "/api/wallets/transacciones/corregir-comisiones-exchange"
+    assert _marcarMovimiento(client, cabeceras, walletId, comisionExchange="0.00035").status_code == 200
+    filas = {"rows": [{"id": "wallet-eth", "assetId": "btc", "assetName": "Bitcoin", "fechaOperacion": "05-11-2026",
+                       "total": "0.04937755", "comisionRed": "0.000361551996827", "walletTipo": "entre_wallet",
+                       "walletDesde": "Exchange", "walletDestino": "Fria", "hashTransaccion": "ABC123", "nota": ""}]}
+    assert client.post("/api/transacciones", json=filas, headers=cabeceras).status_code == 200
+
+    assert client.post(url).status_code == 403
+    assert client.post(url, headers=cabeceras).get_json() == {"ok": True, "corregidas": 1}
+    assert client.get("/api/transacciones").get_json()["rows"][0]["comisionRed"] == "0.00035"
+    assert client.post(url, headers=cabeceras).get_json() == {"ok": True, "corregidas": 0}
+
+
+def testVaciarLaComisionDelExchangeVuelveALaDeRed(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+    assert _marcarMovimiento(client, cabeceras, walletId, comision="0.00000413",
+                             comisionExchange="0.00001").status_code == 200
+
+    marca = _marcarMovimiento(client, cabeceras, walletId, comision="0.00000413",
+                              comisionExchange="").get_json()["marca"]
+
+    assert (marca["comision"], marca["comisionExchange"]) == ("0.00000413", "")
 
 
 def testSinComisionDelExchangeQuedaSoloLaDeRed(cliente):

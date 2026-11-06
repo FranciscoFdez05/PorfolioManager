@@ -796,7 +796,8 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
             }
 
             if (operationType.includes("venta")) {
-                consumeAssetLots(lots, participaciones + cryptoCommission)
+                consumeAssetLots(lots, participaciones)
+                consumeAssetLots(lots, cryptoCommission, true)
                 continue
             }
 
@@ -813,6 +814,7 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
             }
 
             lots.push({
+                origen: "spot",
                 remaining: netParticipaciones,
                 priceQuantity: netParticipaciones,
                 unitCost: netParticipaciones > 0 ? totalCost / netParticipaciones : 0,
@@ -838,7 +840,8 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
             }
 
             if (operationType === "venta") {
-                consumeAssetLots(lots, quantity + cryptoCommission)
+                consumeAssetLots(lots, quantity)
+                consumeAssetLots(lots, cryptoCommission, true)
                 continue
             }
 
@@ -875,6 +878,7 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
             const totalCost = (executionPrice > 0 ? executionPrice * quantity : operationTotal) + fiatCommission
 
             lots.push({
+                origen: "operacion",
                 remaining: netParticipaciones,
                 priceQuantity: quantity,
                 unitCost: netParticipaciones > 0 ? totalCost / netParticipaciones : 0,
@@ -906,17 +910,19 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
             }
 
             if (walletType === "entre_wallet") {
-                if (networkFee > 0) consumeAssetLots(lots, networkFee)
+                if (networkFee > 0) consumeAssetLots(lots, networkFee, true)
                 continue
             }
 
             if (walletType === "enviada") {
-                consumeAssetLots(lots, quantity + networkFee)
+                consumeAssetLots(lots, quantity)
+                consumeAssetLots(lots, networkFee, true)
                 continue
             }
 
             if (walletType === "recibida") {
                 lots.push({
+                    origen: "transaccion",
                     remaining: quantity,
                     priceQuantity: quantity,
                     unitCost: 0,
@@ -942,6 +948,7 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
             }
 
             lots.push({
+                origen: "conversion",
                 remaining: quantity,
                 priceQuantity: quantity,
                 unitCost: 0,
@@ -954,7 +961,9 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
     return lots
 }
 
-function consumeAssetLots(lots, quantityToSell) {
+// Con `esComisionCripto`, cada lote apunta lo que costó la cripto que se fue en
+// comisiones: ese dinero ya no está en la posición, pero salió del bolsillo.
+function consumeAssetLots(lots, quantityToSell, esComisionCripto = false) {
     let remainingToSell = quantityToSell
 
     for (const lot of lots) {
@@ -969,6 +978,9 @@ function consumeAssetLots(lots, quantityToSell) {
         }
 
         lot.remaining -= quantityFromLot
+        if (esComisionCripto) {
+            lot.costeComisionCripto = (lot.costeComisionCripto || 0) + quantityFromLot * lot.unitCost
+        }
         if (typeof lot.priceQuantity === "number") {
             lot.priceQuantity = Math.max(0, lot.priceQuantity - quantityFromLot)
         }
@@ -989,6 +1001,12 @@ async function buildOverviewRow(asset) {
     const participacionesSinTransacciones = Math.max(0, rawParticipaciones)
     const participaciones = participacionesSinTransacciones
     const invertidoBruto = remainingLots.reduce((total, lot) => total + lot.remaining * lot.unitCost, 0)
+    const costeComisionesCripto = remainingLots.reduce((total, lot) => total + (lot.costeComisionCripto || 0), 0)
+    // `invertidoBruto` es el coste de lo que sigue en cartera y coincide con el
+    // del servidor. Lo que se enseña suma además la cripto perdida en comisiones,
+    // que sale por «Comisiones», así que el neto y el precio medio no cambian. Sin
+    // posición no suma: un activo ya vaciado debe seguir contando como sin invertir.
+    const invertidoBrutoVisible = invertidoBruto + (participaciones > 0 ? costeComisionesCripto : 0)
     const comisionesCripto = isCrypto
         ? rows.reduce((total, row) => total + (parseLooseNumber(getCryptoRowCommissionCrypto(row)) || 0), 0) +
           completedOperationsImpact.commissionTotal +
@@ -1022,6 +1040,7 @@ async function buildOverviewRow(asset) {
         : rows.reduce((total, row) => total + (parseLooseNumber(row.comisiones || "") || 0), 0) +
           comisionesFiatOperaciones
     const invertidoNeto = invertidoBruto - comisionesFiat
+    const comisionesTotales = comisionesFiat + costeComisionesCripto
     const valorActual = parseLooseNumber(asset.price || "") || 0
     const netoActual = participaciones * valorActual
     const promedioCompra = participaciones > 0 ? invertidoNeto / participaciones : 0
@@ -1037,9 +1056,11 @@ async function buildOverviewRow(asset) {
         valorActual,
         currency: assetCurrency,
         invertidoBruto,
-        comisiones: comisionesFiat,
-        comisionesFiat,
+        invertidoBrutoVisible,
+        comisiones: comisionesTotales,
+        comisionesFiat: comisionesTotales,
         comisionesCripto,
+        costeComisionesCripto,
         invertidoNeto,
         netoActual,
         rendimiento

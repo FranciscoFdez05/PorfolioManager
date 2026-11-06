@@ -270,6 +270,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     applyTopMetricsVisibility()
     applyModulesVisibility()
     applySidebarState(sideWrapper, toggleButton)
+    await corregirComisionesDeExchange()
     // refreshAssetsSidebar ya llama a refreshTopDividendosIntereses por dentro
     // (nueve fetches en paralelo); repetirlo aquí los disparaba dos veces en
     // cada arranque sin que cambiara nada entre medias.

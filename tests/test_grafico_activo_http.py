@@ -199,6 +199,30 @@ class TestRangos:
 
 
 @pytest.mark.usefixtures("tempDb", "sinRed")
+class TestRangoDelAnio:
+    def testEmpiezaElUnoDeEneroDelAnioEnCurso(self):
+        crearActivo([compra(date(2025, 12, 1), 1, 10)])
+        snapshot(marca(date(2025, 12, 31)), 10, 10)
+        snapshot(marca(date(2026, 1, 1), 1), 11, 10)
+        snapshot(marca(HOY), 12, 10)
+
+        datos = grafico("YTD")
+
+        assert datos["rango"] == "YTD"
+        assert [p["ts"] for p in datos["puntos"]] == [marca(date(2026, 1, 1), 1), marca(HOY)]
+
+    def testCuentaLasOperacionesDelAnioYNoLasAnteriores(self):
+        crearActivo([compra(date(2025, 12, 1), 1, 10), compra(HOY, 1, 10)])
+        snapshot(marca(date(2025, 12, 1)), 10, 10)
+        snapshot(marca(HOY), 24, 20)
+
+        datos = grafico("YTD")
+
+        assert [o["fecha"] for o in datos["operaciones"]] == [fecha(HOY)]
+        assert datos["operacionesSinPunto"] == 0
+
+
+@pytest.mark.usefixtures("tempDb", "sinRed")
 class TestOperaciones:
     def testComprasYVentasDeTodasLasFuentes(self):
         compraFicha = HOY - timedelta(days=9)
@@ -247,6 +271,41 @@ class TestOperaciones:
         operacion = datos["operaciones"][0]
         assert operacion["precioEur"] == 100
         assert datos["puntos"][operacion["indice"]]["ts"] == marca(dia, 17)
+
+    def testLaLineaPasaPorElSnapshotDeLaOperacionAunqueSuCubetaNoLoConserve(self):
+        dia = HOY - timedelta(days=2)
+        crearActivo([compra(dia, 1, 100)])
+        snapshot(marca(dia, 9), 130, 100)
+        snapshot(marca(dia, 11), 101, 100)
+        snapshot(marca(dia, 17), 128, 100)
+
+        datos = grafico()
+
+        marcas = [p["ts"] for p in datos["puntos"]]
+        assert marcas == sorted(marcas)
+        assert len(marcas) == len(set(marcas))
+        punto = datos["puntos"][datos["operaciones"][0]["indice"]]
+        assert (punto["ts"], punto["precio"]) == (marca(dia, 11), 101)
+
+    def testSinPrecioEnEurosNoAnadePuntosALaLinea(self):
+        dia = HOY - timedelta(days=2)
+        crearActivo([compra(dia, 1, 100)], currency="GBP")
+        snapshot(marca(dia, 9), 101, 100)
+        snapshot(marca(dia, 17), 128, 100)
+
+        assert marca(dia, 9) not in [p["ts"] for p in grafico()["puntos"]]
+
+    def testElPuntoDeLaOperacionNoSaleDelRangoPedido(self):
+        ayer = HOY - timedelta(days=1)
+        crearActivo([compra(ayer, 1, 100)])
+        # Las 9 de ayer quedan fuera de las últimas 24 h, aunque coincida el precio.
+        snapshot(marca(ayer, 9), 100, 100)
+        snapshot(marca(ayer, 20), 120, 100)
+
+        datos = grafico("1D")
+
+        assert [p["ts"] for p in datos["puntos"]] == [marca(ayer, 20)]
+        assert datos["operaciones"][0]["indice"] == 0
 
     def testNoSaleDelDiaAunqueOtroDiaTengaUnPrecioMasParecido(self):
         dia = HOY - timedelta(days=2)

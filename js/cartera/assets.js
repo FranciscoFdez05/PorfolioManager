@@ -288,11 +288,12 @@ async function buildOverviewDisplayRow(asset) {
     const row = await buildOverviewRow(asset)
     const netoActualDisplay = row.netoActual
     const currentPriceDisplay = row.valorActual
-    const rendimientoDisplay = netoActualDisplay - row.invertidoBruto
-    const yieldPctVal = row.invertidoBruto > 0 ? (rendimientoDisplay / row.invertidoBruto) * 100 : 0
+    const rendimientoDisplay = netoActualDisplay - row.invertidoBrutoVisible
+    const yieldPctVal = row.invertidoBrutoVisible > 0 ? (rendimientoDisplay / row.invertidoBrutoVisible) * 100 : 0
 
     return {
         ...row,
+        invertidoBruto: row.invertidoBrutoVisible,
         id: asset.id,
         sidebarOrder: asset.order ?? 0,
         hidden: asset.hidden ?? false,
@@ -979,6 +980,39 @@ function buildChangeMoneyDisplay(asset, displayPrice, currency) {
     return { changePctStr, changePct, changeClass, moneyStr }
 }
 
+/**
+ * Unidad con la que se escribe una cantidad de cripto junto a su número.
+ *
+ * @param {object} asset Activo, del que se usa `symbol`.
+ * @returns {string} Símbolo en minúsculas, o cadena vacía si no tiene.
+ */
+function getAssetUnidadCripto(asset) {
+    return String(asset?.symbol || "").toLowerCase()
+}
+
+/**
+ * Texto con la cripto gastada en comisiones de un activo.
+ *
+ * @param {object} asset Activo, del que se usan `type` y `symbol`.
+ * @param {number} comisionesCripto Cantidad total gastada, en la propia cripto.
+ * @returns {string} Cantidad con su símbolo, o cadena vacía si no hay nada que enseñar.
+ */
+function buildComisionCriptoTexto(asset, comisionesCripto) {
+    if (!isCryptoAssetType(asset?.type) || !(comisionesCripto > 0)) return ""
+
+    return `${formatAssetParticipationValue(comisionesCripto, asset.type)} ${getAssetUnidadCripto(asset)}`.trim()
+}
+
+// El título repite el texto porque en la tarjeta se corta si el símbolo es largo.
+function pintarComisionCripto(texto) {
+    const elemento = document.getElementById("detFeesCripto")
+    if (!elemento) return
+
+    elemento.textContent = texto
+    elemento.title = texto
+    elemento.hidden = !texto
+}
+
 async function updateAssetDetail(asset) {
     const detSymbol = document.getElementById("detSymbol")
     const detName = document.getElementById("detName")
@@ -995,7 +1029,7 @@ async function updateAssetDetail(asset) {
     const detChangeAbs = document.getElementById("detChangeAbs")
     const detWeight = document.getElementById("detWeight")
     const summary = await buildOverviewRow(asset)
-    const pnlBruto = summary.netoActual - summary.invertidoBruto
+    const pnlBruto = summary.netoActual - summary.invertidoBrutoVisible
     const displayPrice = await getAssetDisplayPriceValue(asset)
     const displayCurrency = asset.currency || "EUR"
 
@@ -1012,8 +1046,9 @@ async function updateAssetDetail(asset) {
     }
 
     if (detChange) {
-        const yieldPercent = calculateYieldPercent(summary.invertidoBruto, pnlBruto)
+        const yieldPercent = calculateYieldPercent(summary.invertidoBrutoVisible, pnlBruto)
         detChange.textContent = `Rendimiento: ${formatPercent(yieldPercent)}`
+        detChange.title = "Rendimiento con comisiones"
         detChange.classList.toggle("negative", yieldPercent < 0)
     }
 
@@ -1029,7 +1064,7 @@ async function updateAssetDetail(asset) {
     }
 
     if (detInvested) {
-        detInvested.textContent = formatMoney(summary.invertidoBruto, summary.currency)
+        detInvested.textContent = formatMoney(summary.invertidoBrutoVisible, summary.currency)
     }
 
     if (detPnL) {
@@ -1044,6 +1079,8 @@ async function updateAssetDetail(asset) {
     if (detFees) {
         detFees.textContent = formatMoney(summary.comisiones, summary.currency)
     }
+
+    pintarComisionCripto(buildComisionCriptoTexto(asset, summary.comisionesCripto))
 
     if (detStatus) {
         detStatus.textContent = formatAssetLastUpdated(asset.lastUpdated)
@@ -1149,6 +1186,13 @@ function renderAssetCompletedOperationsSection(asset) {
     bindTableSort(section.querySelector("table"), "completedOps")
 }
 
+const ASSET_TRANSACCION_TIPOS = {
+    entre_wallet: "Entre wallet",
+    recibida: "Recibida",
+    enviada: "Enviada",
+    pendiente: "Pendiente de verificar"
+}
+
 function renderAssetTransaccionesSection(asset) {
     const section = document.getElementById("assetTransaccionesSection")
     const tabBtn = document.getElementById("transaccionesTabBtn")
@@ -1169,19 +1213,12 @@ function renderAssetTransaccionesSection(asset) {
         tabBtn.textContent = `Transacciones (${rows.length})`
     }
 
-    const walletLabels = {
-        entre_wallet: "Entre wallet",
-        recibida: "Recibida",
-        enviada: "Enviada",
-        pendiente: "Pendiente de verificar"
-    }
-
     const rowsHtml = rows
         .map((row) => {
             const walletTipo = String(row.walletTipo || "")
                 .trim()
                 .toLowerCase()
-            const walletLabel = walletLabels[walletTipo] || escapeHtml(row.walletTipo || "")
+            const walletLabel = ASSET_TRANSACCION_TIPOS[walletTipo] || escapeHtml(row.walletTipo || "")
             const hash = String(row.hashTransaccion || row.walletOrigen || "").trim()
             const hashDisplay = hash.length > 12 ? hash.slice(0, 8) + "…" + hash.slice(-4) : hash
             return `

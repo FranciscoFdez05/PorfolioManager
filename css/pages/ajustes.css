@@ -1625,11 +1625,8 @@
     cursor: pointer;
 }
 .ajustesTlsConfirma input {
-    width: 15px;
-    height: 15px;
     margin: 1px 0 0;
     flex: 0 0 auto;
-    accent-color: var(--accent);
     cursor: pointer;
 }
 .ajustesTlsConfirma small {

@@ -554,6 +554,61 @@ def testCompletarComisionesArreglaLaFilaAntiguaSinLeerLaRedYSeAprende():
     assert estado["escrituras"] == 1
 
 
+def _marcaConExchange(propia=True, comision="0.000361551996827", exchange="0.00035"):
+    """Como guardó la 5.1.x una marca con comisión del exchange: `comision` es la suma."""
+    return MovimientoMarcado(red="eth", hash="h1", contrato="", propia=propia, comision=comision, assetId="ethereum",
+                             comisionExchange=exchange)
+
+
+def testCorregirComisionesDejaElTotalDelExchangeYSoloEscribeUnaVez():
+    servicio, estado, repositorio = _servicio([], filas=[_filaAntigua(comisionRed="0.000361551996827")])
+    repositorio.movimientos = [_marcaConExchange()]
+
+    assert servicio.corregirComisionesDeExchange() == 1
+    assert estado["rows"][0]["comisionRed"] == "0.00035"
+    assert servicio.corregirComisionesDeExchange() == 0
+    assert estado["escrituras"] == 1
+
+
+def testCorregirComisionesNoTocaLoQueNoEsSuyo():
+    filas = [
+        _filaAntigua(comisionRed="0.5", hashTransaccion="otro"),
+        _filaAntigua(id="wallet-otro", comisionRed="0.5", assetId="bitcoin"),
+        _filaAntigua(id="wallet-recibida", comisionRed="", walletTipo=RECIBIDA),
+    ]
+    servicio, estado, repositorio = _servicio([], filas=filas)
+    repositorio.movimientos = [_marcaConExchange()]
+
+    assert servicio.corregirComisionesDeExchange() == 0
+    assert estado["escrituras"] == 0
+
+
+@pytest.mark.parametrize("marca", [_marcaConExchange(propia=False), _marcaConExchange(exchange="")])
+def testCorregirComisionesIgnoraLasMarcasSinComisionDelExchange(marca):
+    servicio, estado, repositorio = _servicio([], filas=[_filaAntigua(comisionRed="0.5")])
+    repositorio.movimientos = [marca]
+
+    assert servicio.corregirComisionesDeExchange() == 0
+    assert estado["rows"][0]["comisionRed"] == "0.5"
+
+
+def testCorregirComisionesReintentaSiLasFilasCambian():
+    servicio, estado, repositorio = _servicio([], filas=[_filaAntigua(comisionRed="0.5")], conflictos=1)
+    repositorio.movimientos = [_marcaConExchange()]
+
+    assert servicio.corregirComisionesDeExchange() == 1
+    assert estado["rows"][0]["comisionRed"] == "0.00035"
+
+
+def testUnaFilaNuevaConMarcaAntiguaEntraConElTotalDelExchange():
+    servicio, estado, repositorio = _servicio([_recibo()])
+    repositorio.movimientos = [_marcaConExchange()]
+
+    servicio.sincronizar("w1")
+
+    assert estado["rows"][0]["comisionRed"] == "0.00035"
+
+
 def testCompletarComisionesNoTocaLoQueNoEsSuyo():
     filas = [
         _filaAntigua(comisionRed="0"),

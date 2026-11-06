@@ -297,8 +297,10 @@ class MovimientoMarcado:
     fila en Transacciones, que no guarda el contrato. `direccionesAnadidas` son las
     que esta marca dio de alta en la libreta como propias: sin recordarlas, quitar
     la marca no devolvería la transacción a su estado, porque su dirección seguiría
-    haciéndola «entre wallets». `comisionExchange` es la parte de `comision` que
-    cobró el exchange aparte de la red: se guarda para poder enseñarla y corregirla.
+    haciéndola «entre wallets». `comisionExchange` es el total que indica el exchange,
+    con la comisión de red dentro: si la hay, es también `comision`. Se guarda aparte
+    para poder enseñarla y corregirla. Una marca de la 5.1.x puede llevar en `comision`
+    la suma de las dos: `comisionMarcada` la ignora.
     """
 
     red: str

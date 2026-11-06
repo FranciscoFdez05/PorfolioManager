@@ -6,7 +6,8 @@
 
 const ASSET_TODOS_ORIGENES = {
     spot: { etiqueta: "Compra spot", clase: "todosOrigenSpot" },
-    operacion: { etiqueta: "Operación spot", clase: "todosOrigenOperacion" }
+    operacion: { etiqueta: "Operación spot", clase: "todosOrigenOperacion" },
+    transaccion: { etiqueta: "Transacción", clase: "todosOrigenTransaccion" }
 }
 
 function buildAssetTodosRows(asset) {
@@ -46,6 +47,24 @@ function buildAssetTodosRows(asset) {
             precio: formatOperationsMoney(row.precioOrden, row.precioCurrency || currency),
             importe: formatOperationsMoney(row.total, row.currency || currency),
             comisiones: formatOperationsMoney(row.comisionesFiat, "EUR")
+        })
+    })
+
+    // La comisión de red se paga en la propia cripto, así que se enseña en esa
+    // unidad y sin precio ni importe: mover cripto no es comprarla.
+    getTransaccionesCryptoImpact(asset).rows.forEach((row) => {
+        const walletTipo = String(row.walletTipo || "")
+            .trim()
+            .toLowerCase()
+        const comision = formatOperationsQuantity(row.comisionRed)
+        filas.push({
+            origen: "transaccion",
+            fecha: row.fechaOperacion || "",
+            tipo: ASSET_TRANSACCION_TIPOS[walletTipo] || row.walletTipo || "",
+            participaciones: formatOperationsQuantity(row.total),
+            precio: "",
+            importe: "",
+            comisiones: comision ? `${comision} ${escapeHtml(getAssetUnidadCripto(asset))}`.trim() : ""
         })
     })
 
@@ -91,7 +110,8 @@ function renderAssetTodosSection(asset) {
         .map((fila) => {
             const origen = ASSET_TODOS_ORIGENES[fila.origen] || { etiqueta: fila.origen, clase: "" }
             const tipo = String(fila.tipo || "").trim()
-            const tipoClass = tipo.toLowerCase() === "venta" ? "opRowVenta" : "opRowCompra"
+            const tipoClassOperacion = tipo.toLowerCase() === "venta" ? "opRowVenta" : "opRowCompra"
+            const tipoClass = fila.origen === "transaccion" ? "" : tipoClassOperacion
             return `
             <tr>
                 <td class="todosColOrigen"><span class="todosOrigenBadge ${origen.clase}">${escapeHtml(origen.etiqueta)}</span></td>
@@ -199,7 +219,10 @@ window.todosGrid = toggleAssetTodosGrid
 // también con daltonismo: verde, azul y naranja para los repartos por concepto,
 // y una rampa de azules para los años, que son una escala y no categorías
 // sueltas (un arcoíris por año no diría nada del orden).
-const ASSET_TODOS_CHART_COLORS = { verde: "#2e9e6b", azul: "#3a7bd5", naranja: "#d95926" }
+const ASSET_TODOS_CHART_COLORS = { verde: "#2e9e6b", azul: "#3a7bd5", naranja: "#d95926", rojo: "#e5484d" }
+// Fracción mínima del círculo que ocupa una porción. Una comisión puede ser el
+// 0,1 % de la posición: a escala real no se vería. El tooltip da el valor real.
+const ASSET_TODOS_DONUT_MIN_FRACCION = 0.015
 const ASSET_TODOS_YEAR_RAMP = [
     [29, 79, 143],
     [142, 192, 234]
@@ -313,7 +336,7 @@ function createAssetTodosDonut(id, partes, formatValue) {
             labels: datos.map((parte) => parte.etiqueta),
             datasets: [
                 {
-                    data: datos.map((parte) => parte.valor),
+                    data: datos.map((parte) => Math.max(parte.valor, total * ASSET_TODOS_DONUT_MIN_FRACCION)),
                     backgroundColor: datos.map((parte) => parte.color),
                     borderColor: estilos.backgroundColor,
                     borderWidth: 2,
@@ -342,8 +365,9 @@ function createAssetTodosDonut(id, partes, formatValue) {
                 tooltip: {
                     callbacks: {
                         label: (contexto) => {
-                            const porcentaje = ((contexto.raw / total) * 100).toFixed(1).replace(".", ",")
-                            return ` ${formatValue(contexto.raw)}  (${porcentaje} %)`
+                            const { valor } = datos[contexto.dataIndex]
+                            const porcentaje = ((valor / total) * 100).toFixed(1).replace(".", ",")
+                            return ` ${formatValue(valor)}  (${porcentaje} %)`
                         }
                     }
                 }
@@ -354,29 +378,36 @@ function createAssetTodosDonut(id, partes, formatValue) {
     return total
 }
 
-function buildAssetTodosOrigenPartes(asset) {
-    const spot = getPrimaryAssetRows(asset).reduce((total, row) => {
-        const cantidad = parseLooseNumber(row.participaciones) || 0
-        const esVenta =
-            String(row.tipoOperacion || "")
-                .trim()
-                .toLowerCase() === "venta"
-        return total + (esVenta ? -cantidad : cantidad)
-    }, 0)
+// Sale de los mismos lotes que la «Cantidad» de la cabecera: así ventas,
+// comisiones y envíos restan de la compra que toque por FIFO y el total del
+// quesito no puede separarse de la posición. La porción de comisiones es cripto
+// que ya no está: se dibuja, pero no cuenta en la cantidad en cartera.
+async function buildAssetTodosOrigenPartes(asset) {
+    const lotes = await buildRemainingAssetLots(asset, normalizeCurrencyCode(asset?.currency || "EUR"))
+    const { comisionesCripto } = await buildOverviewRow(asset)
+    const sumaDe = (...origenes) =>
+        lotes.reduce((total, lote) => (origenes.includes(lote.origen) ? total + lote.remaining : total), 0)
 
     return [
-        { etiqueta: "Compras spot", valor: spot, color: ASSET_TODOS_CHART_COLORS.verde },
+        { etiqueta: "Compras spot", valor: sumaDe("spot"), color: ASSET_TODOS_CHART_COLORS.verde },
+        { etiqueta: "Operaciones spot", valor: sumaDe("operacion"), color: ASSET_TODOS_CHART_COLORS.azul },
         {
-            etiqueta: "Operaciones spot",
-            valor: getCompletedOperationsCryptoImpact(asset).quantityDelta || 0,
-            color: ASSET_TODOS_CHART_COLORS.azul
-        },
-        {
-            etiqueta: "Transacciones",
-            valor: getTransaccionesCryptoImpact(asset).quantityDelta || 0,
+            etiqueta: "Transacciones y conversiones",
+            valor: sumaDe("transaccion", "conversion"),
             color: ASSET_TODOS_CHART_COLORS.naranja
-        }
+        },
+        { etiqueta: "Comisiones", valor: comisionesCripto, color: ASSET_TODOS_CHART_COLORS.rojo, esPerdida: true }
     ]
+}
+
+function sumarAssetTodosPosicion(partes) {
+    return partes.reduce((total, parte) => (parte.esPerdida ? total : total + parte.valor), 0)
+}
+
+function buildAssetTodosOrigenPie(asset, partes) {
+    const total = `Total: ${formatAssetParticipationValue(sumarAssetTodosPosicion(partes), asset?.type || "cripto")}`
+    const comisiones = buildComisionCriptoTexto(asset, partes.find((parte) => parte.esPerdida)?.valor)
+    return comisiones ? `${total} · Comisiones: ${comisiones}` : total
 }
 
 // Lo vendido se reparte en tres: lo que costó comprarlo, lo que se lleva
@@ -492,22 +523,35 @@ async function renderAssetTodosCharts(asset) {
     const assetType = asset?.type || "cripto"
     const assetCurrency = normalizeCurrencyCode(asset?.currency || "EUR")
 
-    const totalOrigen = createAssetTodosDonut("todosChartOrigen", buildAssetTodosOrigenPartes(asset), (valor) =>
-        formatAssetParticipationValue(valor, assetType)
-    )
-    if (totalOrigen > 0) {
-        setAssetTodosChartFoot("todosChartOrigen", `Total: ${formatAssetParticipationValue(totalOrigen, assetType)}`)
-    } else {
-        setAssetTodosChartEmpty("todosChartOrigen", "Todavía no hay participaciones que repartir.")
-        setAssetTodosChartFoot("todosChartOrigen", "")
-    }
-
     const ventas = buildAssetTodosVentasPartes(asset)
     if (createAssetTodosDonut("todosChartVentas", ventas.partes, (valor) => formatMoney(valor, "EUR")) > 0) {
         setAssetTodosChartFoot("todosChartVentas", ventas.pie)
     } else {
         setAssetTodosChartEmpty("todosChartVentas", "No hay ventas registradas de este activo.")
         setAssetTodosChartFoot("todosChartVentas", "")
+    }
+
+    let origenPartes = []
+    try {
+        origenPartes = await buildAssetTodosOrigenPartes(asset)
+    } catch (error) {
+        console.error("No se pudieron repartir las participaciones por origen", error)
+    }
+
+    if (token !== _assetTodosChartsToken) return
+
+    // Con la posición a cero solo quedaría la porción de comisiones: no hay reparto.
+    const totalOrigen =
+        sumarAssetTodosPosicion(origenPartes) > 0
+            ? createAssetTodosDonut("todosChartOrigen", origenPartes, (valor) =>
+                  formatAssetParticipationValue(valor, assetType)
+              )
+            : 0
+    if (totalOrigen > 0) {
+        setAssetTodosChartFoot("todosChartOrigen", buildAssetTodosOrigenPie(asset, origenPartes))
+    } else {
+        setAssetTodosChartEmpty("todosChartOrigen", "Todavía no hay participaciones que repartir.")
+        setAssetTodosChartFoot("todosChartOrigen", "")
     }
 
     let anios = []

@@ -293,8 +293,14 @@ def reciboConComision(sentido: str, contrato: str) -> bool:
 
 
 def comisionMarcada(marca: MovimientoMarcado | None) -> str:
-    """La comisión que la marca pide descontar; vacía deja la que leyó la red."""
-    return marca.comision if marca is not None and marca.propia else ""
+    """La comisión que la marca pide descontar; vacía deja la que leyó la red.
+
+    El total del exchange manda porque ya incluye la de red, y una marca de la 5.1.x
+    puede llevar en `comision` la suma de las dos.
+    """
+    if marca is None or not marca.propia:
+        return ""
+    return marca.comisionExchange or marca.comision
 
 
 def nombreContraparte(direccion: str, entrada: EntradaLibreta | None) -> str:

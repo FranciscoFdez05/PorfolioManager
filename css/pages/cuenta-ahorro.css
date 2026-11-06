@@ -297,6 +297,11 @@
         border-color 0.15s;
 }
 
+/* El contorno de foco ya lo lleva la etiqueta entera. */
+.cuentaAhorroCheck input:focus-visible {
+    outline: none;
+}
+
 .cuentaAhorroCheck input::after {
     content: "";
     width: 10px;

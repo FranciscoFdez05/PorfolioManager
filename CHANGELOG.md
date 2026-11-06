@@ -22,6 +22,58 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.1.2] — 2026-11-06
+
+**Esquema de base de datos:** no lo toca (sigue en la **27**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+### Añadido
+
+- **Rango YTD en el gráfico de cada activo.** Muestra desde el 1 de enero del año en curso.
+- **Cripto gastada en comisiones.** La tarjeta «Comisiones» del panel lateral muestra, bajo
+  los euros, la cantidad gastada en la propia cripto. «Participaciones por origen» la
+  enseña en una porción roja, con un tamaño mínimo para que se vea aunque sea muy pequeña.
+
+### Corregido
+
+- **Gráfico del activo.** La línea ahora pasa por el momento de cada compra y venta, en
+  vez de dejar la marca flotando. El eje de tiempo se ajusta al tramo con datos, sin dejar
+  vacío el lado izquierdo, y sus fechas dependen de lo que se ve y no del rango elegido.
+  Las marcas del primer punto ya no salen cortadas.
+
+- **Comisiones pagadas en cripto en la ficha del activo.** El valor de la cripto perdida en
+  comisiones (de red, o de una venta) cuenta ahora en «Comisiones» y en el invertido bruto,
+  a su coste de compra. El invertido neto y el precio medio no cambian; el P/L del panel
+  lateral y el rendimiento de la Vista general, sí: ahora incluyen esa pérdida. Las dos
+  cifras de la ficha se rotulan «G/P sin comisiones» y «P/L con comisiones».
+- **Pestaña «Todos».** Incluye las transacciones, y «Participaciones por origen» suma lo
+  mismo que la cantidad en cartera aunque haya ventas, comisiones o envíos.
+
+- **Comisión del exchange.** La de red se añadía encima, aunque el exchange ya la paga
+  con lo que cobra, y la posición quedaba por debajo de lo recibido en la wallet. Ahora
+  se indica el total que muestra el exchange y la aplicación lo reparte entre la comisión
+  de red y el resto, y resta ese total. Las transacciones que aún tengan guardada la suma
+  antigua se corrigen solas al abrir la aplicación, en cada portfolio.
+- **«Marcar también la otra dirección como mía».** Se desmarcaba sola según el camino:
+  «Aplicar comisión» la ignoraba y, en las transacciones fuera de las 10 últimas de la
+  wallet, la ventana seguía mostrando la dirección como sin identificar. Si luego se
+  aplicaba la comisión, la dirección salía de la libreta. Ahora lo que se ve es lo que se
+  guarda con cualquier botón y, si la transacción ya es «Entre mis wallets», se guarda al
+  cambiarla.
+
+### Cambiado
+
+- **La otra dirección ya no se da por tuya sin pedirlo.** La casilla sale desmarcada salvo
+  que la dirección ya sea tuya, para no dar de alta sin querer la de un exchange.
+- **Color de la línea del gráfico.** Usa siempre el acento del tema en lugar del color de
+  cada activo.
+- **Detalle de la transacción.** Pinchar fuera de la ventana ya no la cierra, para no
+  perder lo escrito en la comisión o el apodo. Se cierra con «Cerrar» o con Escape.
+- **Casillas.** Todas siguen ya el tema de la aplicación, incluidas las que quedaban con
+  el aspecto del navegador en Ajustes, Carteras conocidas y el detalle de la transacción.
+
+---
+
 ## [5.1.1] — 2026-11-05
 
 **Esquema de base de datos:** no lo toca (sigue en la **27**). Para deshacer la

@@ -10,6 +10,7 @@ const ASSET_GRAFICO_RANGOS = [
     { clave: "1D", etiqueta: "1 D" },
     { clave: "7D", etiqueta: "7 D" },
     { clave: "30D", etiqueta: "30 D" },
+    { clave: "YTD", etiqueta: "YTD" },
     { clave: "1A", etiqueta: "1 A" },
     { clave: "TODO", etiqueta: "Todo" }
 ]
@@ -27,6 +28,11 @@ const ASSET_GRAFICO_MODO = "assetGraficoCercano"
 // En un año cada día ocupa dos píxeles: sin este margen, acertar en el punto
 // exacto sería cuestión de suerte.
 const ASSET_GRAFICO_RADIO_MARCA = 10
+
+// Hasta qué tramo visible del eje X, en segundos, se escribe la hora o el día. El
+// formato depende de lo que se ve y no del rango: «Todo» puede abarcar solo un mes.
+const ASSET_GRAFICO_EJE_CON_HORA = 2 * 86400
+const ASSET_GRAFICO_EJE_CON_DIA = 200 * 86400
 
 let _assetGraficoChart = null
 let _assetGraficoToken = 0
@@ -47,8 +53,20 @@ function assetGraficoEstado() {
 
 // El primer precio conocido del rango: la referencia del % en la vista de precio.
 function assetGraficoPrecioBase(puntos) {
-    const primero = puntos.find((punto) => Number.isFinite(punto.precio) && punto.precio > 0)
-    return primero ? primero.precio : null
+    const precios = puntos.map((punto) => (Number.isFinite(punto.precio) && punto.precio > 0 ? punto.precio : null))
+    const indice = assetGraficoPrimeroTrazable(precios)
+    return indice === -1 ? null : precios[indice]
+}
+
+// Índice del primer valor que forma parte de un trazo. Un valor rodeado de huecos no
+// se dibuja, porque la línea no tiene puntos propios y no une con nada, así que no
+// puede servir de inicio. Si solo hay valores sueltos, vale el primero.
+function assetGraficoPrimeroTrazable(valores) {
+    const tieneValor = (indice) => Number.isFinite(valores[indice])
+    const conVecino = valores.findIndex(
+        (_valor, indice) => tieneValor(indice) && (tieneValor(indice - 1) || tieneValor(indice + 1))
+    )
+    return conVecino !== -1 ? conVecino : valores.findIndex((_valor, indice) => tieneValor(indice))
 }
 
 // Lo que vale un punto en la vista y unidad elegidas, o null si no se puede saber.
@@ -115,11 +133,13 @@ function assetGraficoSeries(datos, vista, unidad) {
         grupo.get(clave).operaciones.push(operacion)
     })
 
+    const limitesX = assetGraficoLimitesX(linea)
     return {
         linea,
         compras: [...marcas.compra.values()],
         ventas: [...marcas.venta.values()],
-        extremos: assetGraficoExtremos(linea),
+        extremos: assetGraficoExtremos(limitesX ? linea.filter((punto) => punto.x >= limitesX.min) : []),
+        limitesX,
         ultimo: assetGraficoUltimoValido(linea),
         operacionesSinValor: sinValor
     }
@@ -132,6 +152,14 @@ function assetGraficoExtremos(linea) {
         maximo: validos.reduce((mejor, punto) => (punto.y > mejor.y ? punto : mejor)),
         minimo: validos.reduce((mejor, punto) => (punto.y < mejor.y ? punto : mejor))
     }
+}
+
+// El eje abarca lo que se puede pintar: los puntos sin valor en esta vista dejarían
+// vacío el lado izquierdo del gráfico.
+function assetGraficoLimitesX(linea) {
+    const inicio = assetGraficoPrimeroTrazable(linea.map((punto) => punto.y))
+    if (inicio === -1) return null
+    return { min: linea[inicio].x, max: assetGraficoUltimoValido(linea).x }
 }
 
 function assetGraficoUltimoValido(linea) {
@@ -181,10 +209,14 @@ function assetGraficoFormatearFecha(ts, conHora) {
     })
 }
 
-function assetGraficoFormatearEje(ts, rango) {
+function assetGraficoFormatearEje(ts, segundosVisibles) {
     const fecha = new Date(ts * 1000)
-    if (rango === "1D") return fecha.toLocaleTimeString(_nl(), { hour: "2-digit", minute: "2-digit" })
-    if (rango === "7D" || rango === "30D") return fecha.toLocaleDateString(_nl(), { day: "2-digit", month: "short" })
+    if (segundosVisibles <= ASSET_GRAFICO_EJE_CON_HORA) {
+        return fecha.toLocaleTimeString(_nl(), { hour: "2-digit", minute: "2-digit" })
+    }
+    if (segundosVisibles <= ASSET_GRAFICO_EJE_CON_DIA) {
+        return fecha.toLocaleDateString(_nl(), { day: "2-digit", month: "short" })
+    }
     return fecha.toLocaleDateString(_nl(), { month: "short", year: "2-digit" })
 }
 
@@ -428,6 +460,8 @@ function assetGraficoDatasetMarcas(datos, etiqueta, color, fondo) {
         label: etiqueta,
         data: datos,
         showLine: false,
+        // El eje empieza justo en el primer punto: una marca ahí saldría cortada.
+        clip: false,
         pointRadius: 6,
         pointHoverRadius: 8,
         pointBackgroundColor: color,
@@ -463,7 +497,7 @@ function assetGraficoDibujar() {
 
     const estilos = getComputedStyle(lienzo)
     const color = (variable) => estilos.getPropertyValue(variable).trim()
-    const colorLinea = pagina?.dataset.assetColor || color("--accent")
+    const colorLinea = color("--accent")
     const colorTexto = color("--text-muted")
     const colorRejilla = color("--border-soft")
     const fondo = color("--bg-panel")
@@ -494,19 +528,22 @@ function assetGraficoDibujar() {
             maintainAspectRatio: false,
             animation: false,
             // Por encima y por debajo queda sitio para escribir el máximo y el mínimo.
-            layout: { padding: { top: 24, bottom: 8 } },
+            layout: { padding: { top: 24, bottom: 8, left: 8 } },
             interaction: { mode: ASSET_GRAFICO_MODO, intersect: false },
             scales: {
                 x: {
                     type: "linear",
                     bounds: "data",
+                    min: series.limitesX.min,
+                    max: series.limitesX.max,
                     grid: { display: false },
                     border: { color: colorRejilla },
                     ticks: {
                         color: colorTexto,
                         maxTicksLimit: 7,
                         maxRotation: 0,
-                        callback: (valor) => assetGraficoFormatearEje(valor, rango)
+                        callback: (valor) =>
+                            assetGraficoFormatearEje(valor, series.limitesX.max - series.limitesX.min)
                     }
                 },
                 y: {
