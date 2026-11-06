@@ -7,7 +7,18 @@
 const ASSET_TODOS_ORIGENES = {
     spot: { etiqueta: "Compra spot", clase: "todosOrigenSpot" },
     operacion: { etiqueta: "Operación spot", clase: "todosOrigenOperacion" },
-    transaccion: { etiqueta: "Transacción", clase: "todosOrigenTransaccion" }
+    transaccion: { etiqueta: "Transacción", clase: "todosOrigenTransaccion" },
+    recibida: { etiqueta: "Recibida", clase: "todosOrigenRecibida" },
+    comisionTransaccion: { etiqueta: "Com. transacción", clase: "todosOrigenComisionTransaccion" }
+}
+
+// Un movimiento entre wallets propias no cambia la posición: lo único que deja
+// es la comisión, y por eso se rotula como tal. En un envío la cantidad sí sale
+// de la cartera, así que llamarlo comisión ocultaría lo principal de la fila.
+function getAssetTodosOrigenTransaccion(walletTipo, comisionRed) {
+    if (walletTipo === "recibida") return "recibida"
+    if (walletTipo === "entre_wallet" && (parseLooseNumber(comisionRed) || 0) > 0) return "comisionTransaccion"
+    return "transaccion"
 }
 
 function buildAssetTodosRows(asset) {
@@ -59,6 +70,7 @@ function buildAssetTodosRows(asset) {
         const comision = formatOperationsQuantity(row.comisionRed)
         filas.push({
             origen: "transaccion",
+            origenVisible: getAssetTodosOrigenTransaccion(walletTipo, row.comisionRed),
             fecha: row.fechaOperacion || "",
             tipo: ASSET_TRANSACCION_TIPOS[walletTipo] || row.walletTipo || "",
             participaciones: formatOperationsQuantity(row.total),
@@ -108,7 +120,10 @@ function renderAssetTodosSection(asset) {
 
     const rowsHtml = filas
         .map((fila) => {
-            const origen = ASSET_TODOS_ORIGENES[fila.origen] || { etiqueta: fila.origen, clase: "" }
+            const origen = ASSET_TODOS_ORIGENES[fila.origenVisible || fila.origen] || {
+                etiqueta: fila.origen,
+                clase: ""
+            }
             const tipo = String(fila.tipo || "").trim()
             const tipoClassOperacion = tipo.toLowerCase() === "venta" ? "opRowVenta" : "opRowCompra"
             const tipoClass = fila.origen === "transaccion" ? "" : tipoClassOperacion
@@ -219,7 +234,14 @@ window.todosGrid = toggleAssetTodosGrid
 // también con daltonismo: verde, azul y naranja para los repartos por concepto,
 // y una rampa de azules para los años, que son una escala y no categorías
 // sueltas (un arcoíris por año no diría nada del orden).
-const ASSET_TODOS_CHART_COLORS = { verde: "#2e9e6b", azul: "#3a7bd5", naranja: "#d95926", rojo: "#e5484d" }
+const ASSET_TODOS_CHART_COLORS = {
+    verde: "#2e9e6b",
+    azul: "#3a7bd5",
+    naranja: "#d95926",
+    ambar: "#d9a520",
+    magenta: "#c44fb4",
+    rojo: "#e5484d"
+}
 // Fracción mínima del círculo que ocupa una porción. Una comisión puede ser el
 // 0,1 % de la posición: a escala real no se vería. El tooltip da el valor real.
 const ASSET_TODOS_DONUT_MIN_FRACCION = 0.015
@@ -391,11 +413,8 @@ async function buildAssetTodosOrigenPartes(asset) {
     return [
         { etiqueta: "Compras spot", valor: sumaDe("spot"), color: ASSET_TODOS_CHART_COLORS.verde },
         { etiqueta: "Operaciones spot", valor: sumaDe("operacion"), color: ASSET_TODOS_CHART_COLORS.azul },
-        {
-            etiqueta: "Transacciones y conversiones",
-            valor: sumaDe("transaccion", "conversion"),
-            color: ASSET_TODOS_CHART_COLORS.naranja
-        },
+        { etiqueta: "Recibidas", valor: sumaDe("transaccion"), color: ASSET_TODOS_CHART_COLORS.ambar },
+        { etiqueta: "Conversiones", valor: sumaDe("conversion"), color: ASSET_TODOS_CHART_COLORS.magenta },
         { etiqueta: "Comisiones", valor: comisionesCripto, color: ASSET_TODOS_CHART_COLORS.rojo, esPerdida: true }
     ]
 }

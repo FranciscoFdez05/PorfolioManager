@@ -191,8 +191,21 @@ describe("participaciones por origen", () => {
 
         const partes = await buildAssetTodosOrigenPartes(ACTIVO)
 
-        expect(partes.find((parte) => parte.etiqueta === "Transacciones y conversiones").valor).toBeCloseTo(0.001, 12)
+        expect(partes.find((parte) => parte.etiqueta === "Recibidas").valor).toBeCloseTo(0.001, 12)
+        expect(partes.find((parte) => parte.etiqueta === "Recibidas").color).toBe("#d9a520")
+        expect(partes.find((parte) => parte.etiqueta === "Conversiones").valor).toBe(0)
         expect(totalDe(partes)).toBeCloseTo(0.004, 12)
+    })
+
+    it("lo convertido va en una porción distinta de lo recibido", async () => {
+        fijarTransacciones([{ ...entreWallets, walletTipo: "recibida", total: "0.001", comisionRed: "" }])
+        const conversion = { fecha: "03-11-2026", par: "BTC/ETH", tipo: "Convertidos a BTC", cantidad: "0.0005" }
+
+        const partes = await buildAssetTodosOrigenPartes({ ...ACTIVO, conversionRows: [conversion] })
+
+        expect(partes.find((parte) => parte.etiqueta === "Recibidas").valor).toBeCloseTo(0.001, 12)
+        expect(partes.find((parte) => parte.etiqueta === "Conversiones").valor).toBeCloseTo(0.0005, 12)
+        expect(totalDe(partes)).toBeCloseTo(0.0045, 12)
     })
 })
 
@@ -215,5 +228,30 @@ describe("filas de la pestaña Todos", () => {
         const fila = buildAssetTodosRows(ACTIVO).find((candidata) => candidata.origen === "transaccion")
 
         expect(fila.comisiones).toBe("")
+    })
+
+    const origenVisibleDe = (transaccion) => {
+        fijarTransacciones([transaccion])
+        return buildAssetTodosRows(ACTIVO).find((candidata) => candidata.origen === "transaccion").origenVisible
+    }
+
+    it("lo recibido se rotula como recibida", () => {
+        expect(origenVisibleDe({ ...entreWallets, walletTipo: "recibida", comisionRed: "" })).toBe("recibida")
+        expect(ASSET_TODOS_ORIGENES.recibida.etiqueta).toBe("Recibida")
+    })
+
+    it("un movimiento entre wallets con comisión se rotula como comisión de transacción", () => {
+        expect(origenVisibleDe(entreWallets)).toBe("comisionTransaccion")
+        expect(ASSET_TODOS_ORIGENES.comisionTransaccion.etiqueta).toBe("Com. transacción")
+    })
+
+    it("un movimiento entre wallets sin comisión sigue siendo una transacción", () => {
+        expect(origenVisibleDe({ ...entreWallets, comisionRed: "" })).toBe("transaccion")
+        expect(origenVisibleDe({ ...entreWallets, comisionRed: "0" })).toBe("transaccion")
+    })
+
+    // La cantidad enviada sale de la cartera: la comisión no es lo principal de la fila.
+    it("un envío con comisión sigue siendo una transacción", () => {
+        expect(origenVisibleDe({ ...entreWallets, walletTipo: "enviada" })).toBe("transaccion")
     })
 })

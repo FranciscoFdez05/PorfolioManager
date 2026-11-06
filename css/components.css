@@ -4383,6 +4383,14 @@ button.calPopupTitulo:hover,
     color: #d95926;
 }
 
+.todosOrigenRecibida {
+    color: #d9a520;
+}
+
+.todosOrigenComisionTransaccion {
+    color: #e5484d;
+}
+
 /* La tabla de "Todos" se reparte el ancho en columnas fijas en vez de dejar que
    cada celda lo negocie con su contenido: así los encabezados caen justo encima
    de sus valores y las filas no bailan al cambiar de activo. Se centra todo —

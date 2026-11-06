@@ -300,6 +300,11 @@ html[data-theme="light"] .todosOrigenOperacion {
     color: var(--accent-soft);
 }
 
+/* El ambar del tema oscuro no llega a un contraste legible como texto sobre blanco. */
+html[data-theme="light"] .todosOrigenRecibida {
+    color: #8a6500;
+}
+
 /* components.css */
 html[data-theme="light"] .todosChartToggle:hover .todosChartTitle,
 html[data-theme="light"] .todosChartToggle:hover .todosChartChevron {
