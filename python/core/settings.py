@@ -139,6 +139,32 @@ CATALOGO: tuple[Ajuste, ...] = (
            descripcion="Segundos antes de que Gunicorn mate un worker atascado."),
     Ajuste("gunicorn", "keep_alive", ENTERO, 5, env="GUNICORN_KEEP_ALIVE", minimo=0, maximo=300,
            descripcion="Segundos que se mantiene abierta una conexión ociosa."),
+    # Reciclar workers corta las fugas de memoria lentas antes de que el
+    # mem_limit del contenedor mate un proceso a media petición. Alto a propósito:
+    # el límite de escrituras (core/rate_limit.py) vive en memoria del worker y
+    # se vacía con cada reciclado.
+    Ajuste("gunicorn", "max_requests", ENTERO, 10000, env="GUNICORN_MAX_REQUESTS", minimo=0, maximo=10_000_000,
+           descripcion="Peticiones tras las que un worker se recicla. 0 no los recicla nunca."),
+    Ajuste("gunicorn", "max_requests_jitter", ENTERO, 1000, env="GUNICORN_MAX_REQUESTS_JITTER",
+           minimo=0, maximo=1_000_000,
+           descripcion="Margen aleatorio sobre max_requests, para que no se reciclen todos a la vez."),
+    # El supervisor (python/admin/supervisor_web.py) existe porque Docker no
+    # reinicia un contenedor marcado como unhealthy: solo actúa cuando el proceso
+    # termina. Sin él, una web con todos los hilos colgados se quedaba así.
+    Ajuste("gunicorn", "salud_intervalo_segundos", ENTERO, 30, env="SUPERVISOR_INTERVALO",
+           minimo=5, maximo=600,
+           descripcion="Cada cuántos segundos el supervisor pregunta a /api/health."),
+    Ajuste("gunicorn", "salud_timeout_segundos", ENTERO, 10, env="SUPERVISOR_TIMEOUT",
+           minimo=1, maximo=120,
+           descripcion="Segundos de espera de cada comprobación antes de darla por fallida."),
+    Ajuste("gunicorn", "salud_fallos_para_reiniciar", ENTERO, 6, env="SUPERVISOR_FALLOS",
+           minimo=0, maximo=1000,
+           descripcion="Comprobaciones fallidas seguidas antes de reiniciar la web. 0 desactiva el "
+                       "reinicio (solo se registra en el log)."),
+    Ajuste("gunicorn", "salud_gracia_arranque_segundos", ENTERO, 300, env="SUPERVISOR_GRACIA_ARRANQUE",
+           minimo=0, maximo=3600,
+           descripcion="Margen tras arrancar en el que los fallos no cuentan, salvo que ya haya "
+                       "respondido bien: la reparación de la BD al iniciar puede tardar."),
 
     # [registros]
     Ajuste("registros", "nivel", OPCION, "INFO", env="LOG_NIVEL",
@@ -162,9 +188,13 @@ CATALOGO: tuple[Ajuste, ...] = (
     # Seguridad (core/sesion.py la lee de ajustes.json). Este es el tope
     # absoluto, que un despliegue puede querer por encima de lo que elija el
     # usuario; apagado por defecto.
-    Ajuste("seguridad", "sesion_maxima_minutos", ENTERO, 0, env="SESION_MAXIMA_MINUTOS",
+    # Desde la 5.2.0 son 30 días por defecto (auditoría SEC-02): la cookie dura
+    # 365 días y, sin tope, una cookie robada en la LAN valía hasta un logout o
+    # un cambio de contraseña que podía no llegar nunca.
+    Ajuste("seguridad", "sesion_maxima_minutos", ENTERO, 43_200, env="SESION_MAXIMA_MINUTOS",
            minimo=0, maximo=525_600,
-           descripcion="Duración máxima de una sesión desde el login, haya actividad o no. 0 (defecto) lo desactiva."),
+           descripcion="Duración máxima de una sesión desde el login, haya actividad o no. "
+                       "Por defecto 30 días; 0 lo desactiva."),
     Ajuste("seguridad", "escrituras_por_minuto", ENTERO, 120, env="ESCRITURAS_POR_MINUTO",
            minimo=0, maximo=100_000,
            descripcion="Peticiones de escritura (POST/PUT/PATCH/DELETE) por IP y minuto. 0 desactiva el límite."),

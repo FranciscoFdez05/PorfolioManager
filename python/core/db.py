@@ -301,7 +301,10 @@ CREATE TABLE IF NOT EXISTS cuentas (
     dividendos    INTEGER NOT NULL DEFAULT 0,
     -- 1 si sale en la ventana Cuenta de ahorro. Es un papel de la cuenta, no
     -- su tipo: cualquier cuenta existente puede ser también de ahorro.
-    ahorro        INTEGER NOT NULL DEFAULT 0
+    ahorro        INTEGER NOT NULL DEFAULT 0,
+    -- Etiquetas además del tipo (JSON con ids de tipo, p. ej. ["broker"]): una
+    -- cuenta puede ser banco y broker a la vez. El tipo sigue siendo la principal.
+    etiquetas     TEXT NOT NULL DEFAULT ''
 );
 
 -- Qué cuenta remunerada va con qué cuenta de dinero. Una por cada lado: la
@@ -548,6 +551,22 @@ CREATE TABLE IF NOT EXISTS asset_snapshots (
 CREATE INDEX IF NOT EXISTS idx_asset_snapshots_ts ON asset_snapshots(ts);
 CREATE INDEX IF NOT EXISTS idx_asset_snapshots_asset_id_ts ON asset_snapshots(asset_id, ts);
 
+-- Precio por participación en euros de lo que se sigue sin tenerlo en cartera
+-- (activos sin posición y entradas propias de Seguimiento, con id `wl:<segId>`).
+-- `asset_snapshots` guarda el valor de la posición y no sirve para ellos. Solo
+-- alimenta los minigráficos del día de Paneles, así que se guarda en una tabla
+-- aparte —no entra en totales ni en rentabilidades— y solo se conservan los
+-- últimos días (`routes.snapshots._RETENCION_PRECIOS`). Va en el esquema base y
+-- no en una migración porque es una tabla nueva y vacía: el CREATE IF NOT EXISTS
+-- basta para las bases que ya existen.
+CREATE TABLE IF NOT EXISTS asset_price_snapshots (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts        INTEGER NOT NULL,
+    asset_id  TEXT NOT NULL,
+    price_eur REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_asset_price_snapshots_ts ON asset_price_snapshots(ts);
+
 -- Reserva del hueco horario que va a rellenar el scheduler del servidor. Con
 -- varios workers de gunicorn cada uno arranca su propio hilo: sin esta tabla
 -- todos pedirían cotizaciones a los proveedores para el mismo bucket y solo
@@ -670,7 +689,7 @@ CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id,
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 27
+ESQUEMA_VERSION = 28
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1734,6 +1753,19 @@ def _esquema27(conn):
         "UPDATE transacciones SET wallet_tipo = 'pendiente' "
         "WHERE wallet_tipo = 'recibida' AND id LIKE 'wallet-%'"
     )
+
+
+@_migracion(28)
+def _esquema28(conn):
+    """Varias etiquetas por cuenta.
+
+    Una misma cuenta puede ser banco y broker (o exchange) a la vez. El tipo de
+    siempre se queda como etiqueta principal y las demás van en `etiquetas`
+    (JSON); las cuentas que ya existen empiezan sin etiquetas extra.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(cuentas)")}
+    if "etiquetas" not in columnas:
+        conn.execute("ALTER TABLE cuentas ADD COLUMN etiquetas TEXT NOT NULL DEFAULT ''")
 
 
 class _CerrarAlTerminarElHilo:

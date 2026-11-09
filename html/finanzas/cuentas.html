@@ -1,14 +1,29 @@
 <section class="cuentasPage">
     <div class="cuentasTopBar">
-        <div class="overviewSearch tablaBusqueda" data-busca-en="#cuentasBody">
-            <button class="overviewSearchBtn" type="button" aria-label="Buscar en la tabla" title="Buscar en la tabla">
-                <span class="icono iconoBuscar" aria-hidden="true"></span>
-            </button>
-            <input type="text" class="overviewSearchInput" aria-label="Buscar en la tabla" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        <div class="cuentasKpis">
+            <div
+                class="cuentasKpi"
+                title="Suma de todas las cuentas a día de hoy. La bancaria incluye lo apuntado en Gastos e Ingresos."
+            >
+                <span class="cuentasKpiTitulo">Total en cuentas</span>
+                <span class="cuentasKpiValor" id="cuentasTotal">—</span>
+            </div>
+            <div class="cuentasKpi" title="Cuánto ha cambiado el total desde el 1 de enero.">
+                <span class="cuentasKpiTitulo">Variación en el año</span>
+                <span class="cuentasKpiValor" id="cuentasVariacion">—</span>
+            </div>
+            <div
+                class="cuentasKpi"
+                title="Suma de las comisiones de las transferencias. Van aparte del importe: la cuenta de destino recibe la cantidad entera."
+            >
+                <span class="cuentasKpiTitulo">Comisiones pagadas</span>
+                <span class="cuentasKpiValor cuentasNeg" id="cuentasComisiones">—</span>
+            </div>
+            <div class="cuentasKpi">
+                <span class="cuentasKpiTitulo">Cuentas</span>
+                <span class="cuentasKpiValor" id="cuentasNumero">—</span>
+            </div>
         </div>
-        <div class="overviewDivider tablaBusquedaDivisor"></div>
-        <div class="cuentasYearList" id="cuentasYearList"></div>
-        <button id="cuentasAddRowBtn" class="primaryButton" type="button">Nueva transferencia</button>
         <div class="pageActionsMenu" id="cuentasActionsMenu">
             <button class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true">···</button>
             <div class="pageActionsDropdown" id="cuentasActionsDropdown">
@@ -21,34 +36,27 @@
     </div>
 
     <div class="cuentasLayout">
-        <div class="cuentasMain">
-            <div class="cuentasFiltro" id="cuentasFiltro" hidden>
-                <span>Mostrando solo los movimientos de</span>
-                <strong id="cuentasFiltroNombre"></strong>
-                <button type="button" class="cuentasFiltroQuitar" id="cuentasFiltroQuitar">Ver todas</button>
-            </div>
-
-            <div class="gastosMovementsWrapper cuentasTableWrapper">
-                <table class="gastosMovementsTable" id="cuentasTable">
-                    <thead id="cuentasHead"></thead>
-                    <tbody id="cuentasBody"></tbody>
-                </table>
-                <p class="overviewEmpty hidden" id="cuentasEmpty"></p>
-            </div>
-        </div>
+        <div class="cuentasLista" id="cuentasLista"></div>
 
         <aside class="cuentasSide">
-            <div class="summaryCard cuentasTotalCard">
-                <div class="cuentasTotalBloque" title="Suma de todas las cuentas a día de hoy. La bancaria incluye lo apuntado en Gastos e Ingresos.">
-                    <div class="summaryCardTitle">Total en cuentas</div>
-                    <div class="summaryCardValue" id="cuentasTotal">—</div>
+            <section class="cntTotalCard" id="cuentasLateral">
+                <div id="cuentasLateralTabs"></div>
+                <div class="cntTotalCab">
+                    <h3 class="cntTotalTitulo" id="cuentasLateralTitulo"></h3>
+                    <div class="cntLateralSub" id="cuentasLateralSub"></div>
                 </div>
-                <div class="cuentasTotalBloque" title="Suma de las comisiones de las transferencias. Van aparte del importe: la cuenta de destino recibe la cantidad entera.">
-                    <div class="summaryCardTitle">Comisiones pagadas</div>
-                    <div class="summaryCardValue cuentasNeg" id="cuentasComisiones">—</div>
+                <div id="cuentasTotalRangos"></div>
+                <div class="cntGraficaCaja cntTotalGraficaCaja">
+                    <canvas id="cuentasTotalGrafica" aria-label="Gráfico de las cuentas"></canvas>
+                    <div class="cntDonutCentro" id="cuentasLateralCentro" aria-hidden="true" hidden>
+                        <span class="cntDonutCentroValor"></span>
+                        <span class="cntDonutCentroTitulo"></span>
+                        <span class="cntDonutCentroPct"></span>
+                    </div>
                 </div>
-            </div>
-            <div class="cuentasLista" id="cuentasLista"></div>
+                <p class="overviewEmpty hidden" id="cuentasTotalVacio"></p>
+                <ul class="cntLeyenda" id="cuentasLateralLeyenda"></ul>
+            </section>
         </aside>
     </div>
 </section>

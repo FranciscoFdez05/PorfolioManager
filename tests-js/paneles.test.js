@@ -6,8 +6,8 @@
 // TradingView, los textos de variación de cada proveedor— y las que deciden qué
 // activos ve cada widget. Un fallo en ellas no se ve como un error: se ve como
 // un panel que se queda vacío o enseña otra cosa.
-import { beforeAll, beforeEach, describe, expect, it } from "vitest"
-import { cargarScript } from "./cargar.js"
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest"
+import { cargarModulo, cargarScript } from "./cargar.js"
 
 beforeAll(() => {
     // Chart.js lo carga la página desde vendor; paneles.js solo lo usa al pintar.
@@ -18,7 +18,7 @@ beforeAll(() => {
     cargarScript("js/core/shared-utils.js")
     cargarScript("js/analisis/heatmap.js")
     cargarScript("js/analisis/sentimiento.js")
-    cargarScript("js/cartera/paneles.js")
+    cargarModulo("js/cartera/paneles.js")
 })
 
 const activo = (id, extra = {}) => ({
@@ -128,6 +128,40 @@ describe("pnPanelImportado: un fichero que pudo editar cualquiera", () => {
         const panel = importar({ widgets: [{ tipo: "notas", w: "4", h: 1e309, cfg: { a: { b: 1 }, n: 1e309 } }] })
         expect(panel.widgets[0].cfg).toEqual({})
         expect(Number.isFinite(panel.widgets[0].h)).toBe(true)
+    })
+
+    it("conserva los tamaños con fracciones, redondeados al paso fino de la rejilla", () => {
+        const panel = importar({ widgets: [{ tipo: "notas", w: 4.5, h: 3.26 }] })
+        expect(panel.widgets[0].w).toBe(4.5)
+        expect(panel.widgets[0].h).toBe(3.25)
+    })
+})
+
+describe("pnAplicarTamano: tamaño libre en la rejilla fina", () => {
+    const aplicar = (w, h) => {
+        const el = document.createElement("div")
+        const widget = { tipo: "notas", w, h }
+        pnAplicarTamano(el, widget)
+        return { el, widget }
+    }
+
+    it("un tamaño con fracciones ocupa sus pistas exactas", () => {
+        const { el, widget } = aplicar(4.5, 3.25)
+        expect(widget).toMatchObject({ w: 4.5, h: 3.25 })
+        expect(el.style.gridColumn).toBe("span 108")
+        expect(el.style.gridRow).toBe("span 78")
+        expect(el.style.getPropertyValue("--pn-h")).toBe("78")
+    })
+
+    it("se acota al mínimo del tipo y al ancho de la rejilla", () => {
+        const { widget } = aplicar(40, 0.5)
+        expect(widget.w).toBe(12)
+        expect(widget.h).toBe(2)
+    })
+
+    it("sin tamaño válido cae al de fábrica", () => {
+        const { widget } = aplicar("x", NaN)
+        expect(widget).toMatchObject({ w: 4, h: 4 })
     })
 })
 
@@ -317,5 +351,140 @@ describe("turnos de pintado", () => {
         const w = { id: "wQuitado", tipo: "notas", cfg: {} }
         document.body.innerHTML = ""
         expect(pnVigente(w, pnTurno(w))).toBe(false)
+    })
+})
+
+describe("mapa en rejilla", () => {
+    it("elige las columnas que dan casillas más grandes sin bajar del ancho mínimo", () => {
+        // 36 casillas en 1200×600: 6 columnas de 200×100, como la rejilla de referencia.
+        expect(pnRejillaColumnas(36, 1200, 600)).toBe(6)
+        // Un solo activo ocupa todo el ancho.
+        expect(pnRejillaColumnas(1, 800, 400)).toBe(1)
+        // En un lienzo estrecho nunca baja de PN_REJILLA_ANCHO_MIN por casilla.
+        const cols = pnRejillaColumnas(40, 500, 300)
+        expect(500 / cols).toBeGreaterThanOrEqual(PN_REJILLA_ANCHO_MIN)
+        // Muchos activos en un widget estrecho: no caben sin desplazar, y aun así
+        // reparte en columnas en vez de una sola de casillas estiradas.
+        expect(pnRejillaColumnas(32, 900, 670)).toBe(5)
+    })
+
+    it("ordena como el selector: por secciones y, dentro, como la lista", () => {
+        const posicion = pnOrdenSelector([
+            { id: "btc", conPosicion: true },
+            { id: "sinPos", conPosicion: false },
+            { id: "eth", conPosicion: true },
+            { id: "wl:x", watchlist: true },
+            { id: "tk|A", ticker: true },
+            // Repetido (el widget añade sus activos detrás de la lista): manda el primero.
+            { id: "btc", conPosicion: true }
+        ])
+        expect([...posicion.keys()]).toEqual(["btc", "eth", "sinPos", "wl:x", "tk|A"])
+    })
+
+    it("rotula con el nombre del activo salvo que se elija el símbolo", () => {
+        expect(pnRotuloPorNombre({})).toBe(true)
+        expect(pnRotuloPorNombre({ etiqueta: "simbolo" })).toBe(false)
+        expect(pnRotuloPorNombre({ etiqueta: "otra" })).toBe(true)
+    })
+
+    it("la forma por defecto es la rejilla y solo admite las conocidas", () => {
+        expect(pnFormaMapa({})).toBe("rejilla")
+        expect(pnFormaMapa({ forma: "treemap" })).toBe("treemap")
+        expect(pnFormaMapa({ forma: "otra" })).toBe("rejilla")
+    })
+
+    function casilla(precio) {
+        const el = document.createElement("div")
+        el.innerHTML = `<span class="pnRjExt" data-ext="max"></span><span class="pnRjExt" data-ext="min"></span>`
+        el._pn = { precio, currency: "EUR" }
+        return el
+    }
+
+    it("lleva el máximo y el mínimo de la línea a la escala del precio", () => {
+        // La línea va de 50 a 40 y acaba en 45; el precio mostrado es 90.
+        const el = casilla(90)
+        pnRejillaExtremos(el, [
+            [1, 50],
+            [2, 40],
+            [3, 45]
+        ])
+        const [max, min] = el.querySelectorAll(".pnRjExt")
+        expect(max.textContent).toBe(`H ${hmFormatPrice(100, "EUR")}`)
+        expect(min.textContent).toBe(`L ${hmFormatPrice(80, "EUR")}`)
+        expect(max.classList.contains("pnRjCerca")).toBe(false)
+    })
+
+    it("resalta el extremo que está tocando el precio", () => {
+        // La línea acaba en su mínimo: el precio está en el mínimo del día.
+        const el = casilla(30)
+        pnRejillaExtremos(el, [
+            [1, 50],
+            [2, 45]
+        ])
+        const min = el.querySelector('[data-ext="min"]')
+        const max = el.querySelector('[data-ext="max"]')
+        expect(min.textContent).toBe(`L ${hmFormatPrice(30, "EUR")}`)
+        expect(min.classList.contains("pnRjCerca")).toBe(true)
+        expect(max.classList.contains("pnRjCerca")).toBe(false)
+    })
+
+    it("sin serie deja los huecos vacíos", () => {
+        const el = casilla(10)
+        el.querySelector(".pnRjExt").textContent = "viejo"
+        pnRejillaExtremos(el, undefined)
+        expect([...el.querySelectorAll(".pnRjExt")].every((h) => h.textContent === "")).toBe(true)
+    })
+})
+
+describe("mapa de mercado: la lista de Seguimiento", () => {
+    beforeEach(() => {
+        datos([activo("btc", { tipo: "cripto" }), activo("aapl"), activo("oculto", { oculto: true })])
+        // segLoadCustomItems y buildTVSymbol los ponen seguimiento.js y assets.js, que esta prueba no carga.
+        globalThis.segLoadCustomItems = () => [
+            { _segId: "seguir_aapl", assetId: "aapl", nombre: "Apple" },
+            { _segId: "custom_1", nombre: "Nvidia", ticker: "NVDA", tipo: "acciones" },
+            { _segId: "seguir_borrado", assetId: "borrado" }
+        ]
+        globalThis.buildTVSymbol = (a) => a.marketSymbol || ""
+    })
+
+    afterEach(() => {
+        delete globalThis.segLoadCustomItems
+        delete globalThis.buildTVSymbol
+    })
+
+    it("sigue el orden de la lista y dice de dónde sale cada activo", () => {
+        const seguidos = pnActivosSeguimiento()
+
+        expect(seguidos.map((a) => [a.id, a.origen])).toEqual([
+            ["aapl", "Portfolio"],
+            ["wl:custom_1", "Nuevo"]
+        ])
+        expect(seguidos.every((a) => pnGrupoSelector(a) === "Seguimiento")).toBe(true)
+        // Copias: el activo de la cartera no queda marcado como seguido.
+        expect(_pnDatos.porId.get("aapl").seguido).toBeUndefined()
+    })
+
+    it("sin activos elegidos, el mapa de mercado parte de Seguimiento", () => {
+        const items = pnActivosDelWidget({}, { soloPosiciones: false, porDefecto: pnActivosSeguimiento() })
+        expect(items.map((a) => a.id)).toEqual(["aapl", "wl:custom_1"])
+
+        const elegidos = pnActivosDelWidget(
+            { activos: ["btc"] },
+            { soloPosiciones: false, porDefecto: pnActivosSeguimiento() }
+        )
+        expect(elegidos.map((a) => a.id)).toEqual(["btc"])
+    })
+
+    it("el selector del de mercado empieza por Seguimiento y no repite", () => {
+        const opciones = pnOpcionesMapa({}, true)
+        const ids = opciones.map((a) => a.id)
+
+        expect(ids.slice(0, 2)).toEqual(["aapl", "wl:custom_1"])
+        expect(new Set(ids).size).toBe(ids.length)
+        expect(ids).toContain("btc")
+        expect(ids).not.toContain("oculto")
+        // El de la cuenta no cambia.
+        expect(pnOpcionesMapa({}, false).some((a) => a.seguido)).toBe(false)
     })
 })

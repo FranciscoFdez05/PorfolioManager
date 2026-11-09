@@ -29,10 +29,12 @@ _parada = threading.Event()
 
 # Cada cuánto se vuelve a mirar Ajustes cuando los snapshots están desactivados.
 _ESPERA_DESACTIVADO = 300
+_ESPERA_REINTENTO = 300
+_reintentoPendiente = False
 
 
 def _ajustes():
-    from routes.ajustes import _readAjustes
+    from stores.ajustes_store import _readAjustes
     return _readAjustes()
 
 
@@ -70,7 +72,7 @@ def _intervalo() -> int:
 
 def _snapshotsActivos() -> bool:
     """False si el usuario ha puesto los snapshots en 'Off' en Ajustes."""
-    from routes.ajustes import DEFAULT_SNAPSHOT_MINUTES
+    from stores.ajustes_store import DEFAULT_SNAPSHOT_MINUTES
     try:
         minutos = int(_ajustes().get("snapshotMinutes", DEFAULT_SNAPSHOT_MINUTES))
     except (TypeError, ValueError):
@@ -93,14 +95,32 @@ def _esperaHastaSiguiente(ahora=None) -> float:
     return max(1.0, siguiente - ahora)
 
 
-def ejecutarUnaVez(refrescarPrecios=True) -> int:
+def _preciosSinPosicion(ruta) -> list:
+    """Precios para los minigráficos de lo que no está en cartera, o nada si fallan.
+
+    Son un extra del punto: si no se pueden pedir, el punto de la cartera se
+    guarda igual y esas baldosas se quedan sin línea en este hueco.
+    """
+    from stores.valoracion import preciosSinPosicion
+
+    try:
+        return preciosSinPosicion()
+    except Exception as e:
+        log.warning("[snapshots] %s: no se pudieron cotizar los activos sin posición: %s", ruta.stem, e)
+        return []
+
+
+def ejecutarUnaVez(refrescarPrecios=True, esReintento=False) -> int:
     """Guarda el punto pendiente en cada portfolio objetivo. Devuelve cuántos."""
     from core.bloqueo import BloqueoOcupado
     from routes.backup import bloqueoSiLibre
-    from routes.snapshots import guardarSnapshot, reservarBucket
+    from routes.snapshots import guardarSnapshot, liberarBucket, reservarBucket
     from stores.valoracion import registrarFallbacks, registrarOmision, valorarPortfolio
 
+    global _reintentoPendiente
     guardados = 0
+    ahora = time.time()
+    huboFallos = False
     try:
         rutas = _rutasObjetivo()
     except Exception as e:
@@ -110,14 +130,17 @@ def ejecutarUnaVez(refrescarPrecios=True) -> int:
         return 0
 
     for ruta in rutas:
+        reservado = False
+        liberar = False
         try:
             # Una importación o un restore reescribe la cartera: un punto tomado
             # a medias guardaría un valor que nunca existió. Si hay uno en curso
             # se salta, sin reclamar el hueco, y se vuelve en el siguiente.
             with bloqueoSiLibre(), useDbPath(ruta):
-                if not reservarBucket():
+                if not reservarBucket(ahora):
                     log.debug("[snapshots] %s: el hueco actual ya está reclamado", ruta.stem)
                     continue
+                reservado = True
 
                 valoracion = valorarPortfolio(refrescarPrecios=refrescarPrecios)
                 if valoracion["activos"] == 0:
@@ -131,10 +154,12 @@ def ejecutarUnaVez(refrescarPrecios=True) -> int:
                         "[snapshots] %s: valoración incompleta (falta un tipo de cambio o un precio); "
                         "no se guarda el punto", ruta.stem,
                     )
+                    liberar = True
                     continue
 
                 if guardarSnapshot(
-                    valoracion["total_value"], valoracion["total_invested"], valoracion["assets"]
+                    valoracion["total_value"], valoracion["total_invested"], valoracion["assets"],
+                    precios=_preciosSinPosicion(ruta) if refrescarPrecios else (),
                 ):
                     guardados += 1
                     log.info(
@@ -148,7 +173,20 @@ def ejecutarUnaVez(refrescarPrecios=True) -> int:
             # Un portfolio que falle no puede llevarse por delante a los demás
             # ni matar el hilo: el histórico se recupera en el siguiente hueco.
             log.warning("[snapshots] %s: no se pudo guardar el punto: %s", ruta.stem, e)
+            liberar = reservado
+        finally:
+            if liberar:
+                # El hueco reclamado queda libre para el reintento; si no, el
+                # punto se perdería hasta el siguiente hueco.
+                huboFallos = True
+                try:
+                    with useDbPath(ruta):
+                        liberarBucket(ahora)
+                except Exception as e:
+                    log.warning("[snapshots] %s: no se pudo liberar el hueco: %s", ruta.stem, e)
 
+    # Un solo reintento por hueco: evita pedir cotizaciones en bucle si el fallo persiste.
+    _reintentoPendiente = huboFallos and not esReintento
     return guardados
 
 
@@ -157,10 +195,15 @@ _plazoPasadaSegundos = 3 * 3600
 
 
 def _bucle():
+    global _reintentoPendiente
     while not _parada.is_set():
+        reintento = _reintentoPendiente
+        _reintentoPendiente = False
         try:
             activo = _snapshotsActivos()
             espera = _esperaHastaSiguiente() if activo else _ESPERA_DESACTIVADO
+            if activo and reintento:
+                espera = min(espera, _ESPERA_REINTENTO)
         except Exception as e:
             log.warning("[snapshots] No se pudo calcular la próxima ejecución: %s", e)
             activo, espera = False, _ESPERA_DESACTIVADO
@@ -169,7 +212,7 @@ def _bucle():
         if _parada.wait(espera):
             return
         if activo:
-            ejecutarUnaVez()
+            ejecutarUnaVez(esReintento=reintento)
 
 
 def iniciar():

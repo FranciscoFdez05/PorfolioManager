@@ -8,7 +8,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { runInThisContext } from "node:vm"
 
-import { cargarScript } from "./cargar.js"
+import { cargarModulo, cargarScript } from "./cargar.js"
 
 // Las variables de primer nivel del script (let/const) no cuelgan de window:
 // solo se ven desde otro script del mismo contexto.
@@ -34,7 +34,7 @@ const vaciarCola = () => new Promise((resolver) => setTimeout(resolver, 0))
 
 beforeAll(() => {
     cargarScript("js/cripto/wallets.js")
-    cargarScript("js/cripto/wallets-seguimiento.js")
+    cargarModulo("js/cripto/wallets-seguimiento.js")
 })
 
 beforeEach(() => {

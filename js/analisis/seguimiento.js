@@ -12,7 +12,9 @@ const AV_SEG_TYPE_LABELS = {
 }
 
 // Orígenes de la watchlist: se ve uno cada vez, el primero por defecto.
-const SEG_SOURCES = ["portfolio", "operaciones", "nuevos", "seguimiento"]
+// «seguimiento» es la lista que elige el usuario (activos del portfolio y nuevos)
+// y «wallets», la cripto de sus wallets.
+const SEG_SOURCES = ["portfolio", "operaciones", "nuevos", "seguimiento", "wallets"]
 
 let _segAllItems = []
 let _segFilterType = "all"
@@ -135,8 +137,10 @@ function segFilteredItems() {
             (_segFilterSrc === "operaciones" && item._fromOperaciones) ||
             (_segFilterSrc === "nuevos" &&
                 !item._fromWallets &&
+                !item._refActivo &&
                 ((!item._fromPortfolio && !item._fromOperaciones) || item._isWatchOnly)) ||
-            (_segFilterSrc === "seguimiento" && item._fromWallets)
+            (_segFilterSrc === "seguimiento" && item._seguido) ||
+            (_segFilterSrc === "wallets" && item._fromWallets)
         const q = _segSearch.toLowerCase()
         const matchSearch =
             !q ||
@@ -149,6 +153,7 @@ function segFilteredItems() {
 
 function segOrigenTexto(item) {
     if (item._fromWallets) return item.sospechoso ? "Wallets · sospechoso" : "Wallets"
+    if (item._refActivo) return "Portfolio"
     return item._fromPortfolio && !item._isWatchOnly ? "Portfolio" : "Nuevo"
 }
 
@@ -188,11 +193,13 @@ function segBuildCard(item) {
     }
 
     const sid = escapeHtml(item._segId || "")
-    const hideOrDeleteItem = item._isWatchOnly
-        ? `<button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segWatchDeleteBtn" data-seg-id="${sid}">Eliminar</button>`
-        : item._fromPortfolio || item._fromOperaciones
-          ? `<button type="button" class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${sid}">Ocultar</button>`
-          : `<button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${sid}">Eliminar</button>`
+    const hideOrDeleteItem = item._refActivo
+        ? segQuitarSeguidoHtml(sid)
+        : item._isWatchOnly
+          ? `<button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segWatchDeleteBtn" data-seg-id="${sid}">Eliminar</button>`
+          : item._fromPortfolio || item._fromOperaciones
+            ? `<button type="button" class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${sid}">Ocultar</button>`
+            : `<button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${sid}">Eliminar</button>`
     // Lo de las wallets se gestiona en Cripto › Seguimiento: aquí solo se le pone ticker, no se edita ni se quita.
     const actionBtns = item._fromWallets
         ? segWalletMenuHtml(item)
@@ -200,8 +207,7 @@ function segBuildCard(item) {
         <div class="rowMenu">
             <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
             <div class="rowMenuDropdown">
-                <button type="button" class="rowMenuItem avActionBtn avEditBtn segEditBtn" data-seg-id="${sid}">Editar</button>
-                <hr>
+                ${item._refActivo ? "" : `<button type="button" class="rowMenuItem avActionBtn avEditBtn segEditBtn" data-seg-id="${sid}">Editar</button><hr>`}
                 ${hideOrDeleteItem}
             </div>
         </div>`
@@ -276,19 +282,20 @@ function segRenderTable(filtered) {
         const changeMoneyStr = changePctStr ? `${changeSign}${segFormatoPrecio(changeAbs, currency)}` : "—"
         const changePctDisp = changePctStr || "—"
         const tsid = escapeHtml(item._segId || "")
-        const tHideOrDelItem = item._isWatchOnly
-            ? `<button class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segWatchDeleteBtn" data-seg-id="${tsid}">Eliminar</button>`
-            : item._fromPortfolio || item._fromOperaciones
-              ? `<button class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${tsid}">Ocultar</button>`
-              : `<button class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${tsid}">Eliminar</button>`
+        const tHideOrDelItem = item._refActivo
+            ? segQuitarSeguidoHtml(tsid)
+            : item._isWatchOnly
+              ? `<button class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segWatchDeleteBtn" data-seg-id="${tsid}">Eliminar</button>`
+              : item._fromPortfolio || item._fromOperaciones
+                ? `<button class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${tsid}">Ocultar</button>`
+                : `<button class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${tsid}">Eliminar</button>`
         const removeCell = item._fromWallets
             ? segWalletMenuHtml(item)
             : `
             <div class="rowMenu">
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                 <div class="rowMenuDropdown">
-                    <button class="rowMenuItem avActionBtn avEditBtn segEditBtn" data-seg-id="${tsid}">Editar</button>
-                    <hr>
+                    ${item._refActivo ? "" : `<button class="rowMenuItem avActionBtn avEditBtn segEditBtn" data-seg-id="${tsid}">Editar</button><hr>`}
                     ${tHideOrDelItem}
                 </div>
             </div>`
@@ -432,10 +439,27 @@ function segOpenHiddenModal() {
     overlay.classList.remove("hidden")
 }
 
+// Un activo del portfolio en Seguimiento no se edita aquí (se edita en Activos):
+// su menú solo ofrece sacarlo de la lista.
+function segQuitarSeguidoHtml(sid) {
+    return `<button type="button" class="rowMenuItem avActionBtn segRemoveBtn" data-seg-id="${sid}">Quitar de Seguimiento</button>`
+}
+
+function segQuitarDeLista(segId) {
+    segSaveCustomItems(segLoadCustomItems().filter((c) => c._segId !== segId))
+    segMergeAndRender(window._segPortfolioAssets || [])
+}
+
 function segRemoveItem(segId) {
     if (segId.startsWith("portfolio_") || segId.startsWith("operacion_")) return
 
     const item = _segAllItems.find((i) => i._segId === segId)
+    // Sacar un activo del portfolio de Seguimiento no lo borra: se deshace
+    // volviendo a añadirlo, así que no se pide escribir su nombre.
+    if (item?._refActivo) {
+        segQuitarDeLista(segId)
+        return
+    }
     const itemName = item?.name || item?.symbol || segId
 
     openConfirmModal({
@@ -444,11 +468,7 @@ function segRemoveItem(segId) {
         confirmLabel: "Eliminar",
         confirmSide: "right",
         requireText: itemName,
-        onConfirm: () => {
-            const customs = segLoadCustomItems().filter((c) => c._segId !== segId)
-            segSaveCustomItems(customs)
-            segMergeAndRender(window._segPortfolioAssets || [])
-        }
+        onConfirm: () => segQuitarDeLista(segId)
     })
 }
 
@@ -566,15 +586,49 @@ function segRenderGrid() {
     }
 }
 
+/**
+ * Entrada de Seguimiento que apunta a un activo del portfolio, con sus datos al día.
+ *
+ * Se guarda solo el id (`assetId`): el precio, el ticker y el nombre salen del
+ * activo cada vez, igual que en la pestaña Portfolio, con los retoques de ticker
+ * que tenga ese activo.
+ *
+ * @param {object} entrada Entrada de la lista con `_segId` y `assetId`.
+ * @param {Array<object>} portfolioAssets Activos del portfolio.
+ * @param {object} overrides Retoques por `portfolio_<id>`.
+ * @returns {object|null} El elemento, o null si el activo ya no existe.
+ */
+function segItemReferencia(entrada, portfolioAssets, overrides) {
+    const asset = portfolioAssets.find((a) => String(a.id) === String(entrada.assetId))
+    if (!asset) return null
+    const ov = overrides[`portfolio_${asset.id}`] || {}
+    return {
+        ...asset,
+        _segId: entrada._segId,
+        _seguido: true,
+        _refActivo: true,
+        // No cuenta como de Portfolio ni de Operaciones: ya sale en esas pestañas por su cuenta.
+        _fromPortfolio: false,
+        _fromOperaciones: false,
+        _isWatchOnly: false,
+        tvSymbol: ov.tvSymbol ?? (asset.tvSymbol || ""),
+        marketProvider: ov.marketProvider ?? (asset.marketProvider || ""),
+        marketSymbol: ov.ticker ?? (asset.marketSymbol || asset.finnhubSymbol || "")
+    }
+}
+
 function segMergeAndRender(portfolioAssets) {
     window._segPortfolioAssets = portfolioAssets
     const customs = segLoadCustomItems()
+    // La lista guarda los dos tipos de entrada: activos nuevos (nombre y ticker
+    // propios) y referencias a activos del portfolio (solo `assetId`).
+    const propios = customs.filter((c) => !c.assetId)
     const portfolioKeys = new Set([
         ...portfolioAssets.map((a) => (a.name || "").toLowerCase()).filter(Boolean),
         ...portfolioAssets.map((a) => (a.symbol || "").toLowerCase()).filter(Boolean)
     ])
 
-    const customItems = customs
+    const customItems = propios
         .filter(
             (c) =>
                 !portfolioKeys.has((c.nombre || "").toLowerCase()) && !portfolioKeys.has((c.ticker || "").toLowerCase())
@@ -593,6 +647,7 @@ function segMergeAndRender(portfolioAssets) {
             currency: c.currency || "EUR",
             change: c.change || "",
             lastUpdated: c.lastUpdated || null,
+            _seguido: true,
             _fromPortfolio: false
         }))
 
@@ -617,7 +672,14 @@ function segMergeAndRender(portfolioAssets) {
 
     const operacionesItems = (window._segOperacionesItems || []).filter((item) => !hidden.has(item._segId))
 
-    _segAllItems = [...portfolioItems, ...operacionesItems, ...customItems, ...(window._segWalletItems || [])]
+    // Seguimiento enseña la lista en el orden en que se fue añadiendo, mezclando
+    // los dos tipos de entrada.
+    const propiosPorId = new Map(customItems.map((item) => [item._segId, item]))
+    const seguidos = customs
+        .map((c) => (c.assetId ? segItemReferencia(c, portfolioAssets, overrides) : propiosPorId.get(c._segId)))
+        .filter(Boolean)
+
+    _segAllItems = [...portfolioItems, ...operacionesItems, ...seguidos, ...(window._segWalletItems || [])]
     segRenderGrid()
     segUpdateHiddenBtn()
 }
@@ -815,6 +877,83 @@ async function segRecargarWalletItem(segId) {
 }
 
 // El filtro guardado antes de ser de una sola opción era "all" o una lista.
+/**
+ * Añade a la lista referencias a activos del portfolio, sin repetir los que ya estén.
+ *
+ * @param {Array<object>} lista Lista actual (no se modifica).
+ * @param {Array<string>} ids Ids de los activos elegidos, en el orden en que se añaden.
+ * @param {Array<object>} portfolioAssets Activos del portfolio, para el nombre y el tipo.
+ * @returns {Array<object>} La lista nueva.
+ */
+function segAnadirReferencias(lista, ids, portfolioAssets) {
+    const yaSeguidos = new Set(lista.filter((c) => c.assetId).map((c) => String(c.assetId)))
+    const nuevas = ids
+        .map(String)
+        .filter((id) => !yaSeguidos.has(id))
+        .map((id) => {
+            const asset = portfolioAssets.find((a) => String(a.id) === id)
+            // El nombre y el tipo solo identifican la entrada en la copia guardada;
+            // lo que se enseña sale siempre del activo.
+            return { _segId: `seguir_${id}`, assetId: id, nombre: asset?.name || id, tipo: asset?.type || "" }
+        })
+    return [...lista, ...nuevas]
+}
+
+/** Ids marcados en la lista del paso «Activo del portfolio». */
+function segMarcadosEn(contenedor) {
+    return new Set(
+        [...(contenedor?.querySelectorAll("input[type=checkbox]:checked:not(:disabled)") || [])].map((cb) => cb.value)
+    )
+}
+
+/**
+ * Lista de activos del portfolio para añadir a Seguimiento, filtrada por nombre o
+ * ticker. Los que ya están en Seguimiento salen marcados y sin poder tocarse.
+ *
+ * @param {HTMLElement} contenedor Donde se pinta.
+ * @param {string} consulta Texto del buscador.
+ * @param {Set<string>} marcados Ids marcados antes de filtrar, para no perderlos.
+ */
+function segPintarExistentes(contenedor, consulta, marcados) {
+    if (!contenedor) return
+    const q = String(consulta || "")
+        .trim()
+        .toLowerCase()
+    const yaSeguidos = new Set(
+        segLoadCustomItems()
+            .filter((c) => c.assetId)
+            .map((c) => String(c.assetId))
+    )
+    const activos = (window._segPortfolioAssets || []).filter((a) => {
+        if (!q) return true
+        const ticker = a.marketSymbol || a.finnhubSymbol || a.ticker || ""
+        return [a.name, a.symbol, ticker].some((t) =>
+            String(t || "")
+                .toLowerCase()
+                .includes(q)
+        )
+    })
+    if (!activos.length) {
+        contenedor.innerHTML = `<p class="segAddVacio">${q ? "Ningún activo coincide" : "No hay activos en el portfolio"}</p>`
+        return
+    }
+    contenedor.innerHTML = activos
+        .map((a) => {
+            const id = String(a.id)
+            const seguido = yaSeguidos.has(id)
+            const color = AV_SEG_TYPE_COLORS[a.type] || "#888"
+            const tipo = AV_SEG_TYPE_LABELS[a.type] || a.type || ""
+            const ticker = a.marketSymbol || a.finnhubSymbol || a.ticker || ""
+            return `<label class="segAddFila${seguido ? " segAddFilaSeguida" : ""}">
+                <input type="checkbox" value="${escapeHtml(id)}"${seguido || marcados.has(id) ? " checked" : ""}${seguido ? " disabled" : ""}>
+                <span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${escapeHtml(tipo)}</span>
+                <span class="segAddFilaNombre">${escapeHtml(a.name || a.symbol || id)}</span>
+                <span class="segAddFilaTicker">${seguido ? "Ya en Seguimiento" : escapeHtml(ticker)}</span>
+            </label>`
+        })
+        .join("")
+}
+
 function segParseSavedSource(saved) {
     const valor = Array.isArray(saved) ? saved[0] : saved
     return SEG_SOURCES.includes(valor) ? valor : SEG_SOURCES[0]
@@ -1160,6 +1299,27 @@ async function initSeguimientoLogic() {
         }
     }
 
+    // El modal tiene tres pasos: elegir qué añadir, elegir activos del portfolio o
+    // dar de alta uno nuevo (el formulario de siempre).
+    const pasos = {
+        elegir: document.getElementById("segAddPasoElegir"),
+        existente: document.getElementById("segAddPasoExistente"),
+        nuevo: document.getElementById("segAddPasoNuevo")
+    }
+    const existenteBuscar = document.getElementById("segAddExistenteBuscar")
+    const existenteLista = document.getElementById("segAddExistenteLista")
+    const existenteConfirmBtn = document.getElementById("segAddExistenteConfirmBtn")
+
+    function mostrarPaso(paso) {
+        Object.entries(pasos).forEach(([nombre, el]) => el?.classList.toggle("hidden", nombre !== paso))
+        if (paso === "nuevo") nombreInput?.focus()
+        if (paso === "existente") {
+            if (existenteBuscar) existenteBuscar.value = ""
+            segPintarExistentes(existenteLista, "", new Set())
+            existenteBuscar?.focus()
+        }
+    }
+
     function openModal() {
         if (!modalOverlay) return
         nombreInput.value = ""
@@ -1169,8 +1329,38 @@ async function initSeguimientoLogic() {
         segHideSuggestions()
         segClearSearch()
         modalOverlay.classList.remove("hidden")
-        nombreInput.focus()
+        mostrarPaso("elegir")
     }
+
+    modalOverlay?.addEventListener("click", (e) => {
+        const opcion = e.target.closest("[data-seg-paso]")
+        if (opcion) mostrarPaso(opcion.dataset.segPaso)
+        if (e.target.closest("[data-seg-cerrar]")) closeModal()
+    })
+
+    existenteBuscar?.addEventListener("input", () => {
+        segPintarExistentes(existenteLista, existenteBuscar.value, segMarcadosEn(existenteLista))
+    })
+    existenteBuscar?.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeModal()
+    })
+
+    existenteConfirmBtn?.addEventListener("click", () => {
+        const ids = [...segMarcadosEn(existenteLista)]
+        if (!ids.length) {
+            existenteBuscar?.focus()
+            return
+        }
+        segSaveCustomItems(segAnadirReferencias(segLoadCustomItems(), ids, portfolioAssets))
+        closeModal()
+        segMergeAndRender(portfolioAssets)
+        if (_segFilterSrc !== "seguimiento") {
+            window.showToast?.(
+                ids.length === 1 ? "Añadido a Seguimiento" : `${ids.length} activos añadidos a Seguimiento`,
+                { type: "success" }
+            )
+        }
+    })
     function closeModal() {
         segHideSuggestions()
         segClearSearch()

@@ -41,8 +41,10 @@
     <link rel="stylesheet" href="css/pages/ingresos-kpi.css">
     <link rel="stylesheet" href="css/pages/ahorro.css">
     <link rel="stylesheet" href="css/pages/cuenta-ahorro.css">
+    <link rel="stylesheet" href="css/pages/cuenta-remunerada.css">
     <link rel="stylesheet" href="css/pages/intereses.css">
     <link rel="stylesheet" href="css/pages/cuentas.css">
+    <link rel="stylesheet" href="css/pages/movimientos-cuentas.css">
     <link rel="stylesheet" href="css/pages/calendario.css">
     <link rel="stylesheet" href="css/pages/ventas.css">
     <link rel="stylesheet" href="css/pages/fundamentales.css">
@@ -84,12 +86,20 @@
     <!-- api.js envuelve fetch DESPUÉS de csrf.js (sesión caducada, timeouts);
          dom.js expone escapeHtml y los helpers que usan todos los módulos. -->
     <script defer src="js/core/api.js"></script>
+    <!-- cache-api.js envuelve el fetch de api.js: guarda unos segundos las
+         lecturas de datos de la BD y las vacía con cualquier escritura.
+         cache-paginas.js guarda en memoria el HTML de cada ventana. -->
+    <script defer src="js/core/cache-api.js"></script>
+    <script defer src="js/core/cache-paginas.js"></script>
     <script defer src="js/core/dom.js"></script>
     <script defer src="js/core/progreso.js"></script>
     <!-- tooltips.js cambia el title nativo del navegador por un tooltip con estilo. -->
     <script defer src="js/core/tooltips.js"></script>
     <!-- tablas.js reparte por igual el hueco entre columnas en todas las tablas. -->
     <script defer src="js/core/tablas.js"></script>
+    <!-- recuperacion.js avisa de los errores no capturados y reabre la vista
+         cuando el servidor vuelve tras una caída. Después de dom.js. -->
+    <script defer src="js/core/recuperacion.js"></script>
 </head>
 <body>
 
@@ -287,7 +297,10 @@
                         <button class="navBtn navDropdownItem" data-page="calendario">Calendario</button>
                         <button class="navBtn navDropdownItem" data-page="ahorro">Ahorro</button>
                         <button class="navBtn navDropdownItem" data-page="cuentas">Cuentas</button>
-                        <button class="navBtn navDropdownItem" data-page="cuentaAhorro">Cuenta de ahorro</button>
+                        <button class="navBtn navDropdownItem" data-page="movimientosCuentas">Movimientos</button>
+                        <!-- Fuera del menú: solo se llega desde «Abrir cuenta de ahorro» en las tarjetas de Cuentas, que pulsa este botón. -->
+                        <button class="navBtn navDropdownItem" data-page="cuentaAhorro" style="display: none">Cuenta de ahorro</button>
+                        <button class="navBtn navDropdownItem" data-page="cuentaRemunerada">Cuenta remunerada</button>
                     </div>
                 </div>
 
@@ -2360,6 +2373,11 @@
 <script defer src="js/cripto/transacciones.js"></script>
 <script defer src="js/cripto/wallets.js"></script>
 <script defer src="js/cripto/wallets-seguimiento.js"></script>
+<script defer src="js/cripto/wallets-seguimiento-precio.js"></script>
+<script defer src="js/cripto/wallets-seguimiento-detalle.js"></script>
+<script defer src="js/cripto/wallets-seguimiento-libreta.js"></script>
+<script defer src="js/cripto/wallets-seguimiento-visores.js"></script>
+<script defer src="js/cripto/wallets-seguimiento-todas.js"></script>
 <script defer src="js/cripto/carteras-conocidas.js"></script>
 <script defer src="js/cripto/satoshi-vigilancia.js"></script>
 <script defer src="js/cripto/stablecoins.js"></script>
@@ -2369,11 +2387,20 @@
 <script defer src="js/cripto/earn.js"></script>
 <script defer src="js/cripto/conversiones.js"></script>
 <script defer src="js/analisis/herramientas.js"></script>
+<script defer src="js/analisis/herramientas-rebalanceo.js"></script>
+<script defer src="js/analisis/herramientas-extra.js"></script>
+<script defer src="js/analisis/herramientas-calculadoras.js"></script>
+<script defer src="js/analisis/herramientas-ratios.js"></script>
+<script defer src="js/analisis/herramientas-capitalizacion.js"></script>
 <script defer src="js/analisis/herramientas-divisas.js"></script>
 <script defer src="js/finanzas/bonos.js"></script>
 <script defer src="js/analisis/metricas.js"></script>
 <script defer src="js/analisis/metricas-graficos.js"></script>
 <script defer src="js/analisis/metricas-flujos.js"></script>
+<script defer src="js/analisis/metricas-flujos-ingresos.js"></script>
+<script defer src="js/analisis/metricas-flujos-comparativa.js"></script>
+<script defer src="js/analisis/metricas-flujos-saldo.js"></script>
+<script defer src="js/analisis/metricas-flujos-concentracion.js"></script>
 <script defer src="js/analisis/metricas-rentabilidad.js"></script>
 <script defer src="js/analisis/metricas-finanzas.js"></script>
 <script defer src="js/analisis/metricas-init.js"></script>
@@ -2388,11 +2415,21 @@
 <script defer src="js/core/shared-utils.js"></script>
 <script defer src="js/core/flujos-grafo.js"></script>
 <script defer src="js/core/fusion-anual.js"></script>
+<script defer src="js/core/mapa-dia.js"></script>
 <script defer src="js/analisis/heatmap.js"></script>
 <script defer src="js/analisis/seguimiento.js"></script>
 <script defer src="js/analisis/fundamentales.js"></script>
 <script defer src="js/analisis/sentimiento.js"></script>
 <script defer src="js/cartera/paneles.js"></script>
+<script defer src="js/cartera/paneles-intercambio.js"></script>
+<script defer src="js/cartera/paneles-rejilla.js"></script>
+<script defer src="js/cartera/paneles-menu.js"></script>
+<script defer src="js/cartera/paneles-ajustes.js"></script>
+<script defer src="js/cartera/paneles-mapa.js"></script>
+<script defer src="js/cartera/paneles-tradingview.js"></script>
+<script defer src="js/cartera/paneles-cartera.js"></script>
+<script defer src="js/cartera/paneles-sentimiento.js"></script>
+<script defer src="js/cartera/paneles-metricas.js"></script>
 <script defer src="js/cartera/portfolios.js"></script>
 <script defer src="js/cartera/private-market.js"></script>
 <script defer src="js/cartera/planes.js"></script>
@@ -2400,7 +2437,11 @@
 <script defer src="js/cartera/alertas-precio.js"></script>
 <script defer src="js/finanzas/ahorro.js"></script>
 <script defer src="js/finanzas/cuenta-ahorro.js"></script>
+<script defer src="js/finanzas/cuenta-remunerada.js"></script>
 <script defer src="js/finanzas/cuentas.js"></script>
+<script defer src="js/finanzas/cuentas-graficos.js"></script>
+<script defer src="js/finanzas/cuentas-detalle.js"></script>
+<script defer src="js/finanzas/cuentas-movimientos.js"></script>
 <script defer src="js/finanzas/calendario.js"></script>
 <script defer src="js/core/informes.js"></script>
 </body>

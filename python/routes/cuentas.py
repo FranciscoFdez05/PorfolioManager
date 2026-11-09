@@ -1,13 +1,16 @@
 """Cuentas de dinero y transferencias entre ellas (ventana «Cuentas»)."""
 
+import datetime
 import logging
 
 from flask import Blueprint, jsonify, request
 
 from core.dinero import aTexto
-from routes.ajustes import _activePortfolioId, _readPrefs, _writePrefs
+from core.validation import jsonBody
 from routes.cuenta_ahorro import pasarVinculosAntiguos
+from stores.ajustes_store import _activePortfolioId, _readPrefs, _writePrefs
 from stores.cuenta_ahorro_store import claveDeCuenta, renombrarEnConfig
+from stores.cuentas_historico import gastosPorCategoria, historicoSaldos
 from stores.cuentas_store import (
     ETIQUETAS_TIPO,
     MONTH_KEYS,
@@ -23,6 +26,7 @@ from stores.cuentas_store import (
     listarTransferencias,
     modificarCuenta,
     modificarTransferencia,
+    movimientosDeCuenta,
     obtenerCuenta,
     reordenarCuentas,
     saldos,
@@ -43,6 +47,7 @@ def _conSaldo(cuenta, calculados):
     return {
         **cuenta,
         "tipo_etiqueta": ETIQUETAS_TIPO.get(cuenta["tipo"], cuenta["tipo"]),
+        "etiquetas_nombres": [ETIQUETAS_TIPO.get(e, e) for e in cuenta.get("etiquetas", [cuenta["tipo"]])],
         "entradas": aTexto(datos["entradas"], decimales=2) if datos else "0.00",
         "salidas": aTexto(datos["salidas"], decimales=2) if datos else "0.00",
         "comisiones": aTexto(datos["comisiones"], decimales=2) if datos else "0.00",
@@ -81,6 +86,52 @@ def getCuentas():
     })
 
 
+@cuentasBp.route("/api/cuentas/historico", methods=["GET"])
+def getHistorico():
+    """Saldo día a día de cada cuenta, para las gráficas de la ventana Cuentas."""
+    series = historicoSaldos()
+    return jsonify({
+        "cuentas": {
+            cuentaId: [
+                {
+                    "fecha": punto["fecha"].isoformat(),
+                    "entradas": aTexto(punto["entradas"], decimales=2),
+                    "salidas": aTexto(punto["salidas"], decimales=2),
+                    "saldo": aTexto(punto["saldo"], decimales=2),
+                }
+                for punto in puntos
+            ]
+            for cuentaId, puntos in series.items()
+        }
+    })
+
+
+@cuentasBp.route("/api/cuentas/gastos-categorias", methods=["GET"])
+def getGastosCategorias():
+    """Lo gastado por categoría desde `?desde=aaaa-mm-dd` (sin él, todo el histórico)."""
+    texto = request.args.get("desde", "").strip()
+    desde = None
+    if texto:
+        try:
+            desde = datetime.date.fromisoformat(texto)
+        except ValueError:
+            return _error("La fecha debe tener el formato aaaa-mm-dd")
+    categorias = gastosPorCategoria(desde)
+    return jsonify({
+        "categorias": [
+            {"categoria": c["categoria"], "importe": aTexto(c["importe"], decimales=2)} for c in categorias
+        ],
+    })
+
+
+@cuentasBp.route("/api/cuentas/<cuentaId>/movimientos", methods=["GET"])
+def getMovimientosCuenta(cuentaId):
+    """Transferencias, gastos e ingresos de una cuenta (detalle de la cuenta)."""
+    if obtenerCuenta(cuentaId) is None:
+        return _error("La cuenta no existe", 404)
+    return jsonify({"movimientos": movimientosDeCuenta(cuentaId)})
+
+
 @cuentasBp.route("/api/cuentas/saldos-mes", methods=["GET"])
 def getSaldosMes():
     """Saldo con el que cada cuenta entra en un mes, para la gráfica de Métricas."""
@@ -102,12 +153,13 @@ def getSaldosMes():
 
 @cuentasBp.route("/api/cuentas", methods=["POST"])
 def addCuenta():
-    datos = request.get_json(silent=True) or {}
+    datos = jsonBody(required=False)
     try:
         cuenta = crearCuenta(
             datos.get("nombre"), datos.get("tipo"), datos.get("saldoInicial", ""), datos.get("remunerada", ""),
             bool(datos.get("dividendos", False)),
             None if datos.get("ahorro") is None else bool(datos.get("ahorro")),
+            datos.get("etiquetas"),
         )
     except CuentaInvalida as error:
         return _error(error)
@@ -116,7 +168,7 @@ def addCuenta():
 
 @cuentasBp.route("/api/cuentas/orden", methods=["PUT"])
 def ordenCuentas():
-    datos = request.get_json(silent=True) or {}
+    datos = jsonBody(required=False)
     ids = datos.get("ids")
     if not isinstance(ids, list):
         return _error("Falta la lista de cuentas")
@@ -126,13 +178,15 @@ def ordenCuentas():
 
 @cuentasBp.route("/api/cuentas/<cuentaId>", methods=["PUT"])
 def editCuenta(cuentaId):
-    datos = request.get_json(silent=True) or {}
+    datos = jsonBody(required=False)
     antes = obtenerCuenta(cuentaId)
     try:
         cuenta = modificarCuenta(
             cuentaId, datos.get("nombre"), datos.get("saldoInicial"), datos.get("remunerada"),
             None if datos.get("dividendos") is None else bool(datos.get("dividendos")),
             None if datos.get("ahorro") is None else bool(datos.get("ahorro")),
+            datos.get("tipo"),
+            datos.get("etiquetas"),
         )
     except CuentaInvalida as error:
         return _error(error)
@@ -160,7 +214,7 @@ def getTransferencias():
 
 @cuentasBp.route("/api/transferencias", methods=["POST"])
 def addTransferencia():
-    datos = request.get_json(silent=True) or {}
+    datos = jsonBody(required=False)
     try:
         transferencia = crearTransferencia(
             datos.get("origen"), datos.get("destino"), datos.get("fecha"),
@@ -173,7 +227,7 @@ def addTransferencia():
 
 @cuentasBp.route("/api/transferencias/<int:transferenciaId>", methods=["PUT"])
 def editTransferencia(transferenciaId):
-    datos = request.get_json(silent=True) or {}
+    datos = jsonBody(required=False)
     try:
         transferencia = modificarTransferencia(
             transferenciaId, datos.get("origen"), datos.get("destino"), datos.get("fecha"),

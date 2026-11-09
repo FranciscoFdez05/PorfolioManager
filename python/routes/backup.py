@@ -31,7 +31,7 @@ from core.paths import (
     PORTFOLIOS_DIR as _PORTFOLIOS_DIR,
     PORTFOLIOS_META_FILE as _META_FILE,
 )
-from routes.ajustes import _RE_SAFE_PREFS_NAME, _readAjustes
+from stores.ajustes_store import _RE_SAFE_PREFS_NAME, _readAjustes
 
 log = logging.getLogger(__name__)
 

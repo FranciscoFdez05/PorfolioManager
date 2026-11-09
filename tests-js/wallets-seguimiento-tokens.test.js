@@ -4,7 +4,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { runInThisContext } from "node:vm"
 
-import { cargarScript } from "./cargar.js"
+import { cargarModulo, cargarScript } from "./cargar.js"
 
 const global = (expresion) => runInThisContext(expresion)
 
@@ -22,7 +22,7 @@ beforeAll(() => {
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
     cargarScript("js/cripto/wallets.js")
-    cargarScript("js/cripto/wallets-seguimiento.js")
+    cargarModulo("js/cripto/wallets-seguimiento.js")
 })
 
 beforeEach(() => {

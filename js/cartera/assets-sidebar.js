@@ -199,6 +199,8 @@ async function renderAssetsList(assets) {
         const dbIds = new Set(visible.map((a) => a.id))
         const dbNames = new Set(visible.map((a) => (a.name || "").toLowerCase()))
         for (const item of customSeg) {
+            // Las entradas con assetId apuntan a un activo del portfolio, que ya está en la lista.
+            if (item.assetId) continue
             const nombre = (item.nombre || item.ticker || "").trim()
             if (!nombre) continue
             const slugId =

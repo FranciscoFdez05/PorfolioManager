@@ -303,10 +303,24 @@ def testPorDefectoLaSesionNoCaducaPorInactividad(crearApp, bpPrueba, datosAislad
 
     client = _entrar(crearApp(bpPrueba))
     with client.session_transaction() as sesionPrueba:
-        sesionPrueba[sesion.VISTA] = time.time() - 30 * 24 * 3600
-        sesionPrueba[sesion.CREADA] = time.time() - 30 * 24 * 3600
+        # 29 y no 30 días: desde la 5.2.0 hay un tope absoluto de 30 días desde
+        # el login (SEC-02), que es otra regla y tiene su propio test abajo.
+        sesionPrueba[sesion.VISTA] = time.time() - 29 * 24 * 3600
+        sesionPrueba[sesion.CREADA] = time.time() - 29 * 24 * 3600
 
     assert client.get("/api/prueba").status_code == 200
+
+
+def testPorDefectoUnaSesionDeMasDe30DiasCaduca(crearApp, bpPrueba, datosAislados):
+    """Tope absoluto por defecto (SEC-02): pasados 30 días desde el login hay que volver a entrar."""
+    from core import sesion
+
+    client = _entrar(crearApp(bpPrueba))
+    with client.session_transaction() as sesionPrueba:
+        sesionPrueba[sesion.VISTA] = time.time() - 60
+        sesionPrueba[sesion.CREADA] = time.time() - 31 * 24 * 3600
+
+    assert client.get("/api/prueba").status_code == 401
 
 
 def testLaInactividadSeLeeDeAjustes(crearApp, bpPrueba, datosAislados):

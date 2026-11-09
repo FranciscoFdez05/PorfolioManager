@@ -6,8 +6,9 @@ Existen para que el panel de categorías pueda renombrar y eliminar sobre todos
 los años, no solo sobre el que el navegador tenga cargado.
 """
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
+from core.validation import jsonBody
 from stores.categorias_store import (
     CategoriaEnUso,
     CategoriaInvalida,
@@ -26,7 +27,7 @@ def getCategoriasResumen():
 
 @categoriasBp.route("/api/categorias/renombrar", methods=["POST"])
 def renameCategoria():
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
 
     try:
         filas = renombrarCategoria(
@@ -42,7 +43,7 @@ def renameCategoria():
 
 @categoriasBp.route("/api/categorias/eliminar", methods=["POST"])
 def deleteCategoria():
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
 
     try:
         eliminarCategoria(requestData.get("tipo"), requestData.get("label"))

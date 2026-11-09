@@ -16,7 +16,7 @@ beforeAll(() => {
     cargarScript("js/core/shared-utils.js")
     cargarModulo("js/cartera/assets.js")
     cargarScript("js/cripto/wallets.js")
-    cargarScript("js/cripto/wallets-seguimiento.js")
+    cargarModulo("js/cripto/wallets-seguimiento.js")
     cargarScript("js/analisis/seguimiento.js")
 })
 

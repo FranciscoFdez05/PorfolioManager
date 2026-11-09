@@ -41,6 +41,8 @@ _MAX_NOTA = 5000
 COLUMNAS = 12
 MIN_ALTO, MAX_ALTO = 2, 16
 MIN_ANCHO = 2
+# Pistas por columna y por fila en la pantalla (PN_SUBDIVISION en paneles.js).
+SUBDIVISION = 24
 
 
 def _texto(valor, maximo):
@@ -69,10 +71,27 @@ def _numero(valor) -> bool:
         return False
 
 
-def _entero(valor, minimo, maximo, defecto):
+def _tamano(valor, minimo: int, maximo: int, defecto: int) -> float | int:
+    """Acota un ancho o alto de widget, que puede llevar fracciones.
+
+    La pantalla parte cada columna y fila en SUBDIVISION pistas para que el
+    tamaño se ajuste casi libremente, así que el valor se redondea a ese paso
+    en vez de truncarse a entero. Un tamaño exacto se devuelve como int para
+    que los paneles de siempre se guarden igual que antes.
+
+    Args:
+        valor: el tamaño recibido, de cualquier tipo.
+        minimo: tamaño mínimo admitido.
+        maximo: tamaño máximo admitido.
+        defecto: tamaño si el valor no es un número válido.
+
+    Returns:
+        El tamaño acotado y redondeado a 1/SUBDIVISION.
+    """
     if not _numero(valor):
         return defecto
-    return max(minimo, min(maximo, int(valor)))
+    redondeado = round(max(minimo, min(maximo, valor)) * SUBDIVISION) / SUBDIVISION
+    return int(redondeado) if redondeado.is_integer() else round(redondeado, 4)
 
 
 def _opciones(cfg) -> dict:
@@ -100,8 +119,8 @@ def _widget(crudo):
     return {
         "id": ident,
         "tipo": crudo["tipo"],
-        "w": _entero(crudo.get("w"), MIN_ANCHO, COLUMNAS, 6),
-        "h": _entero(crudo.get("h"), MIN_ALTO, MAX_ALTO, 5),
+        "w": _tamano(crudo.get("w"), MIN_ANCHO, COLUMNAS, 6),
+        "h": _tamano(crudo.get("h"), MIN_ALTO, MAX_ALTO, 5),
         "cfg": _opciones(crudo.get("cfg")),
     }
 

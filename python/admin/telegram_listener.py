@@ -145,7 +145,12 @@ def _escuchar() -> bool:
 
     while not _parada.is_set():
         pulso.marcar("telegram", _plazoVueltaSegundos)
-        token, chatId = telegram_notifier.leerConfig()
+        try:
+            token, chatId = telegram_notifier.leerConfig()
+        except Exception as error:
+            # Un config ilegible no puede matar el hilo: se reintenta como sin configurar.
+            log.warning("[telegram] No se pudo leer la configuración: %s", error)
+            token, chatId = None, None
         if not token or not chatId:
             offset = None
             if _parada.wait(_ESPERA_SIN_CONFIGURAR):
@@ -168,8 +173,9 @@ def _escuchar() -> bool:
             continue
 
         for update in updates:
-            offset = update["update_id"] + 1
             try:
+                # Sin update_id válido no se puede avanzar el offset; se descarta.
+                offset = update["update_id"] + 1
                 _procesar(update, token, chatId)
             except Exception as error:
                 log.warning("[telegram] No se pudo procesar una actualización: %s", error)

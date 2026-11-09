@@ -403,11 +403,137 @@ class TestOperaciones:
         assert datos["operacionesSinPunto"] == 1
 
 
+def serieDelDia():
+    return grafico_activo.seriesDelDia(ahora=AHORA)
+
+
+@pytest.mark.usefixtures("tempDb", "sinRed")
+class TestSerieDelDia:
+    def testElEjeEsElDiaNaturalDeHoy(self):
+        datos = serieDelDia()
+
+        assert datos["inicio"] == marca(HOY, 0)
+        assert datos["fin"] == marca(HOY + timedelta(days=1), 0)
+        assert datos["series"] == {}
+
+    def testLineaDePrecioDesdeMedianocheSinLoDeAyer(self):
+        crearActivo([compra(HOY - timedelta(days=5), 10, 10)])
+        snapshot(marca(HOY - timedelta(days=1), 23), 90, 100)
+        snapshot(marca(HOY, 9), 110, 100)
+        snapshot(marca(HOY, 15), 120, 100)
+
+        assert serieDelDia()["series"] == {"acme": [[marca(HOY, 9), 11], [marca(HOY, 15), 12]]}
+
+    def testSinOperacionesUsaElValorDeLaPosicion(self):
+        crearActivo()
+        snapshot(marca(HOY, 9), 110, 0)
+        snapshot(marca(HOY, 15), 120, 0)
+
+        assert serieDelDia()["series"]["acme"] == [[marca(HOY, 9), 110], [marca(HOY, 15), 120]]
+
+    def testCadaCubetaSeQuedaConSuUltimoSnapshot(self):
+        crearActivo([compra(HOY - timedelta(days=5), 10, 10)])
+        snapshot(marca(HOY, 9), 100, 100)
+        snapshot(marca(HOY, 9) + 60, 105, 100)
+        snapshot(marca(HOY, 10), 110, 100)
+
+        assert serieDelDia()["series"]["acme"] == [[marca(HOY, 9) + 60, 10.5], [marca(HOY, 10), 11]]
+
+    def testUnActivoQueFallaNoQuitaLaSerieALosDemas(self, monkeypatch):
+        crearActivo([compra(HOY - timedelta(days=5), 10, 10)])
+        crearActivo([compra(HOY - timedelta(days=5), 10, 10)], assetId="rota")
+        for assetId in ("acme", "rota"):
+            snapshot(marca(HOY, 9), 110, 100, assetId)
+            snapshot(marca(HOY, 15), 120, 100, assetId)
+        original = grafico_activo.construirPuntos
+
+        def construirPuntosRoto(filas, tramos, moneda):
+            if filas and filas[0]["asset_id"] == "rota":
+                raise ValueError("datos corruptos")
+            return original(filas, tramos, moneda)
+
+        monkeypatch.setattr(grafico_activo, "construirPuntos", construirPuntosRoto)
+
+        assert list(serieDelDia()["series"]) == ["acme"]
+
+    def testUnSoloPuntoNoDibujaLineaYNoSale(self):
+        crearActivo([compra(HOY - timedelta(days=5), 10, 10)])
+        snapshot(marca(HOY, 9), 110, 100)
+
+        assert serieDelDia()["series"] == {}
+
+    def testSeparaLosActivosYDescartaLosBorrados(self):
+        crearActivo([compra(HOY - timedelta(days=5), 10, 10)])
+        crearActivo([compra(HOY - timedelta(days=5), 2, 50)], assetId="beta")
+        for assetId, valores in (("acme", (100, 110)), ("beta", (100, 90)), ("borrado", (5, 6))):
+            snapshot(marca(HOY, 9), valores[0], 100, assetId)
+            snapshot(marca(HOY, 15), valores[1], 100, assetId)
+
+        series = serieDelDia()["series"]
+
+        assert set(series) == {"acme", "beta"}
+        assert [precio for _ts, precio in series["beta"]] == [50, 45]
+
+
+def precioSinPosicion(ts, precio, assetId="wl:s1"):
+    conn = getDb()
+    conn.execute(
+        "INSERT INTO asset_price_snapshots (ts, asset_id, price_eur) VALUES (?, ?, ?)", (ts, assetId, precio)
+    )
+    conn.commit()
+
+
+@pytest.mark.usefixtures("tempDb", "sinRed")
+class TestSerieDelDiaSinPosicion:
+    def testUsaLosPreciosGuardadosSinLoDeAyer(self):
+        precioSinPosicion(marca(HOY - timedelta(days=1), 23), 9)
+        precioSinPosicion(marca(HOY, 9), 10.5)
+        precioSinPosicion(marca(HOY, 15), 11)
+
+        assert serieDelDia()["series"] == {"wl:s1": [[marca(HOY, 9), 10.5], [marca(HOY, 15), 11]]}
+
+    def testCadaCubetaSeQuedaConSuUltimoPrecio(self):
+        precioSinPosicion(marca(HOY, 9), 10)
+        precioSinPosicion(marca(HOY, 9) + 60, 10.2)
+        precioSinPosicion(marca(HOY, 10), 11)
+
+        assert serieDelDia()["series"]["wl:s1"] == [[marca(HOY, 9) + 60, 10.2], [marca(HOY, 10), 11]]
+
+    def testUnSoloPrecioNoSale(self):
+        precioSinPosicion(marca(HOY, 9), 10)
+
+        assert serieDelDia()["series"] == {}
+
+    def testLaSerieDeLaPosicionMandaSobreLaDePrecios(self):
+        # Vendido hoy: tiene snapshots de su posición de la mañana y precios de la tarde.
+        crearActivo([compra(HOY - timedelta(days=5), 10, 10)])
+        snapshot(marca(HOY, 9), 110, 100)
+        snapshot(marca(HOY, 10), 120, 100)
+        precioSinPosicion(marca(HOY, 15), 99, "acme")
+        precioSinPosicion(marca(HOY, 16), 98, "acme")
+
+        assert serieDelDia()["series"]["acme"] == [[marca(HOY, 9), 11], [marca(HOY, 10), 12]]
+
+
 class TestRuta:
     @pytest.fixture
     def cliente(self, clienteAutenticado, tempDb, sinRed):
         client, _cabeceras, _app = clienteAutenticado(activosBp)
         return client
+
+    def testSerieDelDiaDeTodosLosActivos(self, cliente):
+        crearActivo([compra(date.today() - timedelta(days=2), 1, 10)])
+        inicioHoy = int(datetime.combine(date.today(), time.min).timestamp())
+        snapshot(inicioHoy + 60, 10, 10)
+        snapshot(inicioHoy + 1800, 11, 10)
+
+        respuesta = cliente.get("/api/activos-serie-dia")
+
+        assert respuesta.status_code == 200
+        cuerpo = respuesta.get_json()
+        assert cuerpo["ok"] is True
+        assert cuerpo["inicio"] == inicioHoy
+        assert [precio for _ts, precio in cuerpo["series"]["acme"]] == [10, 11]
 
     def testDevuelveLaSerie(self, cliente):
         crearActivo([compra(date.today() - timedelta(days=2), 1, 10)])

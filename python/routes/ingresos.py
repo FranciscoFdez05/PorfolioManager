@@ -1,7 +1,8 @@
 from datetime import date
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
+from core.validation import jsonBody
 from stores import revisiones
 from stores.ingresos_store import (
     createDefaultIngresosYear,
@@ -34,7 +35,7 @@ def getIngresosTipos():
 
 @ingresosBp.route("/api/ingresos-tipos", methods=["POST"])
 def saveIngresosTipos():
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     types = sanitizeIngresosTypes(requestData.get("types", []))
     writeIngresosTypes(types)
     return jsonify({"ok": True, "types": types})
@@ -42,7 +43,7 @@ def saveIngresosTipos():
 
 @ingresosBp.route("/api/ingresos", methods=["POST"])
 def createIngresosYear():
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     year = normalizeYear(requestData.get("year"))
 
     if not year:
@@ -91,7 +92,7 @@ def getIngresosYear(year):
 
 @ingresosBp.route("/api/ingresos/<year>", methods=["POST"])
 def saveIngresosYear(year):
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     payload, error = sanitizeIngresosPayload(requestData, year)
 
     if error:

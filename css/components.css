@@ -3074,6 +3074,97 @@ button.calPopupTitulo:hover,
     white-space: nowrap;
 }
 
+/* Añadir a Seguimiento: primero se elige qué añadir y luego, si es del
+   portfolio, se marcan en una lista. */
+.segAddOpciones {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.segAddOpcion {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px;
+    text-align: left;
+    color: var(--text-primary);
+    background: var(--bg-header);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.segAddOpcion:hover,
+.segAddOpcion:focus-visible {
+    border-color: var(--accent, #3b82f6);
+}
+
+.segAddOpcion strong {
+    font-size: 0.95em;
+}
+
+.segAddOpcion span {
+    font-size: 0.82em;
+    color: var(--text-secondary);
+}
+
+.segAddLista {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: min(340px, calc(50 * var(--vh)));
+    margin-top: 10px;
+    overflow-y: auto;
+}
+
+.segAddFila {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    background: var(--bg-header);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.segAddFilaSeguida {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.segAddFilaNombre {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.9em;
+    color: var(--text-primary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.segAddFilaTicker {
+    font-size: 0.78em;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.segAddVacio {
+    padding: 16px 0;
+    margin: 0;
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+@media (max-width: 520px) {
+    .segAddOpciones {
+        grid-template-columns: 1fr;
+    }
+}
+
 .assetColorPicker {
     margin-bottom: 14px;
 }

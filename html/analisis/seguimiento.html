@@ -21,7 +21,8 @@
                 <label class="activosFilterBtn" data-source="portfolio"><input type="checkbox" checked><span>Portfolio</span></label>
                 <label class="activosFilterBtn" data-source="operaciones"><input type="checkbox"><span>Operaciones</span></label>
                 <label class="activosFilterBtn" data-source="nuevos"><input type="checkbox"><span>Nuevos</span></label>
-                <label class="activosFilterBtn" data-source="seguimiento" title="La cripto de tus wallets (Cripto › Seguimiento)"><input type="checkbox"><span>Seguimiento</span></label>
+                <label class="activosFilterBtn" data-source="seguimiento" title="Los activos que has elegido seguir: del portfolio o nuevos"><input type="checkbox"><span>Seguimiento</span></label>
+                <label class="activosFilterBtn" data-source="wallets" title="La cripto de tus wallets (Cripto › Seguimiento)"><input type="checkbox"><span>Wallets</span></label>
             </div>
             <span class="activosCount" id="seguimientoCount"></span>
         </div>
@@ -65,8 +66,34 @@
 
     <div class="modalOverlay hidden" id="seguimientoModalOverlay">
         <div class="assetModal" role="dialog" aria-modal="true">
-            <h3 class="assetModalTitle">Añadir a Watchlist</h3>
+            <h3 class="assetModalTitle">Añadir a Seguimiento</h3>
 
+            <div id="segAddPasoElegir">
+                <div class="segAddOpciones">
+                    <button type="button" class="segAddOpcion" data-seg-paso="existente">
+                        <strong>Activo del portfolio</strong>
+                        <span>Elige uno o varios de los que ya tienes en Activos.</span>
+                    </button>
+                    <button type="button" class="segAddOpcion" data-seg-paso="nuevo">
+                        <strong>Activo nuevo</strong>
+                        <span>Búscalo por su ticker y síguelo sin tenerlo en el portfolio.</span>
+                    </button>
+                </div>
+                <div class="assetModalActions">
+                    <button type="button" class="cancelButton" data-seg-cerrar>Cancelar</button>
+                </div>
+            </div>
+
+            <div id="segAddPasoExistente" class="hidden">
+                <input id="segAddExistenteBuscar" class="assetModalInput" type="text" placeholder="Buscar por nombre o ticker..." autocomplete="off" aria-label="Buscar activo del portfolio">
+                <div id="segAddExistenteLista" class="segAddLista"></div>
+                <div class="assetModalActions">
+                    <button type="button" class="cancelButton" data-seg-paso="elegir">Volver</button>
+                    <button type="button" id="segAddExistenteConfirmBtn" class="primaryButton">Añadir</button>
+                </div>
+            </div>
+
+            <div id="segAddPasoNuevo" class="hidden">
             <label class="assetModalLabel" for="seguimientoNombreInput">Nombre del activo</label>
             <div class="segAutocompleteWrap">
                 <input id="seguimientoNombreInput" class="assetModalInput" type="text" placeholder="Ej: Apple, Bitcoin..." autocomplete="off">
@@ -97,8 +124,10 @@
             <input id="seguimientoTVTickerInput" class="assetModalInput" type="text" placeholder="Ej: NASDAQ:AAPL, BINANCE:BTCUSDT...">
 
             <div class="assetModalActions">
+                <button class="cancelButton" type="button" data-seg-paso="elegir">Volver</button>
                 <button id="seguimientoCancelBtn" class="cancelButton" type="button">Cancelar</button>
                 <button id="seguimientoConfirmBtn" class="primaryButton" type="button">Confirmar</button>
+            </div>
             </div>
         </div>
     </div>

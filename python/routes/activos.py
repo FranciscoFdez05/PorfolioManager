@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from core import dinero, pnl_divisa
 from core.db import getActiveDbPath, getDb
+from core.validation import jsonBody
 from providers.finnhub_client import convertAmount, fetchExchangeRate
 from stores import alertas_store, grafico_activo, rendimiento_activo, revisiones
 from stores.asset_store import (
@@ -44,20 +45,6 @@ activosBp = Blueprint("activos", __name__)
 @activosBp.route("/api/activos", methods=["GET"])
 def getActivos():
     return jsonify({"assets": listAssets()})
-
-
-def _columna(row, nombre, defecto=""):
-    """Valor de una columna que puede no existir todavía en la BD.
-
-    `fx_rate` se añade por migración, y una consulta hecha contra una base que
-    aún no la tiene lanzaría IndexError. Devolver el defecto deja el desglose
-    marcado como incompleto, que es la degradación correcta.
-    """
-    try:
-        valor = row[nombre]
-    except (IndexError, KeyError):
-        return defecto
-    return defecto if valor is None else valor
 
 
 def _descomponerPorDivisa(rows, participacionesVivas, currentPrice, fxActual, operaciones=(), esCripto=False,
@@ -191,7 +178,7 @@ def _tipoDelProveedor(moneda):
 
 @activosBp.route("/api/activos", methods=["POST"])
 def createActivo():
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     # Se acota como en saveActivo: sin tope, el slug derivado del nombre podía
     # superar el limit_request_line de gunicorn y dejar el activo imborrable
     # (DELETE/PUT llevan el id en la URL y caían en 400 antes de llegar a Flask).
@@ -231,7 +218,7 @@ def createActivo():
 
 @activosBp.route("/api/activos/reorder", methods=["POST"])
 def reorderActivos():
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     assets = listAssets()
     orderedAssetIds = requestData.get("orderedAssetIds")
 
@@ -297,6 +284,12 @@ def getActivoGrafico(assetId):
     return jsonify({"ok": True, **datos})
 
 
+@activosBp.route("/api/activos-serie-dia", methods=["GET"])
+def getActivosSerieDia():
+    """Evolución de hoy de todos los activos, para los minigráficos de los mapas."""
+    return jsonify({"ok": True, **grafico_activo.seriesDelDia()})
+
+
 # Tope de ids por lote: el frontend los parte en trozos de 50, y sin tope una
 # URL manipulada podría pedir miles de fichas en una sola petición.
 _MAX_IDS_LOTE = 200
@@ -340,7 +333,7 @@ def _respuestaConflicto(conflicto):
 
 @activosBp.route("/api/activos/<assetId>", methods=["POST"])
 def saveActivo(assetId):
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     payload, error = sanitizeAssetPayload(requestData, slugify(assetId))
 
     if error:
@@ -551,7 +544,7 @@ def changeActivoCurrency(assetId):
     if assetData is None:
         return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
 
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     isCrypto = str(assetData.get("type", "")).strip().lower() == "cripto"
     currentCurrency = normalizeCurrencyCode(assetData.get("currency", ""), fallback="EUR")
     targetCurrency = normalizeCurrencyCode(requestData.get("currency", ""), fallback=currentCurrency)
@@ -656,7 +649,7 @@ def rellenarFx():
     """
     from stores.fx_historico import rellenarPendientes
 
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     try:
         # Tope generoso pero acotado: sin límite superior, un cliente podría
         # pedir un lote que tarde minutos y bloquee un worker.

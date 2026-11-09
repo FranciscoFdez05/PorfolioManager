@@ -7,8 +7,8 @@ from flask import Blueprint, current_app, jsonify, request
 
 from core import dinero, rentabilidad, settings
 from core.db import getDb, transaction
-from routes.ajustes import DEFAULT_SNAPSHOT_MINUTES, _readAjustes
 from stores import historico_snapshots, historico_tipos
+from stores.ajustes_store import DEFAULT_SNAPSHOT_MINUTES, _readAjustes
 from stores.flujos_snapshot import tomarFlujo
 
 log = logging.getLogger(__name__)
@@ -28,6 +28,11 @@ def _intervalSeconds() -> int:
     except (TypeError, ValueError):
         minutes = DEFAULT_SNAPSHOT_MINUTES
     return max(settings.snapshotIntervaloMinimo(), minutes * 60)
+
+# Lo que se conserva de `asset_price_snapshots`: el minigráfico solo usa el día
+# de hoy, y dos días cubren el cambio de fecha en cualquier zona horaria.
+_RETENCION_PRECIOS = 2 * 86400
+
 
 def _sameBucket(tsA: int, tsB: int, interval: int) -> bool:
     return tsA // interval == tsB // interval
@@ -83,6 +88,19 @@ def reservarBucket(nowTs=None) -> bool:
         raise
 
 
+def liberarBucket(nowTs=None) -> None:
+    """Devuelve el hueco horario reclamado con `reservarBucket`.
+
+    Para cuando el hilo del servidor reservó el hueco y no pudo guardar el punto
+    (valoración incompleta, excepción): sin esto nadie lo vuelve a intentar hasta
+    el hueco siguiente y el histórico queda con un agujero.
+    """
+    nowTs = int(nowTs if nowTs is not None else time.time())
+    bucket = nowTs // _intervalSeconds()
+    with transaction() as conn:
+        conn.execute("DELETE FROM snapshot_jobs WHERE bucket = ?", (bucket,))
+
+
 def _aReal(value):
     """Importe listo para una columna REAL, o `None` si no se entiende.
 
@@ -110,7 +128,30 @@ def _aReal(value):
         return None
 
 
-def guardarSnapshot(totalValue, totalInvested, assets=(), nowTs=None) -> bool:
+def _guardarPrecios(conn, nowTs: int, precios) -> None:
+    """Precios de lo que no está en cartera (`asset_price_snapshots`), y purga.
+
+    Args:
+        conn: Conexión dentro de la transacción del snapshot.
+        nowTs: Instante del punto, el mismo que el del snapshot.
+        precios: `[{"id", "p"}]`, precio por participación en euros.
+    """
+    filas = []
+    for precio in precios or ():
+        if not isinstance(precio, dict):
+            continue
+        aid = str(precio.get("id") or "").strip()
+        p = _aReal(precio.get("p"))
+        if aid and p is not None and p > 0:
+            filas.append((nowTs, aid, p))
+    if filas:
+        conn.executemany("INSERT INTO asset_price_snapshots (ts, asset_id, price_eur) VALUES (?, ?, ?)", filas)
+    # Solo sirven para el minigráfico de hoy: se purga aquí para que la tabla no
+    # crezca sin que nadie tenga que acordarse de limpiarla.
+    conn.execute("DELETE FROM asset_price_snapshots WHERE ts < ?", (nowTs - _RETENCION_PRECIOS,))
+
+
+def guardarSnapshot(totalValue, totalInvested, assets=(), nowTs=None, precios=()) -> bool:
     """Escribe un punto del histórico si el hueco horario sigue libre.
 
     Devuelve True si se guardó y False si ya había un snapshot en el mismo
@@ -119,6 +160,9 @@ def guardarSnapshot(totalValue, totalInvested, assets=(), nowTs=None) -> bool:
     pestaña abierta a la vez) el SELECT y el INSERT sueltos dejaban una ventana
     en la que ambos veían el bucket vacío y se guardaban dos puntos casi
     simultáneos.
+
+    `precios` (`[{"id", "p"}]`) son los de lo que no está en cartera, para los
+    minigráficos del día; van en el mismo hueco que el punto.
     """
     nowTs   = int(nowTs if nowTs is not None else time.time())
     interval = _intervalSeconds()
@@ -153,6 +197,7 @@ def guardarSnapshot(totalValue, totalInvested, assets=(), nowTs=None) -> bool:
                     (nowTs, aid, v, c or 0.0)
                 )
 
+        _guardarPrecios(conn, nowTs, precios)
         conn.commit()
         return True
     except Exception:
@@ -395,6 +440,7 @@ def purgeSnapshots():
         with transaction() as conn:
             cur = conn.execute("DELETE FROM portfolio_snapshots")
             conn.execute("DELETE FROM asset_snapshots")
+            conn.execute("DELETE FROM asset_price_snapshots")
         return jsonify({"ok": True, "deleted": cur.rowcount, "safetyCopy": safety})
     if days not in {30, 90, 180, 365}:
         return jsonify({"ok": False, "error": "Valor de días no permitido"}), 400

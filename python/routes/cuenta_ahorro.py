@@ -9,7 +9,7 @@ import logging
 
 from flask import Blueprint, jsonify
 
-from routes.ajustes import _activePortfolioId, _readPrefs, _writePrefs
+from stores.ajustes_store import _activePortfolioId, _readPrefs, _writePrefs
 from stores.cuenta_ahorro_store import (
     aplicarRecurrentes,
     claveDeCuenta,

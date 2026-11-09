@@ -1,7 +1,8 @@
 from datetime import date
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
+from core.validation import jsonBody
 from stores import revisiones
 from stores.gastos_store import (
     createDefaultGastosYear,
@@ -35,7 +36,7 @@ def getGastosTipos():
 
 @gastosBp.route("/api/gastos-tipos", methods=["POST"])
 def saveGastosTipos():
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     types = sanitizeGastosTypes(requestData.get("types", []))
     writeGastosTypes(types)
     return jsonify({"ok": True, "types": types})
@@ -43,7 +44,7 @@ def saveGastosTipos():
 
 @gastosBp.route("/api/gastos", methods=["POST"])
 def createGastosYear():
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     year = normalizeYear(requestData.get("year"))
 
     if not year:
@@ -92,7 +93,7 @@ def getGastosYear(year):
 
 @gastosBp.route("/api/gastos/<year>", methods=["POST"])
 def saveGastosYear(year):
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     payload, error = sanitizeGastosPayload(requestData, year)
 
     if error:

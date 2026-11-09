@@ -1392,14 +1392,14 @@ def guardarVigilancia():
     """Cada cuántos minutos se revisan las wallets en segundo plano (0 = nunca)."""
     # Importado aquí: es el único sitio que escribe ajustes.json, y así este
     # ajuste se guarda saneado junto al resto, sin pisar los demás.
-    from routes import ajustes as rutasAjustes
+    from stores import ajustes_store
 
     minutos = jsonBody().get("minutos")
     if isinstance(minutos, bool) or minutos not in wallets_vigilancia.OPCIONES_MINUTOS:
         raise ValidationError("Intervalo no válido", field="minutos")
-    datos = rutasAjustes._readAjustes()
+    datos = ajustes_store._readAjustes()
     datos[wallets_vigilancia.CLAVE_AJUSTE_MINUTOS] = minutos
-    rutasAjustes._writeAjustes(datos)
+    ajustes_store._writeAjustes(datos)
     return jsonify({"ok": True, "vigilanciaMinutos": minutos})
 
 

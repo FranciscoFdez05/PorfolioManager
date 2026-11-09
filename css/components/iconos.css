@@ -29,6 +29,10 @@
 }
 
 /* general */
+.iconoAmpliar {
+    -webkit-mask-image: url("../../img/icons/general/ampliar.svg");
+    mask-image: url("../../img/icons/general/ampliar.svg");
+}
 .iconoAjustes {
     -webkit-mask-image: url("../../img/icons/general/ajustes.svg");
     mask-image: url("../../img/icons/general/ajustes.svg");

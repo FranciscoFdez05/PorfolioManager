@@ -1,0 +1,269 @@
+/* Mi dinero › Movimientos: las transferencias entre cuentas a la izquierda y,
+   a la derecha, el total, las comisiones del periodo y una tarjeta por cuenta.
+   Reutiliza de Gastos la tabla y el menú ···, de Intereses los botones de año
+   y de Cuentas los colores (.cuentasPos, .cuentasNeg, .cntTipo). */
+
+.mvcPage {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-right: 18px;
+    flex: 1;
+    margin-top: -6px;
+}
+
+.mvcTopBar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* Años y cuentas en una línea con scroll lateral, como las tiras de Intereses;
+   el botón principal y el ··· se quedan a la derecha. */
+.mvcYearList,
+.mvcCuentaList {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 10px;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+    padding-bottom: 6px;
+}
+
+.mvcYearList {
+    flex: 0 1 auto;
+}
+
+.mvcCuentaList {
+    flex: 1 1 0;
+}
+
+.mvcYearList::-webkit-scrollbar,
+.mvcCuentaList::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+}
+
+.mvcYearList::-webkit-scrollbar-thumb,
+.mvcCuentaList::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.mvcYearList > *,
+.mvcCuentaList > * {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.mvcTopBar > #mvcAddRowBtn {
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.mvcLayout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 16px;
+    align-items: stretch;
+    flex: 1;
+}
+
+/* ── Tabla ── */
+.mvcTableWrapper {
+    min-height: 120px;
+}
+
+.mvcTableWrapper .overviewEmpty {
+    padding: 18px 12px;
+    text-align: center;
+}
+
+/* Vacía: solo queda el aviso. */
+.mvcTableWrapper.mvcVacio {
+    min-height: 0;
+    border: none;
+    background: none;
+}
+
+.mvcVacio .gastosMovementsTable {
+    display: none;
+}
+
+/* Gastos fija el ancho de cada columna, que aquí no cabe: el concepto se queda
+   con el sobrante. */
+#mvcTable thead th,
+#mvcTable tbody td {
+    width: auto;
+}
+
+#mvcTable thead th:first-child,
+#mvcTable tbody td:first-child {
+    width: 110px;
+}
+
+#mvcTable thead th.rowActionHeader,
+#mvcTable tbody td.rowActionsCell {
+    width: 52px;
+}
+
+/* Cantidad y Comisión (5.ª y 6.ª): ancho y alineación por posición, que no
+   dependan de si la celda lleva importe o «—». */
+#mvcTable thead th:nth-child(5),
+#mvcTable thead th:nth-child(6),
+#mvcTable tbody td:nth-child(5),
+#mvcTable tbody td:nth-child(6) {
+    width: 130px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Lateral ── */
+.mvcSide {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    /* No aporta altura a la fila: la fija la tabla, y la lista de cuentas hace
+       scroll por dentro cuando hay muchas. */
+    height: 0;
+    min-height: 100%;
+}
+
+.mvcTotalCard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.mvcTotalBloque {
+    min-width: 0;
+}
+
+.mvcCuentas {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+}
+
+.mvcCuenta {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    background: var(--bg-panel);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition:
+        border-color 0.15s,
+        background 0.15s;
+}
+
+.mvcCuenta:hover {
+    border-color: var(--btn-border-hover);
+}
+
+.mvcCuenta.activa {
+    border-color: var(--btn-active-border);
+    background: var(--btn-active-bg);
+}
+
+.mvcCuentaCab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mvcCuentaNombre {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-bright);
+}
+
+.mvcCuentaSaldo {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-bright);
+    font-variant-numeric: tabular-nums;
+}
+
+.mvcCuentaSaldo.cuentasNeg {
+    color: #f87171;
+}
+
+.mvcCuentaDetalle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Ajustada al alto visible (fitPageActive, ver base.css): la tabla llega hasta
+   abajo de la ventana y hace scroll por dentro, en vez de quedarse en el tope
+   de 610 px que trae de Gastos. */
+@media (min-width: 1201px) {
+    .fitPageActive .mvcPage {
+        min-height: 480px;
+        overflow: hidden;
+    }
+
+    .fitPageActive .mvcTopBar {
+        flex: 0 0 auto;
+    }
+
+    .fitPageActive .mvcLayout {
+        flex: 1 1 auto;
+        min-height: 0;
+        grid-template-rows: minmax(0, 1fr);
+    }
+
+    .fitPageActive .mvcTableWrapper {
+        min-height: 0;
+        max-height: none;
+    }
+}
+
+@media (max-width: 1100px) {
+    .mvcLayout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .mvcSide {
+        height: auto;
+        min-height: 0;
+    }
+    .mvcCuentas {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    }
+}
+
+@media (max-width: 720px) {
+    .mvcTopBar {
+        flex-wrap: wrap;
+    }
+    .mvcCuentaList {
+        flex-basis: 100%;
+        order: 1;
+    }
+}

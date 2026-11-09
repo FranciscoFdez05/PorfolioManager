@@ -146,11 +146,39 @@ def _decimal(texto):
 # los demás hilos hasta el siguiente commit.
 
 _SELECT_CUENTAS = (
-    "SELECT c.id, c.nombre, c.tipo, c.saldo_inicial, c.dividendos, c.ahorro, v.remunerada_id, r.nombre AS remunerada_nombre "
+    "SELECT c.id, c.nombre, c.tipo, c.etiquetas, c.saldo_inicial, c.dividendos, c.ahorro, v.remunerada_id, "
+    "r.nombre AS remunerada_nombre "
     "FROM cuentas c "
     "LEFT JOIN cuenta_remunerada_vinculo v ON v.cuenta_id = c.id "
     "LEFT JOIN cuentas_remuneradas r ON r.id = v.remunerada_id"
 )
+
+
+def _etiquetasGuardadas(texto, tipo):
+    """Etiquetas de la cuenta, la principal (el tipo) primero. Lo que no se
+    entienda o ya no sea un tipo válido se descarta en vez de romper la lectura."""
+    try:
+        extra = json.loads(texto) if texto else []
+    except ValueError:
+        extra = []
+    if not isinstance(extra, list):
+        extra = []
+    return list(dict.fromkeys([tipo, *(str(e) for e in extra if str(e) in TIPOS)]))
+
+
+def _normalizarEtiquetas(valor, tipo):
+    """Texto JSON de las etiquetas extra (sin la principal), en el orden de TIPOS.
+
+    Raises:
+        CuentaInvalida: si no es una lista o alguna etiqueta no es un tipo válido.
+    """
+    if valor is None or valor == "":
+        return ""
+    if not isinstance(valor, list):
+        raise CuentaInvalida("Las etiquetas deben ser una lista")
+    pedidas = {_normalizarTipo(v) for v in valor}
+    extra = [t for t in TIPOS if t in pedidas and t != tipo]
+    return json.dumps(extra) if extra else ""
 
 
 def _filaACuenta(fila):
@@ -158,6 +186,7 @@ def _filaACuenta(fila):
         "id": fila["id"],
         "nombre": fila["nombre"],
         "tipo": fila["tipo"],
+        "etiquetas": _etiquetasGuardadas(fila["etiquetas"], fila["tipo"]),
         "saldo_inicial": fila["saldo_inicial"],
         "protegida": fila["id"] in (ID_BANCO, ID_AHORRO),
         "remunerada": fila["remunerada_id"] or "",
@@ -177,10 +206,6 @@ def obtenerCuenta(cuentaId, conn=None):
     conn = conn or getDb()
     fila = conn.execute(f"{_SELECT_CUENTAS} WHERE c.id = ?", (cuentaId,)).fetchone()
     return _filaACuenta(fila) if fila else None
-
-
-def cuentasDeTipo(tipo, conn=None):
-    return [c for c in listarCuentas(conn) if c["tipo"] == tipo]
 
 
 def resolverCuenta(valor, conn=None):
@@ -337,8 +362,9 @@ def importarVinculos(pares):
 
 
 @transactional
-def crearCuenta(nombre, tipo, saldoInicial="", remunerada="", dividendos=False, ahorro=None):
-    """Crea una cuenta. `ahorro=None` la saca en la ventana de ahorro si es de tipo ahorro."""
+def crearCuenta(nombre, tipo, saldoInicial="", remunerada="", dividendos=False, ahorro=None, etiquetas=None):
+    """Crea una cuenta. `ahorro=None` la saca en la ventana de ahorro si es de tipo ahorro.
+    `etiquetas` son las extra además del tipo (lista de ids de tipo)."""
     nombre = normalizarNombre(nombre)
     if not nombre:
         raise CuentaInvalida("Escribe un nombre para la cuenta")
@@ -351,9 +377,11 @@ def crearCuenta(nombre, tipo, saldoInicial="", remunerada="", dividendos=False, 
     orden = conn.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cuentas").fetchone()[0]
     cuentaId = _idNuevo(nombre, tipo, conn)
     esAhorro = tipo == "ahorro" if ahorro is None else bool(ahorro)
+    extra = _normalizarEtiquetas(etiquetas, tipo)
     conn.execute(
-        "INSERT INTO cuentas (id, nombre, tipo, saldo_inicial, sort_order, ahorro) VALUES (?, ?, ?, ?, ?, ?)",
-        (cuentaId, nombre, tipo, inicial, orden, 1 if esAhorro else 0),
+        "INSERT INTO cuentas (id, nombre, tipo, etiquetas, saldo_inicial, sort_order, ahorro) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (cuentaId, nombre, tipo, extra, inicial, orden, 1 if esAhorro else 0),
     )
     _vincular(cuentaId, remunerada, conn)
     _marcarDividendos(cuentaId, bool(dividendos), conn)
@@ -362,12 +390,15 @@ def crearCuenta(nombre, tipo, saldoInicial="", remunerada="", dividendos=False, 
 
 
 @transactional
-def modificarCuenta(cuentaId, nombre=None, saldoInicial=None, remunerada=None, dividendos=None, ahorro=None):
+def modificarCuenta(
+    cuentaId, nombre=None, saldoInicial=None, remunerada=None, dividendos=None, ahorro=None, tipo=None, etiquetas=None
+):
     """Cambia el nombre, el saldo inicial, la cuenta remunerada vinculada, si
-    cobra los dividendos y/o si es de ahorro (`None` deja cada uno como está;
-    `remunerada=''` la desvincula). El tipo no se cambia. La cuenta de ahorro
-    principal no deja de serlo: la ventana de ahorro guarda su configuración
-    con ella."""
+    cobra los dividendos, si es de ahorro, el tipo (etiqueta principal) y/o las
+    etiquetas extra (`None` deja cada uno como está; `remunerada=''` la
+    desvincula). El identificador no cambia con el tipo: solo se usó para
+    crearlo. La cuenta de ahorro principal no deja de serlo: la ventana de
+    ahorro guarda su configuración con ella."""
     conn = getDb()
     cuenta = obtenerCuenta(cuentaId, conn)
     if cuenta is None:
@@ -383,6 +414,16 @@ def modificarCuenta(cuentaId, nombre=None, saldoInicial=None, remunerada=None, d
     if saldoInicial is not None:
         conn.execute(
             "UPDATE cuentas SET saldo_inicial = ? WHERE id = ?", (_saldoInicial(saldoInicial), cuentaId)
+        )
+
+    if tipo is not None or etiquetas is not None:
+        nuevoTipo = _normalizarTipo(tipo) if tipo is not None else cuenta["tipo"]
+        # Sin etiquetas nuevas se conservan las extra que ya tenía; la principal
+        # anterior no pasa a extra: cambiar el tipo es reemplazarlo.
+        pedidas = etiquetas if etiquetas is not None else cuenta["etiquetas"][1:]
+        conn.execute(
+            "UPDATE cuentas SET tipo = ?, etiquetas = ? WHERE id = ?",
+            (nuevoTipo, _normalizarEtiquetas(pedidas, nuevoTipo), cuentaId),
         )
 
     if remunerada is not None:

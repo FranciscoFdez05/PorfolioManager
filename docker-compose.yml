@@ -86,7 +86,13 @@ services:
       # API/ va montado (y en escritura) porque las claves que se guardan desde
       # Ajustes acaban en API/*.key: sin volumen se perderían en cada rebuild.
       - ${PORTFOLIO_HOST_API_DIR:-./API}:/app/API
+    # Docker no reinicia un contenedor «unhealthy»: el reinicio lo provoca el
+    # supervisor de entrypoint.sh, que termina el proceso cuando /api/health
+    # lleva varios minutos fallando, y entonces actúa esta política.
     restart: unless-stopped
+    # tini como PID 1: el supervisor de Python no recoge procesos huérfanos, y
+    # así ninguno se queda como zombi ocupando el pids_limit.
+    init: true
     # Igual que el vigilante: ningún proceso del contenedor puede ganar
     # privilegios (setuid) después de arrancar. gosu no lo necesita: arranca
     # como root y solo los suelta.

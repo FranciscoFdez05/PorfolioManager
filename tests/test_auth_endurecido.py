@@ -142,3 +142,28 @@ def testConCaducidadAbsolutaBastaConRecordarlaHastaEntonces(monkeypatch):
 
     assert sesion._retencion() == 3600
 
+
+
+# ── SEC-02: tope absoluto de sesión por defecto ─────────────────────────────
+
+def testPorDefectoUnaSesionDuraComoMucho30Dias(monkeypatch):
+    """La cookie dura 365 días: sin tope, una cookie robada valía casi un año."""
+    from core import settings
+
+    monkeypatch.delenv("SESION_MAXIMA_MINUTOS", raising=False)
+
+    assert settings.declaracion("seguridad.sesion_maxima_minutos").defecto == 43_200
+
+
+def testUnaSesionDeMasDe30DiasSeRechaza(monkeypatch):
+    from core import sesion, settings
+
+    monkeypatch.setattr(settings, "sesionMaximaSegundos", lambda: 30 * 24 * 3600)
+    monkeypatch.setattr(sesion, "inactividadSegundos", lambda: 0)
+    ahora = 2_000_000_000.0
+    monkeypatch.setattr(sesion.time, "time", lambda: ahora)
+    creada = ahora - 31 * 24 * 3600
+
+    motivo = sesion.motivoInvalidez({sesion.CREADA: creada, sesion.VISTA: ahora, sesion.EPOCA: 0, sesion.SID: "x"})
+
+    assert motivo and "abierta hace" in motivo

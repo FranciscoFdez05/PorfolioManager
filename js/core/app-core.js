@@ -14,7 +14,9 @@ const _PAGE_DIRS = {
     ingresos: "finanzas",
     ahorro: "finanzas",
     cuentaAhorro: "finanzas",
+    cuentaRemunerada: "finanzas",
     cuentas: "finanzas",
+    movimientosCuentas: "finanzas",
     calendario: "finanzas",
     ventas: "finanzas",
     dividendos: "finanzas",
@@ -49,6 +51,22 @@ function pageHtmlPath(page) {
     const dir = _PAGE_DIRS[page]
     const fichero = page.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase()
     return dir ? `./html/${dir}/${fichero}.html` : `./html/${fichero}.html`
+}
+
+function pageHtmlUrl(page) {
+    return `${pageHtmlPath(page)}?v=${PAGE_HTML_VERSION}`
+}
+
+// Descarga en segundo plano el HTML de las ventanas del menú que estén
+// activas, para que abrirlas por primera vez no espere al servidor. Ajustes
+// no es una ventana de loadPage (abre su propio overlay).
+function precargarPaginasDelMenu() {
+    const paginas = new Set()
+    document.querySelectorAll("[data-page]").forEach((el) => {
+        const page = el.dataset.page
+        if (page && page !== "ajustes" && paginaVisible(page)) paginas.add(page)
+    })
+    CachePaginas.precargar([...paginas].map(pageHtmlUrl))
 }
 
 // ── Preferencias de visualización de los gráficos ─────────────────────────
@@ -92,7 +110,16 @@ const _MODULE_PAGES = {
     panelSuperior: [],
     vistaGeneral: ["vistaGeneral"],
     activos: ["activos", "seguimiento", "heatmap", "fundamentales", "sentimiento", "paneles"],
-    gastos: ["gastos", "ingresos", "ahorro", "cuentas", "cuentaAhorro", "calendario"],
+    gastos: [
+        "gastos",
+        "ingresos",
+        "ahorro",
+        "cuentas",
+        "movimientosCuentas",
+        "cuentaAhorro",
+        "cuentaRemunerada",
+        "calendario"
+    ],
     finanzas: ["intereses", "dividendos", "bonos", "ventas", "privateMarket", "operacionesBolsa"],
     cripto: [
         "stablecoins",
@@ -284,6 +311,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         activarBotonNav(paginaInicial)
         loadPage(paginaInicial)
     }
+    precargarPaginasDelMenu()
 
     refreshOverviewMarketData().then(() => {
         _postSnapshot()
@@ -410,6 +438,8 @@ function tipoEnPausa(tipo) {
 
 let _autoRefreshTimer = null
 let _autoRefreshInitTimer = null
+// Evita que una vuelta lenta se solape con la siguiente del intervalo.
+let _autoRefreshEnCurso = false
 function applyAutoRefresh(minutes) {
     if (_autoRefreshTimer) {
         clearInterval(_autoRefreshTimer)
@@ -424,6 +454,18 @@ function applyAutoRefresh(minutes) {
     const intervalMs = minutes * 60 * 1000
 
     async function doRefresh() {
+        if (_autoRefreshEnCurso) return
+        _autoRefreshEnCurso = true
+        try {
+            await doRefreshPasada()
+        } catch (error) {
+            console.error("Refresco automático fallido:", error)
+        } finally {
+            _autoRefreshEnCurso = false
+        }
+    }
+
+    async function doRefreshPasada() {
         // La pausa ya no corta el refresco entero: la aplica activo a activo
         // refreshOverviewMarketData. Cortar aquí paraba también la cripto, que
         // cotiza 24/7 y a la que el propio panel de Ajustes promete no pausar,
@@ -444,6 +486,7 @@ function applyAutoRefresh(minutes) {
 
 let _snapshotTimer = null
 let _snapshotInitTimer = null
+let _snapshotEnCurso = false
 function applySnapshotSchedule(minutes) {
     if (_snapshotTimer) {
         clearInterval(_snapshotTimer)
@@ -458,6 +501,18 @@ function applySnapshotSchedule(minutes) {
     const intervalMs = minutes * 60 * 1000
 
     async function doSnapshot() {
+        if (_snapshotEnCurso) return
+        _snapshotEnCurso = true
+        try {
+            await doSnapshotPasada()
+        } catch (error) {
+            console.error("Snapshot automático fallido:", error)
+        } finally {
+            _snapshotEnCurso = false
+        }
+    }
+
+    async function doSnapshotPasada() {
         await _postSnapshot()
         if (typeof mRenderEvolucion === "function") {
             const activeBtn = document.querySelector(".mEvolucionRangeBtn.active")
@@ -1133,13 +1188,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
         // Cache-Control: no-cache (ETag/Last-Modified), así que el navegador
         // revalida solo y, si no cambiaron, la respuesta es un 304 sin cuerpo
         // en vez de repetir la descarga completa en cada cambio de sección.
-        const response = await fetch(`${pageHtmlPath(page)}?v=${PAGE_HTML_VERSION}`)
-
-        if (!response.ok) {
-            throw new Error(`No se pudo cargar ${page}.html`)
-        }
-
-        const htmlContent = await response.text()
+        // Tras la primera vez sale de memoria (ver core/cache-paginas.js).
+        const htmlContent = await CachePaginas.obtener(pageHtmlUrl(page))
         document.querySelectorAll(".csBodyMenu").forEach((m) => m.remove())
         contentArea.innerHTML = htmlContent
 
@@ -1155,9 +1205,11 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             // scroll dentro en vez de alargar mainContent (ver base.css).
             const fitPages = [
                 "vistaGeneral",
+                "cuentaRemunerada",
                 "gastos",
                 "ingresos",
                 "calendario",
+                "movimientosCuentas",
                 "ventas",
                 "operaciones",
                 "operacionesBolsa",
@@ -1226,8 +1278,12 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initAhorroLogic()
         } else if (page === "cuentaAhorro") {
             await initCuentaAhorroLogic()
+        } else if (page === "cuentaRemunerada") {
+            await initCuentaRemuneradaLogic()
         } else if (page === "cuentas") {
             await initCuentasLogic()
+        } else if (page === "movimientosCuentas") {
+            await initMovimientosCuentasLogic()
         } else if (page === "calendario") {
             await initCalendarioLogic()
         } else if (page === "planesInversion") {

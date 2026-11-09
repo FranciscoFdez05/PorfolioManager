@@ -1,0 +1,37 @@
+<div class="interesesLayout crLayout">
+    <div class="interesesYearBar">
+        <div class="overviewSearch tablaBusqueda" data-busca-en="#crBody">
+            <button class="overviewSearchBtn" type="button" aria-label="Buscar en los movimientos" title="Buscar en los movimientos">
+                <span class="icono iconoBuscar" aria-hidden="true"></span>
+            </button>
+            <input type="text" class="overviewSearchInput" aria-label="Buscar en los movimientos" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        </div>
+        <div class="overviewDivider tablaBusquedaDivisor"></div>
+        <div class="interesesYearList" id="crYearList"></div>
+        <div class="overviewDivider"></div>
+        <div class="cuentasBar">
+            <div class="cuentasList" id="crCuentasList"></div>
+        </div>
+    </div>
+
+    <div class="crPanel">
+        <div class="crGraficoSeccion">
+            <div class="crGraficoWrap">
+                <canvas id="crGrafico" role="img" aria-label="Evolución de lo que suman a la cuenta los intereses y los dividendos"></canvas>
+            </div>
+            <p class="overviewEmpty hidden" id="crEmptyMsg">Sin intereses ni dividendos en este año.</p>
+        </div>
+
+        <aside class="crMovimientos">
+            <div class="crMovimientosCabecera">
+                <span class="summaryCardTitle">Movimientos</span>
+                <span class="crMovimientosTotal" id="crTotalAnio"></span>
+            </div>
+            <div class="crMovimientosLista">
+                <table class="crMovimientosTabla">
+                    <tbody id="crBody"></tbody>
+                </table>
+            </div>
+        </aside>
+    </div>
+</div>

@@ -1,6 +1,6 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
-from core.validation import primerIdDuplicado
+from core.validation import jsonBody, primerIdDuplicado
 from stores import revisiones
 from stores.app_data import readTradingFile, writeTradingFile
 
@@ -18,7 +18,7 @@ def getTrading():
 
 @tradingBp.route("/api/trading", methods=["POST"])
 def saveTrading():
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     if "rows" not in requestData:
         return jsonify({"ok": False, "error": "JSON inválido: falta rows"}), 400
     rows = requestData.get("rows", [])

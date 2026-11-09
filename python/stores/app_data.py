@@ -52,11 +52,6 @@ def _readApiKeys(filePath):
     return apiKeys
 
 
-def _readFirstApiKey(filePath):
-    apiKeys = _readApiKeys(filePath)
-    return apiKeys[0] if apiKeys else None
-
-
 # De dónde puede salir la clave de cada proveedor: (variable de entorno,
 # fichero, si la variable admite varias separadas por coma).
 API_KEY_SOURCES = {

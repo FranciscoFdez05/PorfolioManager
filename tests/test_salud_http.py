@@ -146,3 +146,36 @@ def testConSesionPublicaElEstadoDeLosDirectorios(clienteAutenticado, tempDb, dat
 
 def testElEstadoDeLosDirectoriosNoSaleSinSesion(clienteSalud):
     assert "almacenamiento" not in clienteSalud.get("/api/health").get_json()
+
+
+# ── Tareas de fondo dentro de la web ──────────────────────────────────────────
+
+def testUnaTareaAtascadaMarcaLaWebComoNoSana(clienteSalud, monkeypatch):
+    """Sin el worker aparte, nadie más vería que la copia automática se ha colgado."""
+    from routes import salud
+
+    monkeypatch.setattr(salud.pulso, "vencidas", lambda: ["copias"])
+
+    respuesta = clienteSalud.get("/api/health")
+    assert respuesta.status_code == 503
+    assert respuesta.get_json()["fallo"] == "tareas"
+
+
+def testConSesionSeDiceQueTareaSeAtasco(clienteAutenticado, tempDb, monkeypatch):
+    from routes import salud
+    from routes.salud import saludBp
+
+    monkeypatch.setattr(salud.pulso, "vencidas", lambda: ["avisos", "copias"])
+    client, _, _ = clienteAutenticado(saludBp)
+
+    cuerpo = client.get("/api/health").get_json()
+    assert cuerpo["ok"] is False
+    assert cuerpo["bd"]["tareas_atascadas"] == ["avisos", "copias"]
+
+
+def testSinTareasMarcadasSigueSana(clienteSalud, monkeypatch):
+    from routes import salud
+
+    monkeypatch.setattr(salud.pulso, "vencidas", lambda: [])
+
+    assert clienteSalud.get("/api/health").status_code == 200

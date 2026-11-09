@@ -62,6 +62,28 @@ def testLosTamanosSeAcotanALaRejilla():
     assert (w["w"], w["h"]) == (12, 2)
 
 
+def testLosTamanosAdmitenFraccionesDeLaRejillaFina():
+    """La pantalla estira los widgets en pasos de 1/24 de columna y de fila."""
+    [w] = _uno(_widget(w=4.5, h=3.25))
+    assert (w["w"], w["h"]) == (4.5, 3.25)
+
+
+def testUnaFraccionSeRedondeaAlPasoMasCercano():
+    [w] = _uno(_widget(w=4.01, h=3.0 + 1 / 24 + 0.001))
+    assert w["w"] == 4
+    assert w["h"] == pytest.approx(3 + 1 / 24, abs=1e-4)
+
+
+def testUnTamanoExactoSeGuardaComoEntero():
+    [w] = _uno(_widget(w=6.0, h=5.0))
+    assert isinstance(w["w"], int) and isinstance(w["h"], int)
+
+
+def testUnaFraccionTambienSeAcotaALaRejilla():
+    [w] = _uno(_widget(w=12.4, h=1.5))
+    assert (w["w"], w["h"]) == (12, 2)
+
+
 def testSoloLasNotasPuedenSerLargas():
     [w] = _uno(_widget(cfg={"texto": "a" * 9000, "titulo": "b" * 9000}))
     assert len(w["cfg"]["texto"]) == 5000

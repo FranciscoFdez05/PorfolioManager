@@ -14,6 +14,7 @@ coste del snapshot, que sí refleja lo que había al guardarlo, decide la cantid
 """
 
 import bisect
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from decimal import Decimal
@@ -23,6 +24,8 @@ from core.db import getDb
 from core.fifo import FifoError, parseFecha
 from stores import rendimiento_activo
 from stores.fx_historico import tasa, tipoActualConMemo
+
+log = logging.getLogger(__name__)
 
 _DIA = 86400
 _HORA = 3600
@@ -464,3 +467,119 @@ def datosDelGrafico(assetId: str, rango: str, ahora: float | None = None) -> dic
         "operaciones": operaciones,
         "operacionesSinPunto": sinPunto,
     }
+
+
+# Minigráfico del día en los mapas de calor: un punto cada diez minutos sobra para
+# una baldosa de unos cientos de píxeles y deja la cartera entera en una respuesta
+# pequeña. Pasado `_HUECO_DIA` sin snapshots (servidor parado) la línea se corta.
+_CUBETA_DIA = 600
+_HUECO_DIA = 2 * _HORA
+
+
+def _leerSnapshotsDesde(conn, desdeTs: int, hastaTs: int, cubeta: int) -> dict[str, list]:
+    # Una sola consulta para todos los activos en vez de una por baldosa. Como en
+    # `_leerSnapshots`, el MAX() hace que cada cubeta se quede con su último snapshot.
+    filas = conn.execute(
+        "SELECT asset_id, MAX(ts) AS ts, price_eur, cost_eur FROM asset_snapshots "
+        "WHERE ts >= ? AND ts < ? AND price_eur > 0 GROUP BY asset_id, ts / ? ORDER BY asset_id, ts",
+        (desdeTs, hastaTs, cubeta),
+    ).fetchall()
+    porActivo: dict[str, list] = {}
+    for fila in filas:
+        porActivo.setdefault(fila["asset_id"], []).append(fila)
+    return porActivo
+
+
+def lineaDelDia(puntos: list[dict]) -> list[list]:
+    """Pares `[ts, valor]` que dibujan la evolución de un activo en el día.
+
+    Manda el precio por participación, que es lo que se ha movido el activo. Si no
+    se puede reconstruir en al menos dos puntos (activo sin operaciones o con un
+    coste que no cuadra), se usa el valor de la posición: sin compras ni ventas
+    en el día tiene la misma forma.
+
+    Args:
+        puntos: Resultado de `construirPuntos`, ordenado por `ts`.
+
+    Returns:
+        La línea, o una lista vacía si no hay dos puntos que unir.
+    """
+    conPrecio = [[p["ts"], p["precio"]] for p in puntos if p["precio"] is not None]
+    if len(conPrecio) >= 2:
+        return conPrecio
+    conValor = [[p["ts"], p["valor"]] for p in puntos]
+    return conValor if len(conValor) >= 2 else []
+
+
+def seriesDelDia(ahora: float | None = None) -> dict:
+    """Evolución de hoy de todos los activos, para los minigráficos de los mapas.
+
+    El día es el natural en la hora del servidor: el eje va de las 00:00 a las 24:00
+    y la línea llega hasta el último snapshot, así que se va completando a lo largo
+    del día.
+
+    Args:
+        ahora: Instante de referencia; por defecto, el actual.
+
+    Returns:
+        `{"inicio", "fin", "segundosHueco", "series": {asset_id: [[ts, valor], ...]}}`.
+        Solo aparecen los activos con al menos dos puntos.
+    """
+    ahora = datetime.now().timestamp() if ahora is None else ahora
+    hoy = date.fromtimestamp(ahora)
+    inicio = int(datetime.combine(hoy, time.min).timestamp())
+    # Por fecha y no sumando 86400: los días de cambio de hora duran 23 o 25 horas.
+    fin = int(datetime.combine(date.fromordinal(hoy.toordinal() + 1), time.min).timestamp())
+
+    conn = getDb()
+    snapshots = _leerSnapshotsDesde(conn, inicio, fin, _CUBETA_DIA)
+    series: dict[str, list] = {}
+    if snapshots:
+        activos = {
+            fila["id"]: fila
+            for fila in conn.execute("SELECT id, type, currency FROM activos").fetchall()
+        }
+        posiciones = rendimiento_activo.cargarPosiciones(conn)
+        tipo = tipoActualConMemo()
+        vacio = {"filas": [], "operaciones": [], "ventas": [], "transacciones": [], "conversiones": []}
+        for assetId, filas in snapshots.items():
+            activo = activos.get(assetId)
+            if activo is None:
+                continue
+            esCripto = str(activo["type"] or "").strip().lower() == "cripto"
+            moneda = str(activo["currency"] or "EUR").strip().upper() or "EUR"
+            try:
+                tramos = construirTramos(posiciones.get(assetId) or vacio, esCripto, moneda, tipo)
+                linea = lineaDelDia(construirPuntos(filas, tramos, moneda))
+            except Exception as error:
+                # Un activo con datos raros no puede quitar el minigráfico a los demás.
+                log.warning("[grafico] Serie del día de %s no calculable: %s", assetId, error)
+                continue
+            if linea:
+                series[assetId] = linea
+
+    for assetId, linea in _seriesDePrecios(conn, inicio, fin, _CUBETA_DIA).items():
+        series.setdefault(assetId, linea)
+
+    return {"inicio": inicio, "fin": fin, "segundosHueco": _HUECO_DIA, "series": series}
+
+
+def _seriesDePrecios(conn, desdeTs: int, hastaTs: int, cubeta: int) -> dict[str, list]:
+    """Líneas del día de lo que no está en cartera, desde `asset_price_snapshots`.
+
+    Ahí el precio ya es por participación y en euros, así que no hay posición
+    que reconstruir. Si el activo también tiene serie de su posición (se vendió
+    hoy), manda esa: es la que cuadra con el resto de su ficha.
+
+    Returns:
+        `{asset_id: [[ts, precio], ...]}`, solo con los que tienen dos puntos.
+    """
+    filas = conn.execute(
+        "SELECT asset_id, MAX(ts) AS ts, price_eur FROM asset_price_snapshots "
+        "WHERE ts >= ? AND ts < ? GROUP BY asset_id, ts / ? ORDER BY asset_id, ts",
+        (desdeTs, hastaTs, cubeta),
+    ).fetchall()
+    porActivo: dict[str, list] = {}
+    for fila in filas:
+        porActivo.setdefault(fila["asset_id"], []).append([fila["ts"], fila["price_eur"]])
+    return {assetId: linea for assetId, linea in porActivo.items() if len(linea) >= 2}

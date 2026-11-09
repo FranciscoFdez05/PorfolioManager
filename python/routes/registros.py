@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 
-from core.validation import primerIdDuplicado
+from core.validation import jsonBody, primerIdDuplicado
 from core.wallets_sync import filaProtegidaDeBorrado, protegerFilasImportadas, redesConWalletPropia
 from stores import revisiones
 from stores.app_data import (
@@ -35,7 +35,7 @@ def getIntereses():
 
 @registrosBp.route("/api/intereses", methods=["POST"])
 def saveIntereses():
-    requestData = request.get_json(silent=True)
+    requestData = jsonBody(required=False)
 
     if not requestData or "cuentas" not in requestData:
         return jsonify({"ok": False, "error": "JSON inválido"}), 400
@@ -88,7 +88,7 @@ def getDividendos():
 
 @registrosBp.route("/api/dividendos", methods=["POST"])
 def saveDividendos():
-    requestData = request.get_json(silent=True)
+    requestData = jsonBody(required=False)
 
     if not requestData or "rows" not in requestData:
         return jsonify({"ok": False, "error": "JSON inválido"}), 400
@@ -141,7 +141,7 @@ def getDividendoCalendar():
 
 @registrosBp.route("/api/dividendos/calendar", methods=["POST"])
 def saveDividendoCalendar():
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     if "calendar" not in requestData or not isinstance(requestData["calendar"], dict):
         return jsonify({"ok": False, "error": "JSON inválido"}), 400
     writeDividendoCalendar(requestData)
@@ -162,7 +162,7 @@ def getTransacciones():
 
 @registrosBp.route("/api/transacciones", methods=["POST"])
 def saveTransacciones():
-    requestData = request.get_json(silent=True) or {}
+    requestData = jsonBody(required=False)
     if "rows" not in requestData:
         return jsonify({"ok": False, "error": "JSON inválido: falta rows"}), 400
     rows = requestData.get("rows", [])
@@ -215,7 +215,7 @@ def getBonos():
 
 @registrosBp.route("/api/bonos", methods=["POST"])
 def saveBonos():
-    requestData = request.get_json(silent=True)
+    requestData = jsonBody(required=False)
 
     if not requestData or "rows" not in requestData:
         return jsonify({"ok": False, "error": "JSON inválido"}), 400
@@ -261,7 +261,7 @@ def getRentaFija():
 
 @registrosBp.route("/api/rentafija", methods=["POST"])
 def saveRentaFija():
-    requestData = request.get_json(silent=True)
+    requestData = jsonBody(required=False)
 
     if not requestData or "rows" not in requestData:
         return jsonify({"ok": False, "error": "JSON inválido"}), 400
@@ -304,7 +304,7 @@ def getPrivateMarket():
 
 @registrosBp.route("/api/privatemarket", methods=["POST"])
 def savePrivateMarket():
-    requestData = request.get_json(silent=True)
+    requestData = jsonBody(required=False)
 
     if not requestData or "rows" not in requestData:
         return jsonify({"ok": False, "error": "JSON inválido"}), 400
@@ -352,7 +352,7 @@ def getStaking():
 
 @registrosBp.route("/api/staking", methods=["POST"])
 def saveStaking():
-    requestData = request.get_json(silent=True)
+    requestData = jsonBody(required=False)
     if not requestData or "criptos" not in requestData:
         return jsonify({"ok": False, "error": "JSON inválido"}), 400
     criptos = requestData["criptos"]
@@ -384,7 +384,7 @@ def getEarn():
 
 @registrosBp.route("/api/earn", methods=["POST"])
 def saveEarn():
-    requestData = request.get_json(silent=True)
+    requestData = jsonBody(required=False)
     if not requestData or "criptos" not in requestData:
         return jsonify({"ok": False, "error": "JSON inválido"}), 400
     criptos = requestData["criptos"]

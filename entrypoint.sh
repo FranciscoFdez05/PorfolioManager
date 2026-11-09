@@ -135,6 +135,8 @@ WORKERS=$(ajuste gunicorn.workers 2)
 THREADS=$(ajuste gunicorn.threads 4)
 TIMEOUT=$(ajuste gunicorn.timeout 120)
 KEEP_ALIVE=$(ajuste gunicorn.keep_alive 5)
+MAX_REQUESTS=$(ajuste gunicorn.max_requests 10000)
+MAX_REQUESTS_JITTER=$(ajuste gunicorn.max_requests_jitter 1000)
 
 # El servicio worker de docker-compose.yml usa la misma imagen con el argumento
 # «worker»: mismas comprobaciones de permisos de arriba, pero en vez de la web
@@ -145,9 +147,13 @@ if [ "${1:-}" = "worker" ]; then
     exec gosu appuser python -m admin.worker
 fi
 
-echo "Arrancando gunicorn: puerto=$PORT workers=$WORKERS threads=$THREADS timeout=$TIMEOUT usuario=$PUID:$PGID"
+echo "Arrancando gunicorn: puerto=$PORT workers=$WORKERS threads=$THREADS timeout=$TIMEOUT max_requests=$MAX_REQUESTS usuario=$PUID:$PGID"
 
-exec gosu appuser gunicorn \
+# gunicorn va debajo del supervisor (python/admin/supervisor_web.py): Docker no
+# reinicia un contenedor «unhealthy», solo uno cuyo proceso termina, y el
+# supervisor es quien lo termina cuando /api/health lleva varios minutos fallando.
+cd /app/python
+exec gosu appuser python -m admin.supervisor_web -- gunicorn \
   --chdir /app/python \
   --bind 0.0.0.0:"$PORT" \
   --worker-class gthread \
@@ -156,4 +162,6 @@ exec gosu appuser gunicorn \
   --threads "$THREADS" \
   --timeout "$TIMEOUT" \
   --keep-alive "$KEEP_ALIVE" \
+  --max-requests "$MAX_REQUESTS" \
+  --max-requests-jitter "$MAX_REQUESTS_JITTER" \
   server:app

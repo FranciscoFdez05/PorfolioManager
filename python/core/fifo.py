@@ -371,7 +371,3 @@ def cuantizar(value, escala=Decimal("0.01")) -> Decimal:
     if value is None:
         return Decimal("0")
     return Decimal(value).quantize(escala)
-
-
-def cuantizarCantidad(value) -> Decimal:
-    return Decimal(value or 0).quantize(_ESCALA).normalize()

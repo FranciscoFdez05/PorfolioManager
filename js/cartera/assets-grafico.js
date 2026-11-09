@@ -411,6 +411,42 @@ function assetGraficoPluginGuia(colorGuia) {
     }
 }
 
+// Etiqueta en el eje derecho con el valor a la altura del cursor. La línea
+// horizontal la dibuja el crosshair global (app-core.js), que no sabe formatear
+// el valor de este gráfico; por eso la cifra se pinta aquí.
+function assetGraficoPluginValorCursor(formatear, colorFondo, colorTexto) {
+    let cursorY = null
+    return {
+        id: "assetGraficoValorCursor",
+        afterEvent(chart, argumentos) {
+            const { type, y } = argumentos.event
+            if (type === "mousemove" || type === "touchmove") cursorY = y
+            else if (type === "mouseout" || type === "touchend") cursorY = null
+            else return
+            argumentos.changed = true
+        },
+        afterDraw(chart) {
+            const { ctx, chartArea, scales } = chart
+            if (cursorY === null || cursorY < chartArea.top || cursorY > chartArea.bottom) return
+            if (!chart.getActiveElements().length) return
+            const texto = formatear(scales.y.getValueForPixel(cursorY))
+            ctx.save()
+            ctx.font = "bold 12px sans-serif"
+            const alto = 20
+            const anchoTexto = ctx.measureText(texto).width + 12
+            // Si la cifra no cabe en el hueco del eje, se mete hacia dentro para no cortarla.
+            const izquierda = Math.min(chartArea.right + 2, chart.width - anchoTexto)
+            const ancho = Math.max(anchoTexto, chart.width - izquierda)
+            ctx.fillStyle = colorFondo
+            ctx.fillRect(izquierda, cursorY - alto / 2, ancho, alto)
+            ctx.fillStyle = colorTexto
+            ctx.textBaseline = "middle"
+            ctx.fillText(texto, izquierda + 6, cursorY)
+            ctx.restore()
+        }
+    }
+}
+
 // Máximo y mínimo del periodo, escritos junto al punto en que ocurrieron. Se
 // mantienen dentro del lienzo para que no se corten cerca de los bordes.
 function assetGraficoPluginExtremos(extremos, formatear, color) {
@@ -542,8 +578,7 @@ function assetGraficoDibujar() {
                         color: colorTexto,
                         maxTicksLimit: 7,
                         maxRotation: 0,
-                        callback: (valor) =>
-                            assetGraficoFormatearEje(valor, series.limitesX.max - series.limitesX.min)
+                        callback: (valor) => assetGraficoFormatearEje(valor, series.limitesX.max - series.limitesX.min)
                     }
                 },
                 y: {
@@ -575,6 +610,11 @@ function assetGraficoDibujar() {
         },
         plugins: [
             assetGraficoPluginGuia(colorTexto),
+            assetGraficoPluginValorCursor(
+                (valor) => assetGraficoFormatearValor(valor, vista, unidad),
+                colorTexto,
+                fondo
+            ),
             assetGraficoPluginExtremos(
                 series.extremos,
                 (valor) => assetGraficoFormatearValor(valor, vista, unidad),

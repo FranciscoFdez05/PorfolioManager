@@ -5,7 +5,7 @@ import { runInThisContext } from "node:vm"
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { cargarScript } from "./cargar.js"
+import { cargarModulo, cargarScript } from "./cargar.js"
 
 const PROPIA_ETH = { id: "w-eth", red: "eth", propia: true }
 const PROPIA_BTC = { id: "w-btc", red: "btc", propia: true }
@@ -16,7 +16,7 @@ beforeAll(() => {
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
     cargarScript("js/cripto/wallets.js")
-    cargarScript("js/cripto/wallets-seguimiento.js")
+    cargarModulo("js/cripto/wallets-seguimiento.js")
 })
 
 describe("direcciones de la marca", () => {

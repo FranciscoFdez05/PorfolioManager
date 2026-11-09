@@ -394,7 +394,8 @@ html[data-theme="light"] #addConversionRowBtn,
 html[data-theme="light"] #addGastoRowBtn,
 html[data-theme="light"] #addIngresoRowBtn,
 html[data-theme="light"] #cuentasAddRowBtn,
-html[data-theme="light"] #cuentaAhorroAddRowBtn {
+html[data-theme="light"] #cuentaAhorroAddRowBtn,
+html[data-theme="light"] #mvcAddRowBtn {
     background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%) !important;
     border: 1px solid var(--accent) !important;
     border-left: 3px solid var(--accent) !important;
@@ -423,7 +424,8 @@ html[data-theme="light"] #addConversionRowBtn:hover,
 html[data-theme="light"] #addGastoRowBtn:hover,
 html[data-theme="light"] #addIngresoRowBtn:hover,
 html[data-theme="light"] #cuentasAddRowBtn:hover,
-html[data-theme="light"] #cuentaAhorroAddRowBtn:hover {
+html[data-theme="light"] #cuentaAhorroAddRowBtn:hover,
+html[data-theme="light"] #mvcAddRowBtn:hover {
     background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%) !important;
     border-color: var(--accent-hover) !important;
     border-left-color: var(--accent-soft) !important;
@@ -1447,7 +1449,8 @@ html[data-theme="light"]
         #addGastoRowBtn,
         #addIngresoRowBtn,
         #cuentasAddRowBtn,
-        #cuentaAhorroAddRowBtn
+        #cuentaAhorroAddRowBtn,
+        #mvcAddRowBtn
     ) {
     background: var(--accent-tint) !important;
     border-color: var(--accent-soft) !important;
@@ -1476,7 +1479,8 @@ html[data-theme="light"]
         #addGastoRowBtn,
         #addIngresoRowBtn,
         #cuentasAddRowBtn,
-        #cuentaAhorroAddRowBtn
+        #cuentaAhorroAddRowBtn,
+        #mvcAddRowBtn
     ):hover {
     background: var(--accent-tint-strong) !important;
     border-color: var(--accent-soft) !important;

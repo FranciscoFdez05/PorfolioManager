@@ -7,7 +7,11 @@ necesitan base de datos apuntan `db` a un fichero temporal con
 datos reales del usuario que ejecuta la suite en su máquina.
 """
 
+import atexit
+import os
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -18,6 +22,52 @@ import pytest
 _PYTHON_DIR = Path(__file__).resolve().parent.parent / "python"
 if str(_PYTHON_DIR) not in sys.path:
     sys.path.insert(0, str(_PYTHON_DIR))
+
+
+_MARCA_REDIRECCION = "PORTFOLIO_TESTS_RAIZ_DATOS"
+
+
+def _redirigirDatosDeLaSuite() -> Path:
+    """Apunta data/, API/ y logs/ a una carpeta temporal para toda la sesión.
+
+    `datosAislados` solo protege a los tests que lo piden, y bastaba con que uno
+    lo olvidase para escribir en los datos reales: un test que importaba por
+    /api/import/json sin él dejaba copias en data/pre_restore y reescribía
+    ajustes.json y los prefs del usuario mientras su servidor estaba abierto.
+    Fijando el entorno antes de que se importe `core.paths`, las constantes ya
+    nacen apuntando aquí, y un test mal aislado ensucia esta carpeta temporal en
+    vez de `data/`. Se fuerza aunque el entorno traiga valores: si alguien lanza
+    la suite con PORTFOLIO_DATA_DIR apuntando a sus datos, tampoco deben tocarse.
+
+    Returns:
+        La carpeta temporal raíz de la sesión.
+
+    Raises:
+        RuntimeError: si `core.paths` ya estaba importado, porque entonces las
+            rutas ya se resolvieron contra los directorios reales.
+    """
+    # Algunos tests hacen `from tests.conftest import …`, que ejecuta este módulo
+    # una segunda vez con otro nombre y con `core.paths` ya importado: si la
+    # redirección ya se hizo en este proceso, se reutiliza.
+    yaRedirigida = os.environ.get(_MARCA_REDIRECCION)
+    if yaRedirigida and os.environ.get("PORTFOLIO_DATA_DIR", "").startswith(yaRedirigida):
+        return Path(yaRedirigida)
+    if "core.paths" in sys.modules:
+        raise RuntimeError("core.paths se importó antes de conftest: las rutas de la suite apuntarían a data/ real")
+    raiz = Path(tempfile.mkdtemp(prefix="porfolio-tests-"))
+    os.environ[_MARCA_REDIRECCION] = str(raiz)
+    for variable, carpeta in (
+        ("PORTFOLIO_DATA_DIR", "data"),
+        ("PORTFOLIO_API_DIR", "API"),
+        ("PORTFOLIO_LOGS_DIR", "logs"),
+    ):
+        (raiz / carpeta).mkdir()
+        os.environ[variable] = str(raiz / carpeta)
+    atexit.register(shutil.rmtree, raiz, ignore_errors=True)
+    return raiz
+
+
+_RAIZ_DATOS_SUITE = _redirigirDatosDeLaSuite()
 
 
 @pytest.fixture(autouse=True)
@@ -170,6 +220,7 @@ def datosAislados(tmp_path, monkeypatch):
         backup as rutasBackup,
         portfolios as rutasPortfolios,
     )
+    from stores import ajustes_store as ajustesStore
 
     data = tmp_path / "data"
     backups = data / "backups"
@@ -200,6 +251,8 @@ def datosAislados(tmp_path, monkeypatch):
     monkeypatch.setattr(rutasBackup, "_META_FILE", data / "portfolios.json")
     monkeypatch.setattr(rutasAjustes, "_AJUSTES_JSON", jsonDir / "ajustes.json")
     monkeypatch.setattr(rutasAjustes, "JSON_DIR", jsonDir)
+    monkeypatch.setattr(ajustesStore, "_AJUSTES_JSON", jsonDir / "ajustes.json")
+    monkeypatch.setattr(ajustesStore, "JSON_DIR", jsonDir)
     # Las claves de API se guardan cifradas en API/*.key; sin aislarlas, un test
     # de /api/settings sobrescribiría las del usuario.
     claves = tmp_path / "API"

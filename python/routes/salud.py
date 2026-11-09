@@ -22,7 +22,7 @@ import time
 
 from flask import Blueprint, jsonify, session
 
-from core import db, paths, settings
+from core import db, paths, pulso, settings
 from core.version import __version__
 
 log = logging.getLogger(__name__)
@@ -99,9 +99,29 @@ def _comprobarBd():
         return False, {"bd": "no disponible", "detalle": str(error)[:200]}
 
 
+def _comprobarTareas():
+    """(sano, detalle) de los hilos de fondo que corren en este proceso.
+
+    Sin el servicio worker (instalación sin Docker, o `tareas_en_web = true`),
+    las copias, snapshots, Telegram y avisos corren dentro de la web y nadie
+    miraba si se atascaban: el worker se reinicia solo, la web no. Con el worker
+    aparte, aquí no marca ninguna tarea y la lista sale vacía.
+    """
+    atascadas = pulso.vencidas()
+    if atascadas:
+        log.error("Healthcheck: tareas de fondo sin avanzar: %s", ", ".join(atascadas))
+        return False, {"tareas_atascadas": atascadas}
+    return True, {}
+
+
 @saludBp.route("/api/health", methods=["GET"])
 def getHealth():
     sano, detalle = _comprobarBd()
+    if sano:
+        tareasSanas, detalleTareas = _comprobarTareas()
+        if not tareasSanas:
+            sano = False
+            detalle = {**detalle, **detalleTareas}
 
     respuesta = {
         "ok": sano,
@@ -143,7 +163,7 @@ def getHealth():
     elif not sano:
         # Al anónimo se le dice qué subsistema falla, pero no el mensaje del
         # motor: puede llevar rutas absolutas del servidor.
-        respuesta["fallo"] = detalle.get("bd", "desconocido")
+        respuesta["fallo"] = detalle.get("bd") or ("tareas" if detalle.get("tareas_atascadas") else "desconocido")
 
     # 503 y no 200: es lo que hace que docker/k8s marquen el contenedor como
     # no sano. Con 200 el healthcheck pasaría igual y no serviría de nada.

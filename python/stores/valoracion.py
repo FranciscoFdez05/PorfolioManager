@@ -28,7 +28,8 @@ from decimal import Decimal
 from core import dinero, paths, settings, telegram_notifier
 from core.db import getActiveDbPath, getDb
 from providers.finnhub_client import fetchExchangeRate
-from stores import fx_historico, rendimiento_activo, ventas_fifo
+from stores import fx_historico, rendimiento_activo, seguimiento_prefs, ventas_fifo
+from stores.ajustes_store import _activePortfolioId, _readPrefs
 from stores.helpers import normalizeCurrencyCode
 from stores.market_data import fetchAssetQuote
 
@@ -326,3 +327,77 @@ def valorarPortfolio(refrescarPrecios=True):
             valorDeReserva == 0 or (totalValue > 0 and valorDeReserva / totalValue <= _FALLBACK_MAXIMO)
         ),
     }
+
+
+def _candidato(assetId: str, simbolo: str, proveedor, moneda) -> dict:
+    """Entrada con la forma que espera `_refrescarPrecios`, aún sin precio."""
+    return {
+        "id": assetId,
+        "simbolo": simbolo,
+        "proveedor": proveedor,
+        "precio": Decimal("0"),
+        "moneda": normalizeCurrencyCode(moneda, fallback="EUR"),
+    }
+
+
+def _candidatosSinPosicion(conn, enCartera: set, listaSeguimiento: list[dict]) -> list[dict]:
+    """Lo que se puede ver en un mapa de Paneles sin tenerlo en cartera.
+
+    Son los activos del portfolio sin posición viva y las entradas propias de
+    Seguimiento, que no son activos y llevan en Paneles el id `wl:<segId>`. Las
+    entradas de Seguimiento con `assetId` apuntan a un activo del portfolio y ya
+    salen con él.
+    """
+    candidatos = []
+    for fila in conn.execute("SELECT id, market_provider, market_symbol, finnhub_symbol, currency FROM activos"):
+        simbolo = str(fila["market_symbol"] or fila["finnhub_symbol"] or "").strip()
+        if fila["id"] not in enCartera and simbolo:
+            candidatos.append(_candidato(fila["id"], simbolo, fila["market_provider"], fila["currency"]))
+    for entrada in listaSeguimiento:
+        segId = str(entrada.get("_segId") or "").strip()
+        simbolo = str(entrada.get("ticker") or "").strip()
+        if segId and simbolo and not entrada.get("assetId"):
+            candidatos.append(
+                _candidato("wl:" + segId, simbolo, entrada.get("marketProvider"), entrada.get("currency"))
+            )
+    return candidatos
+
+
+def _listaSeguimiento() -> list[dict]:
+    """Lista propia de Seguimiento del portfolio de la base activa en este hilo."""
+    prefs = _readPrefs(_activePortfolioId())
+    return seguimiento_prefs.normalizarLista(prefs.get(seguimiento_prefs.CLAVE_LISTA))
+
+
+def preciosSinPosicion(listaSeguimiento: list[dict] | None = None) -> list[dict]:
+    """Precio por participación en euros de lo que se sigue sin tenerlo en cartera.
+
+    El histórico por activo guarda el valor de la posición, así que lo que no se
+    tiene no deja rastro y su baldosa de Paneles se quedaba sin minigráfico del
+    día. Se cotiza igual que la cartera (`fetchAssetQuote`, con su caché) y se
+    descarta lo que no tiene precio o tipo de cambio: un 1:1 inventado dibujaría
+    un salto que no ha existido.
+
+    Args:
+        listaSeguimiento: Lista propia de Seguimiento; por defecto, la del
+            portfolio de la base activa en este hilo.
+
+    Returns:
+        `[{"id", "p"}]`, la forma que espera `guardarSnapshot(precios=...)`.
+    """
+    if listaSeguimiento is None:
+        listaSeguimiento = _listaSeguimiento()
+    enCartera = set(ventas_fifo.carteraViva() or {})
+    candidatos = _candidatosSinPosicion(getDb(), enCartera, listaSeguimiento)
+    _refrescarPrecios(candidatos)
+
+    cambios = _Cambios()
+    precios = []
+    for candidato in candidatos:
+        if candidato["precio"] <= 0:
+            continue
+        enEuros = cambios.aEuros(candidato["precio"], candidato["moneda"])
+        if normalizeCurrencyCode(candidato["moneda"], fallback="EUR") in cambios.sinTipo:
+            continue
+        precios.append({"id": candidato["id"], "p": float(dinero.redondear(enEuros, 8))})
+    return precios

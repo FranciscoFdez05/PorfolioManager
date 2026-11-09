@@ -116,27 +116,6 @@ function planPrecioActual() {
 
 // ── Fechas ───────────────────────────────────────────────────────────────────
 
-function planFechaADate(texto) {
-    const ms = parseAssetOperationDate(texto)
-    return Number.isFinite(ms) ? new Date(ms) : null
-}
-
-function planFormatearFecha(fecha) {
-    if (!fecha) return "—"
-    const dia = String(fecha.getDate()).padStart(2, "0")
-    const mes = String(fecha.getMonth() + 1).padStart(2, "0")
-    return `${dia}-${mes}-${fecha.getFullYear()}`
-}
-
-function planHoy() {
-    const ahora = new Date()
-    return new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate())
-}
-
-function planDiasEntre(desde, hasta) {
-    return Math.round((hasta - desde) / 86400000)
-}
-
 // ── Cálculo de un plan de inversión ──────────────────────────────────────────
 
 function planNumero(valor) {

@@ -350,13 +350,21 @@ body.pnPantallaCompleta {
 }
 
 /* ── Rejilla ───────────────────────────────────────────────────── */
+/* Cada columna y cada fila se parten en 24 pistas (PN_SUBDIVISION en
+   paneles.js) para que estirar un widget sea casi continuo. Sin gap, porque se
+   repetiría entre cada pista: el hueco lo pone el margen de cada widget, y la
+   rejilla se sale medio hueco por cada lado para que los bordes cuadren. */
 .pnGrid {
     display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    grid-auto-rows: var(--pn-fila, 56px);
+    grid-template-columns: repeat(288, minmax(0, 1fr));
+    grid-auto-rows: calc((var(--pn-fila, 56px) + var(--pn-hueco, 10px)) / 24);
     grid-auto-flow: dense;
-    gap: var(--pn-hueco, 10px);
+    margin: calc(var(--pn-hueco, 10px) / -2);
     padding-bottom: 24px;
+}
+
+.pnGrid > .pnWidget {
+    margin: calc(var(--pn-hueco, 10px) / 2);
 }
 
 /* Mientras se arrastra o se estira un widget, los iframes no deben quedarse
@@ -960,6 +968,18 @@ body.pnPantallaCompleta {
     text-overflow: ellipsis;
 }
 
+/* De dónde sale un activo de la lista de Seguimiento: del portfolio o dado de
+   alta solo para seguirlo. */
+.pnSelOrigen {
+    flex-shrink: 0;
+    padding: 1px 6px;
+    border: 1px solid var(--border-soft);
+    border-radius: 999px;
+    color: var(--text-secondary);
+    font-size: 0.64rem;
+    white-space: nowrap;
+}
+
 .pnSelSimbolo {
     flex-shrink: 0;
     max-width: 110px;
@@ -1188,6 +1208,122 @@ body.money-hidden .pnMoney {
 .pnCeldaMov {
     font-weight: 500;
     opacity: 0.85;
+}
+
+/* Mapa en rejilla: casillas iguales con el precio arriba y la línea del día
+   abajo. Columnas y alto de fila los pone pnRejilla(); si no caben, se desplaza. */
+.pnMapa.pnMapaRejilla {
+    display: grid;
+    align-content: start;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.pnCelda.pnRejillaCelda {
+    position: relative;
+    display: block;
+    padding: 4px 6px;
+    border: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.pnCelda.pnRejillaCelda:hover {
+    border-color: #facc15;
+}
+
+.pnRjCab {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.pnRjIzq,
+.pnRjDer {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.pnRjDer {
+    flex-shrink: 0;
+    align-items: flex-end;
+}
+
+.pnRjSimbolo {
+    overflow: hidden;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.pnRjPrecio {
+    overflow: hidden;
+    font-weight: 700;
+    line-height: 1.1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.pnRjPct {
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.pnRjMov,
+.pnRjExt {
+    font-size: 0.68rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    opacity: 0.9;
+}
+
+.pnRjExt:empty {
+    display: none;
+}
+
+/* El precio está tocando el máximo o el mínimo del día. */
+.pnRjExt.pnRjCerca {
+    padding: 0 3px;
+    border-radius: 2px;
+    color: #111827;
+    background: #facc15;
+    text-shadow: none;
+    opacity: 1;
+}
+
+/* La línea entre la cabecera y las horas, más marcada que en el treemap porque
+   aquí no tiene rótulos encima. */
+.pnRejillaCelda .mapaDiaLinea {
+    bottom: 14px;
+    height: calc(100% - 66px);
+    min-height: 18px;
+}
+
+.pnRejillaCelda .mapaDiaTrazo {
+    stroke: rgba(255, 255, 255, 0.85);
+}
+
+.pnRjEje {
+    position: absolute;
+    right: 0;
+    bottom: 1px;
+    left: 0;
+    height: 12px;
+    pointer-events: none;
+}
+
+.pnRjEje span {
+    position: absolute;
+    transform: translateX(-50%);
+    font-size: 0.58rem;
+    line-height: 12px;
+    opacity: 0.7;
 }
 
 /* Gráfico */

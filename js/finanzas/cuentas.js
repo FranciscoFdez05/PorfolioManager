@@ -5,24 +5,23 @@
 // Los prefijos «cnt» evitan chocar con los nombres de las demás páginas, que
 // comparten el ámbito global.
 
-let cntYear = ""
-let cntYears = []
 let cntCuentas = []
 let cntTransferencias = []
 let cntTipos = []
-let cntFiltro = ""
-const cntSort = { key: "fecha", dir: "desc" }
+// `{id: [{fecha, entradas, salidas, saldo}]}` de /api/cuentas/historico, o null
+// si no se pudo cargar: las tarjetas se enseñan igual, sin la miniatura.
+let cntHistorico = null
+let cntGraficaLateral = null
+// Gastos por categoría ya pedidos, por fecha de inicio: cambiar de pestaña o de
+// periodo y volver no repite la petición. Se vacía al recargar los datos.
+let cntGastosCache = {}
+// Sube con cada pintado de la tarjeta: una respuesta que llega tarde (de otra
+// pestaña u otro periodo) se descarta.
+let cntLateralTurno = 0
 
 async function initCuentasLogic() {
     try {
         await cntRecargar()
-
-        const thisYear = String(new Date().getFullYear())
-        cntYears = [...new Set([thisYear, ...cntTransferencias.map((t) => t.year).filter(Boolean)])].sort()
-        // «» es «todos los años»: con pocas transferencias es lo más cómodo.
-        if (cntYear !== "" && !cntYears.includes(cntYear)) cntYear = thisYear
-        cntFiltro = ""
-
         cntBind()
         cntRender()
     } catch (error) {
@@ -32,10 +31,20 @@ async function initCuentasLogic() {
 }
 
 async function cntRecargar() {
-    const [cuentas, transferencias] = await Promise.all([Api.get("/api/cuentas"), Api.get("/api/transferencias")])
+    const [cuentas, transferencias, historico] = await Promise.all([
+        Api.get("/api/cuentas"),
+        Api.get("/api/transferencias"),
+        // El histórico es un extra: si falla, la página sigue sirviendo.
+        Api.get("/api/cuentas/historico").catch((error) => {
+            console.error("Error cargando el histórico de saldos:", error)
+            return null
+        })
+    ])
     cntCuentas = Array.isArray(cuentas?.cuentas) ? cuentas.cuentas : []
     cntTipos = Array.isArray(cuentas?.tipos) ? cuentas.tipos : []
     cntTransferencias = Array.isArray(transferencias?.transferencias) ? transferencias.transferencias : []
+    cntHistorico = historico?.cuentas && typeof historico.cuentas === "object" ? historico.cuentas : null
+    cntGastosCache = {}
     // Los desplegables de Gastos e Ingresos leen esta misma lista.
     window._cuentasDinero = cntCuentas
 }
@@ -45,9 +54,9 @@ function cntNombre(id) {
 }
 
 function cntRender() {
-    cntRenderYears()
     cntRenderCuentas()
-    cntRenderTabla()
+    cntRenderLateral()
+    cntRefrescarPanel()
 }
 
 // ── Cuentas ──────────────────────────────────────────────────────────────
@@ -69,21 +78,28 @@ function cntRenderCuentas() {
     const totalComisiones = document.getElementById("cuentasComisiones")
     if (totalComisiones) totalComisiones.textContent = formatEuro(comisiones)
 
+    const numero = document.getElementById("cuentasNumero")
+    if (numero) numero.textContent = String(cntCuentas.length)
+
+    // La variación del total es la suma de la de cada cuenta en lo que va de año.
+    const variaciones = new Map(cntCuentas.map((c) => [c.id, cntVariacionYtd(c.id)]))
+    const variacionTotal = document.getElementById("cuentasVariacion")
+    if (variacionTotal) {
+        const absoluta = [...variaciones.values()].reduce((acc, v) => acc + (v?.absoluta || 0), 0)
+        variacionTotal.textContent = cntHistorico ? cntSigned(absoluta) : "—"
+        variacionTotal.classList.toggle("cuentasPos", Boolean(cntHistorico) && absoluta > 0)
+        variacionTotal.classList.toggle("cuentasNeg", Boolean(cntHistorico) && absoluta < 0)
+    }
+
     lista.innerHTML = cntCuentas
-        .map((c) => {
+        .map((c, indice) => {
             const saldo = parseEuroNumber(c.saldo)
-            const entradas = parseEuroNumber(c.entradas)
-            const salidas = parseEuroNumber(c.salidas)
-            const comisiones = parseEuroNumber(c.comisiones)
-            const intereses = parseEuroNumber(c.intereses)
-            const dividendos = parseEuroNumber(c.dividendos_cobrados)
-            const inicial = parseEuroNumber(c.saldo_inicial)
-            const activa = c.id === cntFiltro
+            const peso = suma > 0 && saldo > 0 ? (saldo / suma) * 100 : 0
             return `
-                <div class="cntCuenta${activa ? " activa" : ""}" data-cuenta="${escapeGastosHtml(c.id)}" draggable="true" title="Ver solo los movimientos de esta cuenta. Arrastra para reordenar">
+                <div class="cntCuenta" data-cuenta="${escapeGastosHtml(c.id)}" draggable="true" title="Ver el detalle de la cuenta. Arrastra para reordenar">
                     <div class="cntCuentaCab">
+                        <span class="cntCuentaPunto" style="background:${CNT_PALETA[indice % CNT_PALETA.length]}" aria-hidden="true"></span>
                         <span class="cntCuentaNombre">${escapeGastosHtml(c.nombre)}</span>
-                        <span class="cntTipo cntTipo-${escapeGastosHtml(c.tipo)}">${escapeGastosHtml(c.tipo_etiqueta || c.tipo)}</span>
                         <div class="rowMenu">
                             <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                             <div class="rowMenuDropdown">
@@ -93,36 +109,258 @@ function cntRenderCuentas() {
                             </div>
                         </div>
                     </div>
+                    <div class="cntCuentaEtiquetas">${cntEtiquetasHtml(c)}</div>
                     <div class="cntCuentaSaldo ${saldo < 0 ? "cuentasNeg" : ""}">${formatEuro(saldo)}</div>
-                    <div class="cntCuentaDetalle">
-                        <span class="cuentasPos">${cntSigned(entradas)}</span>
-                        <span class="cuentasNeg">${formatEuro(-salidas)}</span>
-                        ${comisiones ? `<span class="cuentasNeg" title="Comisiones pagadas por esta cuenta">Comisiones ${formatEuro(-comisiones)}</span>` : ""}
-                        ${inicial ? `<span>Saldo inicial ${formatEuro(inicial)}</span>` : ""}
+                    ${cntVariacionTexto(variaciones.get(c.id))}
+                    ${cntMiniatura(c)}
+                    <div class="cntCuentaPie">
+                        <span>${peso ? `${peso.toFixed(1).replace(".", ",")} % del total` : "&nbsp;"}</span>
+                        <span class="cntCuentaPieRango">YTD</span>
                     </div>
-                    ${
-                        intereses || dividendos
-                            ? `<div class="cntCuentaDetalle">
-                        ${intereses ? `<span class="cuentasPos" title="Intereses netos de la cuenta remunerada vinculada">Intereses ${cntSigned(intereses)}</span>` : ""}
-                        ${dividendos ? `<span class="cuentasPos" title="Dividendos cobrados, en euros">Dividendos ${cntSigned(dividendos)}</span>` : ""}
-                    </div>`
-                            : ""
-                    }
-                    ${cntVinculosTexto(c)}
                 </div>`
         })
         .join("")
 }
 
-// Los papeles de la cuenta: de ahorro, remunerada y
-// la que cobra los dividendos.
-function cntVinculosTexto(cuenta) {
-    const partes = []
-    if (cuenta.ahorro) partes.push("Cuenta de ahorro")
-    if (cuenta.remunerada) partes.push("Remunerada")
-    if (cuenta.dividendos) partes.push("Dividendos")
-    if (!partes.length) return ""
-    return `<div class="cntCuentaRemunerada" title="Papeles de esta cuenta">${escapeGastosHtml(partes.join(" · "))}</div>`
+// Variación de la cuenta desde el 1 de enero, o null sin histórico.
+function cntVariacionYtd(cuentaId) {
+    if (!cntHistorico) return null
+    return cntVariacion(cntPuntosEnRango(cntSerieDe(cuentaId), cntInicioRango("YTD")))
+}
+
+function cntVariacionTexto(variacion, sufijo = "en el año") {
+    if (!variacion) return '<div class="cntCuentaVariacion">&nbsp;</div>'
+    const { absoluta, porcentaje } = variacion
+    const clase = absoluta > 0 ? "cuentasPos" : absoluta < 0 ? "cuentasNeg" : ""
+    const pct = porcentaje === null ? "" : ` (${porcentaje > 0 ? "+" : ""}${porcentaje.toFixed(1).replace(".", ",")} %)`
+    return `<div class="cntCuentaVariacion"><span class="${clase}">${cntSigned(absoluta)}${pct}</span> ${escapeGastosHtml(sufijo)}</div>`
+}
+
+// Miniatura del saldo en lo que va de año, siempre YTD como en el boceto: el
+// rango se elige en la gráfica ampliada.
+function cntMiniatura(cuenta) {
+    const ancho = 240
+    const alto = 56
+    const trazado = cntHistorico
+        ? cntTrazadoMini(cntPuntosEnRango(cntSerieDe(cuenta.id), cntInicioRango("YTD")), ancho, alto)
+        : ""
+    return `
+        <div class="cntCuentaMini">
+            ${
+                trazado
+                    ? `<svg viewBox="0 0 ${ancho} ${alto}" preserveAspectRatio="none" aria-hidden="true">
+                        <path class="cntMiniArea" d="${cntAreaMini(trazado, alto)}"></path>
+                        <path class="cntMiniLinea" d="${trazado}"></path>
+                    </svg>`
+                    : '<span class="cntCuentaMiniVacia">Sin histórico</span>'
+            }
+            <button type="button" class="cntCuentaAmpliar" data-cnt-ampliar title="Ampliar la gráfica" aria-label="Ampliar la gráfica de ${escapeGastosHtml(cuenta.nombre)}">
+                <span class="icono iconoAmpliar" aria-hidden="true"></span>
+            </button>
+        </div>`
+}
+
+// ── Tarjeta de la derecha ───────────────────────────────────────────────
+// Un selector cambia entre el reparto del dinero por cuenta, los gastos por
+// categoría del periodo y la evolución del total. Los dos últimos comparten
+// periodo; el reparto es el de hoy.
+
+const CNT_VISTAS_LATERAL = [
+    { clave: "reparto", etiqueta: "Reparto", titulo: "Reparto por cuenta" },
+    { clave: "gastos", etiqueta: "Gastos", titulo: "Gastos por categoría" },
+    { clave: "evolucion", etiqueta: "Evolución", titulo: "Evolución del total" }
+]
+const CNT_VISTA_LATERAL_PREF = "cuentasLateralVista"
+
+function cntRangoTotal() {
+    return cntRangoValido(getChartPref(CNT_RANGO_TOTAL_PREF, CNT_RANGO_DEFECTO))
+}
+
+function cntVistaLateral() {
+    const guardada = getChartPref(CNT_VISTA_LATERAL_PREF, "reparto")
+    return CNT_VISTAS_LATERAL.some((v) => v.clave === guardada) ? guardada : "reparto"
+}
+
+function cntPeriodoTexto(rango) {
+    return CNT_RANGOS.find((r) => r.clave === rango)?.periodo || "el periodo"
+}
+
+function cntLateral() {
+    return {
+        tarjeta: document.getElementById("cuentasLateral"),
+        pestanas: document.getElementById("cuentasLateralTabs"),
+        titulo: document.getElementById("cuentasLateralTitulo"),
+        subtitulo: document.getElementById("cuentasLateralSub"),
+        rangos: document.getElementById("cuentasTotalRangos"),
+        canvas: document.getElementById("cuentasTotalGrafica"),
+        centro: document.getElementById("cuentasLateralCentro"),
+        leyenda: document.getElementById("cuentasLateralLeyenda"),
+        vacio: document.getElementById("cuentasTotalVacio")
+    }
+}
+
+function cntRenderLateral() {
+    cntGraficaLateral?.destroy()
+    cntGraficaLateral = null
+    cntLateralTurno += 1
+    const el = cntLateral()
+    if (!el.tarjeta) return
+    const vista = cntVistaLateral()
+    const rango = cntRangoTotal()
+
+    el.tarjeta.classList.toggle("cntLateralCircular", vista !== "evolucion")
+    if (el.pestanas) {
+        el.pestanas.innerHTML = cntSegmento(
+            CNT_VISTAS_LATERAL.map((v) => [v.clave, v.etiqueta]),
+            vista,
+            "data-cnt-lateral",
+            "Gráfico"
+        )
+    }
+    if (el.titulo) el.titulo.textContent = CNT_VISTAS_LATERAL.find((v) => v.clave === vista).titulo
+    if (el.rangos) {
+        el.rangos.hidden = vista === "reparto"
+        el.rangos.innerHTML = cntSegmento(
+            CNT_RANGOS.map((r) => [r.clave, r.etiqueta]),
+            rango,
+            "data-cnt-total-rango",
+            "Periodo"
+        )
+    }
+    if (el.subtitulo) el.subtitulo.innerHTML = ""
+    if (el.leyenda) el.leyenda.innerHTML = ""
+    if (el.centro) el.centro.hidden = true
+    cntLateralEstado(el, false, "")
+
+    if (vista === "reparto") cntLateralReparto(el)
+    else if (vista === "gastos") cntLateralGastos(el, rango, cntLateralTurno)
+    else cntLateralEvolucion(el, rango)
+}
+
+// Con gráfica se ve la caja; sin ella, el aviso.
+function cntLateralEstado(el, hayGrafica, aviso) {
+    el.canvas?.closest(".cntGraficaCaja")?.classList.toggle("hidden", !hayGrafica)
+    if (el.vacio) {
+        el.vacio.textContent = aviso
+        el.vacio.classList.toggle("hidden", hayGrafica || !aviso)
+    }
+}
+
+function cntLateralReparto(el) {
+    const partes = cntAgruparPartes(
+        cntCuentas.map((c, i) => ({
+            etiqueta: c.nombre,
+            valor: parseEuroNumber(c.saldo),
+            color: CNT_PALETA[i % CNT_PALETA.length]
+        }))
+    )
+    if (el.subtitulo) el.subtitulo.textContent = "Saldo de hoy de cada cuenta"
+    cntLateralDonut(el, partes, "No hay saldo positivo que repartir.")
+}
+
+async function cntLateralGastos(el, rango, turno) {
+    const desde = cntInicioRango(rango)
+    const clave = desde === null ? "" : cntFechaIso(desde)
+    cntLateralEstado(el, false, "Cargando…")
+    let categorias = cntGastosCache[clave]
+    if (!categorias) {
+        try {
+            const datos = await Api.get(`/api/cuentas/gastos-categorias${clave ? `?desde=${clave}` : ""}`)
+            categorias = Array.isArray(datos?.categorias) ? datos.categorias : []
+            cntGastosCache[clave] = categorias
+        } catch (error) {
+            console.error("Error cargando los gastos por categoría:", error)
+            if (turno === cntLateralTurno) cntLateralEstado(el, false, "No se pudieron cargar los gastos.")
+            return
+        }
+    }
+    // Mientras llegaba la respuesta se ha cambiado de pestaña o de periodo.
+    if (turno !== cntLateralTurno) return
+
+    const partes = cntAgruparPartes(
+        categorias.map((c, i) => ({
+            etiqueta: c.categoria,
+            valor: Number(c.importe),
+            color: CNT_PALETA[i % CNT_PALETA.length]
+        }))
+    )
+    const total = partes.reduce((suma, p) => suma + p.valor, 0)
+    if (el.subtitulo && total > 0) {
+        el.subtitulo.innerHTML = `<span class="cuentasNeg">${formatEuro(total)}</span> gastados en ${escapeGastosHtml(cntPeriodoTexto(rango))}`
+    }
+    cntLateralDonut(el, partes, `No hay gastos en ${cntPeriodoTexto(rango)}.`)
+}
+
+function cntLateralEvolucion(el, rango) {
+    const puntos = cntHistorico
+        ? cntPuntosEnRango(cntSerieTotal(cntCuentas.map((c) => cntSerieDe(c.id))), cntInicioRango(rango))
+        : []
+    if (el.subtitulo && puntos.length) {
+        el.subtitulo.innerHTML = cntVariacionTexto(cntVariacion(puntos), `en ${cntPeriodoTexto(rango)}`)
+    }
+    // La caja se enseña antes de pintar: oculta mide 0 de ancho y el eje
+    // calcularía sus marcas como si cupieran todas.
+    cntLateralEstado(el, true, "")
+    cntGraficaLateral = cntPintarSaldo(el.canvas, puntos)
+    cntLateralEstado(
+        el,
+        Boolean(cntGraficaLateral),
+        cntHistorico ? "Todavía no hay movimientos que dibujar." : "No se pudo cargar el histórico de saldos."
+    )
+}
+
+// Donut con el total en el hueco y una leyenda con importe y porcentaje.
+function cntLateralDonut(el, partes, aviso) {
+    const total = partes.reduce((suma, p) => suma + p.valor, 0)
+    cntLateralEstado(el, true, "")
+    cntGraficaLateral = cntPintarDonut(el.canvas, partes, (parte) => cntCentroDonut(el, parte, total))
+    cntLateralEstado(el, Boolean(cntGraficaLateral), aviso)
+    if (!cntGraficaLateral) return
+    if (el.centro) el.centro.hidden = false
+    cntCentroDonut(el, null, total)
+    cntRenderLeyenda(el, partes, total)
+}
+
+// El centro del donut: el total o, con una porción señalada, esa porción.
+function cntCentroDonut(el, parte, total) {
+    if (!el.centro) return
+    el.centro.querySelector(".cntDonutCentroValor").textContent = formatEuro(parte ? parte.valor : total)
+    const titulo = el.centro.querySelector(".cntDonutCentroTitulo")
+    titulo.textContent = parte ? parte.etiqueta : "Total"
+    titulo.title = parte ? parte.etiqueta : ""
+    el.centro.querySelector(".cntDonutCentroPct").textContent = parte ? cntPorcentajeTexto(parte.valor, total) : ""
+    el.leyenda
+        ?.querySelectorAll(".cntLeyendaFila")
+        .forEach((fila) => fila.classList.toggle("activa", Boolean(parte) && fila.dataset.etiqueta === parte.etiqueta))
+}
+
+// Pasar por una fila de la leyenda resalta su porción, como pasar por el donut.
+function cntRenderLeyenda(el, partes, total) {
+    if (!el.leyenda) return
+    el.leyenda.innerHTML = partes
+        .map(
+            (p) => `
+                <li class="cntLeyendaFila" data-etiqueta="${escapeGastosHtml(p.etiqueta)}">
+                    <span class="cntLeyendaColor" style="background:${escapeGastosHtml(p.color)}"></span>
+                    <span class="cntLeyendaNombre">${escapeGastosHtml(p.etiqueta)}</span>
+                    <span class="cntLeyendaValor">${formatEuro(p.valor)}</span>
+                    <span class="cntLeyendaPct">${cntPorcentajeTexto(p.valor, total)}</span>
+                </li>`
+        )
+        .join("")
+    // Propiedades y no addEventListener: la leyenda se repinta en cada render
+    // y así no se acumulan manejadores.
+    el.leyenda.onmouseover = (event) => {
+        const fila = event.target.closest(".cntLeyendaFila")
+        if (!fila) return
+        const parte = partes.find((p) => p.etiqueta === fila.dataset.etiqueta) || null
+        cntResaltarPorcion(cntGraficaLateral, parte ? parte.etiqueta : null)
+        cntCentroDonut(el, parte, total)
+    }
+    el.leyenda.onmouseleave = () => {
+        cntResaltarPorcion(cntGraficaLateral, null)
+        cntCentroDonut(el, null, total)
+    }
 }
 
 // Arrastrar y soltar como las tarjetas de Activos: la tarjeta se coloca en vivo
@@ -154,11 +392,15 @@ function cntBindOrden(lista) {
         if (!origen) return
         event.preventDefault()
         event.dataTransfer.dropEffect = "move"
+        // Las tarjetas van en rejilla: se suelta delante de la primera que, en
+        // orden de lectura, queda por debajo del cursor o a su derecha en la
+        // misma fila.
         const siguiente = [...lista.querySelectorAll(".cntCuenta")]
             .filter((c) => c !== origen)
             .find((c) => {
                 const caja = c.getBoundingClientRect()
-                return event.clientY < caja.top + caja.height / 2
+                if (event.clientY < caja.top) return true
+                return event.clientY <= caja.bottom && event.clientX < caja.left + caja.width / 2
             })
         moveDraggedAssetPreview(lista, origen, siguiente || null)
     })
@@ -180,18 +422,55 @@ function cntBindOrden(lista) {
     })
 }
 
-function cntTipoOptions(actual = "exchange") {
+/**
+ * Las etiquetas de una cuenta como chapas, la principal primero.
+ * @param {{tipo: string, tipo_etiqueta?: string, etiquetas?: string[], etiquetas_nombres?: string[]}} cuenta
+ * @returns {string} HTML.
+ */
+function cntEtiquetasHtml(cuenta) {
+    const ids = Array.isArray(cuenta.etiquetas) && cuenta.etiquetas.length ? cuenta.etiquetas : [cuenta.tipo]
+    const nombres = Array.isArray(cuenta.etiquetas_nombres) ? cuenta.etiquetas_nombres : []
+    return ids
+        .map((id, i) => {
+            const nombre =
+                nombres[i] || (i === 0 && cuenta.tipo_etiqueta) || cntTipos.find((t) => t.id === id)?.nombre || id
+            return `<span class="cntTipo cntTipo-${escapeGastosHtml(id)}">${escapeGastosHtml(nombre)}</span>`
+        })
+        .join("")
+}
+
+// Las etiquetas son solo para identificar la cuenta: se marcan todas las que
+// apliquen. Una cuenta nueva empieza como exchange, como antes.
+function cntEtiquetasOpciones(cuenta) {
+    const marcadas = new Set(cuenta?.etiquetas?.length ? cuenta.etiquetas : [cuenta?.tipo || "exchange"])
     return cntTipos
         .map(
-            (t) =>
-                `<option value="${escapeGastosHtml(t.id)}"${t.id === actual ? " selected" : ""}>${escapeGastosHtml(t.nombre)}</option>`
+            (t) => `
+                <label class="cntEtiquetaOpcion">
+                    <input type="checkbox" value="${escapeGastosHtml(t.id)}"${marcadas.has(t.id) ? " checked" : ""}>
+                    <span class="cntTipo cntTipo-${escapeGastosHtml(t.id)}">${escapeGastosHtml(t.nombre)}</span>
+                </label>`
         )
         .join("")
 }
 
-// Sin `cuenta` crea una; con ella, edita el nombre, el saldo inicial y si cobra
-// los dividendos (el tipo no se cambia). Que sea remunerada o de ahorro se
-// decide en sus ventanas, eligiendo allí esta cuenta.
+/**
+ * Reparte las etiquetas marcadas entre el tipo (la principal, que la base de
+ * datos necesita) y las extra. Se conserva el tipo que ya tenía la cuenta si
+ * sigue marcado, para que no cambie sin querer; si no, la primera marcada.
+ * @param {string[]} marcadas Ids de tipo, en el orden del modal.
+ * @param {string} [tipoActual]
+ * @returns {{tipo: string, etiquetas: string[]}|null} null si no hay ninguna.
+ */
+function cntRepartirEtiquetas(marcadas, tipoActual = "") {
+    if (!marcadas.length) return null
+    const tipo = marcadas.includes(tipoActual) ? tipoActual : marcadas[0]
+    return { tipo, etiquetas: marcadas.filter((id) => id !== tipo) }
+}
+
+// Sin `cuenta` crea una; con ella, edita el nombre, las etiquetas, el saldo
+// inicial y si cobra los dividendos. Que sea remunerada o
+// de ahorro se decide en sus ventanas, eligiendo allí esta cuenta.
 function cntAbrirModalCuenta(cuenta = null) {
     openGastosCreateModal({
         title: cuenta ? "Editar cuenta" : "Nueva cuenta",
@@ -202,11 +481,12 @@ function cntAbrirModalCuenta(cuenta = null) {
                     <label class="assetModalLabel" for="cntCuentaNombre">Nombre</label>
                     <input id="cntCuentaNombre" class="assetModalInput" type="text" maxlength="60" value="${escapeGastosHtml(cuenta?.nombre || "")}" placeholder="Ej: Binance, Degiro, Cuenta nómina">
                 </div>
-                <div class="gastosCreateModalField">
-                    <label class="assetModalLabel" for="cntCuentaTipo">Tipo</label>
-                    <select id="cntCuentaTipo" class="assetModalSelect"${cuenta ? " disabled" : ""}>${cntTipoOptions(cuenta?.tipo || "exchange")}</select>
+                <div class="gastosCreateModalField mensFormFieldWide">
+                    <span class="assetModalLabel">Etiquetas</span>
+                    <div class="cntEtiquetasElegir" id="cntCuentaEtiquetas">${cntEtiquetasOpciones(cuenta)}</div>
+                    <p class="cuentasHint">Marca todas las que encajen, como un banco que también es broker. Son solo para identificar la cuenta.</p>
                 </div>
-                <div class="gastosCreateModalField">
+                <div class="gastosCreateModalField mensFormFieldWide">
                     <label class="assetModalLabel" for="cntCuentaSaldo">Saldo inicial <span class="assetModalLabelHint">opcional</span></label>
                     <input id="cntCuentaSaldo" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(cuenta ? cntSaldoInicialTexto(cuenta) : "")}" placeholder="0,00">
                 </div>
@@ -231,10 +511,19 @@ function cntAbrirModalCuenta(cuenta = null) {
         `,
         submitLabel: "Guardar",
         onSubmit: async ({ modal, getValue, setFeedback }) => {
+            const etiquetas = cntRepartirEtiquetas(
+                [...modal.querySelectorAll(".cntEtiquetaOpcion input:checked")].map((casilla) => casilla.value),
+                cuenta?.tipo
+            )
+            if (!etiquetas) {
+                setFeedback("Marca al menos una etiqueta.", true)
+                return false
+            }
             const cuerpo = {
                 nombre: getValue("cntCuentaNombre").trim(),
                 saldoInicial: getValue("cntCuentaSaldo").trim(),
-                dividendos: Boolean(modal.querySelector("#cntCuentaDividendos")?.checked)
+                dividendos: Boolean(modal.querySelector("#cntCuentaDividendos")?.checked),
+                ...etiquetas
             }
             const remunerada = Boolean(modal.querySelector("#cntCuentaRemunerada")?.checked)
             try {
@@ -244,7 +533,7 @@ function cntAbrirModalCuenta(cuenta = null) {
                     await Api.put(`/api/cuentas/${encodeURIComponent(cuenta.id)}`, cuerpo)
                 } else {
                     if (remunerada) cuerpo.remunerada = await cntCrearRemunerada(cuerpo.nombre)
-                    await Api.post("/api/cuentas", { ...cuerpo, tipo: getValue("cntCuentaTipo") })
+                    await Api.post("/api/cuentas", cuerpo)
                 }
                 await cntRecargar()
                 cntRender()
@@ -282,7 +571,6 @@ function cntEliminarCuenta(cuenta) {
         onConfirm: async () => {
             try {
                 await Api.del(`/api/cuentas/${encodeURIComponent(cuenta.id)}`)
-                if (cntFiltro === cuenta.id) cntFiltro = ""
             } catch (error) {
                 showError("No se pudo eliminar la cuenta", error)
             }
@@ -294,117 +582,9 @@ function cntEliminarCuenta(cuenta) {
 
 // ── Transferencias ───────────────────────────────────────────────────────
 
-function cntRenderYears() {
-    const list = document.getElementById("cuentasYearList")
-    if (!list) return
-    list.innerHTML = ""
-    // Como en Intereses: el más reciente a la izquierda, tras «Todos».
-    ;[["", "Todos"], ...[...cntYears].reverse().map((y) => [y, y])].forEach(([valor, etiqueta]) => {
-        const btn = document.createElement("button")
-        btn.type = "button"
-        btn.className = `interesesYearBtn${valor === cntYear ? " active" : ""}`
-        btn.textContent = etiqueta
-        btn.addEventListener("click", () => {
-            cntYear = valor
-            cntRender()
-        })
-        list.appendChild(btn)
-    })
-    refrescarTiraPestanas(list)
-}
-
 function cntFechaClave(fecha) {
     const p = splitDividendoFecha(fecha)
     return p ? new Date(Number(p.anio), Number(p.mes) - 1, Number(p.dia) || 1).getTime() : 0
-}
-
-function cntTransferenciasVisibles() {
-    return cntTransferencias.filter(
-        (t) => (!cntYear || t.year === cntYear) && (!cntFiltro || t.origen === cntFiltro || t.destino === cntFiltro)
-    )
-}
-
-function cntHead() {
-    const columnas = [
-        ["fecha", "Fecha"],
-        ["origen", "Origen"],
-        ["destino", "Destino"],
-        ["concepto", "Concepto"],
-        ["cantidad", "Cantidad", true],
-        ["comision", "Comisión", true]
-    ]
-    const celdas = columnas
-        .map(([key, label, num]) => {
-            const activa = cntSort.key === key
-            const flecha = activa ? (cntSort.dir === "asc" ? "▲" : "▼") : ""
-            return `<th class="mThSort${activa ? " mThActive" : ""}${num ? " numCol" : ""}" data-cnt-sort="${key}" title="Ordenar por ${label.toLowerCase()}">${label}<span class="mSortArrow">${flecha}</span></th>`
-        })
-        .join("")
-    return `<tr>${celdas}<th class="rowActionHeader"></th></tr>`
-}
-
-function cntRenderTabla() {
-    const head = document.getElementById("cuentasHead")
-    const body = document.getElementById("cuentasBody")
-    const empty = document.getElementById("cuentasEmpty")
-    if (!head || !body || !empty) return
-
-    head.innerHTML = cntHead()
-
-    const valores = {
-        fecha: (t) => cntFechaClave(t.fecha),
-        origen: (t) => t.origen_nombre || "",
-        destino: (t) => t.destino_nombre || "",
-        concepto: (t) => t.concepto || "",
-        cantidad: (t) => parseEuroNumber(t.cantidad),
-        comision: (t) => parseEuroNumber(t.comision)
-    }
-    const signo = cntSort.dir === "asc" ? 1 : -1
-    const filas = [...cntTransferenciasVisibles()].sort((a, b) => {
-        const x = valores[cntSort.key](a)
-        const y = valores[cntSort.key](b)
-        const cmp = typeof x === "string" ? x.localeCompare(y, "es", { sensitivity: "base" }) : x - y
-        return cmp * signo || cntFechaClave(b.fecha) - cntFechaClave(a.fecha) || b.id - a.id
-    })
-
-    body.innerHTML = filas
-        .map(
-            (t) => `
-                <tr class="movDetailRow" data-id="${t.id}">
-                    <td>${escapeGastosHtml(t.fecha)}</td>
-                    <td>${escapeGastosHtml(t.origen_nombre)}</td>
-                    <td>${escapeGastosHtml(t.destino_nombre)}</td>
-                    <td title="${escapeGastosHtml(t.nota)}">${t.concepto ? escapeGastosHtml(t.concepto) : '<span class="cuentasSinConcepto">Sin concepto</span>'}</td>
-                    <td class="numCell">${formatEuro(parseEuroNumber(t.cantidad))}</td>
-                    <td class="numCell">${parseEuroNumber(t.comision) > 0 ? `<span class="cuentasNeg">${formatEuro(parseEuroNumber(t.comision))}</span>` : '<span class="cuentasSinConcepto">—</span>'}</td>
-                    <td class="rowActionsCell">
-                        <div class="rowMenu">
-                            <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
-                            <div class="rowMenuDropdown">
-                                <button type="button" class="rowMenuItem" data-cnt-editar>Editar</button>
-                                <hr>
-                                <button type="button" class="rowMenuItem rowMenuItemDanger" data-cnt-eliminar>Eliminar</button>
-                            </div>
-                        </div>
-                    </td>
-                </tr>`
-        )
-        .join("")
-
-    empty.textContent = cntFiltro
-        ? "No hay transferencias con esta cuenta en el periodo."
-        : cntYear
-          ? `No hay transferencias en ${cntYear}.`
-          : "Todavía no hay transferencias."
-    empty.classList.toggle("hidden", filas.length > 0)
-    empty.closest(".cuentasTableWrapper")?.classList.toggle("cuentasVacio", filas.length === 0)
-
-    const filtro = document.getElementById("cuentasFiltro")
-    if (filtro) {
-        filtro.hidden = !cntFiltro
-        const nombre = document.getElementById("cuentasFiltroNombre")
-        if (nombre) nombre.textContent = cntNombre(cntFiltro)
-    }
 }
 
 function cntOpcionesCuenta(seleccionada) {
@@ -416,9 +596,11 @@ function cntOpcionesCuenta(seleccionada) {
         .join("")
 }
 
-// Con `transferencia`, edita esa; sin ella, crea una nueva.
-function cntAbrirModalTransferencia(transferencia = null) {
-    const origen = transferencia?.origen || cntFiltro || "banco"
+// Con `transferencia`, edita esa; sin ella, crea una nueva, saliendo de
+// `origenPorDefecto` si se da (la cuenta abierta en su ventana). `alGuardar`
+// repinta la página que lo abre; por defecto, esta.
+function cntAbrirModalTransferencia(transferencia = null, origenPorDefecto = "", alGuardar = cntRecargarYPintar) {
+    const origen = transferencia?.origen || origenPorDefecto || "banco"
     const destino = transferencia?.destino || cntCuentas.find((c) => c.id !== origen)?.id || "ahorro"
 
     openGastosCreateModal({
@@ -470,15 +652,9 @@ function cntAbrirModalTransferencia(transferencia = null) {
                 nota: getValue("cntTransNota").trim()
             }
             try {
-                const res = transferencia
-                    ? await Api.put(`/api/transferencias/${transferencia.id}`, cuerpo)
-                    : await Api.post("/api/transferencias", cuerpo)
-                await cntRecargar()
-                const year = res?.transferencia?.year
-                if (year && !cntYears.includes(year)) cntYears = [...cntYears, year].sort()
-                // Se enseña lo que acaba de guardarse, aunque fuera de otro año.
-                if (year && cntYear && cntYear !== year) cntYear = year
-                cntRender()
+                if (transferencia) await Api.put(`/api/transferencias/${transferencia.id}`, cuerpo)
+                else await Api.post("/api/transferencias", cuerpo)
+                await alGuardar()
                 return true
             } catch (error) {
                 setFeedback(error?.message || "No se pudo guardar la transferencia.", true)
@@ -488,7 +664,7 @@ function cntAbrirModalTransferencia(transferencia = null) {
     })
 }
 
-function cntEliminarTransferencia(transferencia) {
+function cntEliminarTransferencia(transferencia, alGuardar = cntRecargarYPintar) {
     openConfirmModal({
         title: "Eliminar transferencia",
         message: "El dinero vuelve a su cuenta de origen. No se puede deshacer.",
@@ -499,14 +675,19 @@ function cntEliminarTransferencia(transferencia) {
             } catch (error) {
                 showError("No se pudo eliminar la transferencia", error)
             }
-            await cntRecargar()
-            cntRender()
+            await alGuardar()
         }
     })
 }
 
+// Refresco por defecto de los modales de transferencia: el de esta página.
+async function cntRecargarYPintar() {
+    await cntRecargar()
+    cntRender()
+}
+
 function cntDescargarCsv() {
-    const filas = cntTransferenciasVisibles().map((t) => ({
+    const filas = cntTransferencias.map((t) => ({
         Fecha: t.fecha,
         Origen: t.origen_nombre,
         Destino: t.destino_nombre,
@@ -515,18 +696,16 @@ function cntDescargarCsv() {
         Comision: parseEuroNumber(t.comision),
         Nota: t.nota || ""
     }))
-    downloadCsvFile(`transferencias${cntYear ? "-" + cntYear : ""}.csv`, filas)
+    downloadCsvFile("transferencias.csv", filas)
 }
 
-// Respeta el año y la cuenta elegidos, como la tabla. La comisión no se dibuja:
-// no llega a ninguna cuenta.
+// Todas las transferencias, de todos los años. La comisión no se dibuja: no
+// llega a ninguna cuenta.
 function cntAbrirGrafo() {
-    const partes = [cntYear || "Todos los años"]
-    if (cntFiltro) partes.push(`solo ${cntNombre(cntFiltro)}`)
     abrirGrafoFlujos({
         titulo: "Movimientos entre cuentas",
-        subtitulo: partes.join(" · "),
-        movimientos: cntTransferenciasVisibles().map((t) => ({
+        subtitulo: "Todos los años",
+        movimientos: cntTransferencias.map((t) => ({
             origen: t.origen_nombre || cntNombre(t.origen),
             destino: t.destino_nombre || cntNombre(t.destino),
             cantidad: parseEuroNumber(t.cantidad)
@@ -558,35 +737,19 @@ function cntBind() {
     }
 
     const on = (id, handler) => document.getElementById(id)?.addEventListener("click", handler)
-    on("cuentasAddRowBtn", () => cntAbrirModalTransferencia())
     on("cuentasNuevaCuentaBtn", () => cntAbrirModalCuenta())
     on("cuentasCsvBtn", cntDescargarCsv)
     on("cuentasGrafoBtn", cntAbrirGrafo)
-    // Con «Todos» seleccionado (cntYear vacío) el informe es del año en curso.
-    on("cuentasInformeBtn", (e) => descargarInformeFinanzas(cntYear, e.currentTarget))
-    on("cuentasFiltroQuitar", () => {
-        cntFiltro = ""
-        cntRender()
-    })
+    // Sin año elegido el informe es del año en curso.
+    on("cuentasInformeBtn", (e) => descargarInformeFinanzas("", e.currentTarget))
 
-    document.getElementById("cuentasHead")?.addEventListener("click", (event) => {
-        const th = event.target.closest("[data-cnt-sort]")
-        if (!th) return
-        const key = th.dataset.cntSort
-        if (cntSort.key === key) cntSort.dir = cntSort.dir === "asc" ? "desc" : "asc"
-        else {
-            cntSort.key = key
-            cntSort.dir = key === "fecha" || key === "cantidad" ? "desc" : "asc"
-        }
-        cntRenderTabla()
-    })
-
-    document.getElementById("cuentasBody")?.addEventListener("click", (event) => {
-        const fila = event.target.closest("tr")
-        const transferencia = fila && cntTransferencias.find((t) => String(t.id) === fila.dataset.id)
-        if (!transferencia) return
-        if (event.target.closest("[data-cnt-editar]")) cntAbrirModalTransferencia(transferencia)
-        else if (event.target.closest("[data-cnt-eliminar]")) cntEliminarTransferencia(transferencia)
+    document.getElementById("cuentasLateral")?.addEventListener("click", (event) => {
+        const vista = event.target.closest("[data-cnt-lateral]")
+        const rango = event.target.closest("[data-cnt-total-rango]")
+        if (vista) setChartPref(CNT_VISTA_LATERAL_PREF, vista.dataset.cntLateral)
+        else if (rango) setChartPref(CNT_RANGO_TOTAL_PREF, rango.dataset.cntTotalRango)
+        else return
+        cntRenderLateral()
     })
 
     cntBindOrden(document.getElementById("cuentasLista"))
@@ -601,9 +764,9 @@ function cntBind() {
             document.querySelector('[data-page="cuentaAhorro"]')?.click()
             return
         }
-        // Pulsar la tarjeta (fuera de su menú) filtra la tabla por esa cuenta.
         if (event.target.closest(".rowMenu")) return
-        cntFiltro = cntFiltro === cuenta.id ? "" : cuenta.id
-        cntRender()
+        if (event.target.closest("[data-cnt-ampliar]")) return cntAbrirPanel("graficos", cuenta.id)
+        // Pulsar la tarjeta (fuera de su menú) abre el detalle de la cuenta.
+        cntAbrirPanel("resumen", cuenta.id)
     })
 }

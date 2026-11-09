@@ -5,7 +5,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { runInThisContext } from "node:vm"
 
-import { cargarScript } from "./cargar.js"
+import { cargarModulo, cargarScript } from "./cargar.js"
 
 const global = (expresion) => runInThisContext(expresion)
 
@@ -50,7 +50,7 @@ function ponerGuardado(datos) {
 
 beforeAll(() => {
     cargarScript("js/cripto/wallets.js")
-    cargarScript("js/cripto/wallets-seguimiento.js")
+    cargarModulo("js/cripto/wallets-seguimiento.js")
 })
 
 beforeEach(() => {

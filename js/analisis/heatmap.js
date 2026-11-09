@@ -119,6 +119,7 @@ async function initHeatmapLogic() {
                 _hmThemeObserver.disconnect()
                 clearTimeout(_hmRenderTimer)
                 document.getElementById("hmTooltip")?.remove()
+                mapaDiaOcultarTv()
             }
         })
     )
@@ -341,6 +342,7 @@ function hmRender() {
     container.innerHTML = ""
     hmBindContainer(container)
     rects.forEach((rect) => container.appendChild(hmBuildCell(rect)))
+    mapaDiaPrecalentarTv(rects.map(hmSimboloTv).find(Boolean))
 }
 
 /**
@@ -427,8 +429,19 @@ function hmBindContainer(container) {
         const cell = e.target.closest(".heatmapCell")
         if (!cell || !cell._hmData) {
             tip.classList.remove("hmTooltipVisible")
+            mapaDiaOcultarTv()
             return
         }
+
+        // Con símbolo de TradingView, la vista previa de su gráfico ocupa el
+        // lugar del tooltip. Sin él, queda el tooltip con los datos.
+        const tvSym = hmSimboloTv(cell._hmData)
+        if (tvSym) {
+            tip.classList.remove("hmTooltipVisible")
+            mapaDiaMostrarTv(cell, tvSym)
+            return
+        }
+        mapaDiaOcultarTv()
 
         tip.innerHTML = hmTooltipHtml(cell._hmData)
         tip.classList.add("hmTooltipVisible")
@@ -446,7 +459,10 @@ function hmBindContainer(container) {
         tip.style.top = Math.max(4, ly) + "px"
     })
 
-    container.addEventListener("mouseleave", () => hmGetTooltip().classList.remove("hmTooltipVisible"))
+    container.addEventListener("mouseleave", () => {
+        hmGetTooltip().classList.remove("hmTooltipVisible")
+        mapaDiaOcultarTv()
+    })
 
     // Una baldosa es el activo: al pulsarla se abre su gráfico de TradingView
     // en el mismo modal flotante que usan Seguimiento y Planes.
@@ -455,9 +471,14 @@ function hmBindContainer(container) {
         const d = cell?._hmData
         if (!d) return
         hmGetTooltip().classList.remove("hmTooltipVisible")
-        const tvSym = typeof buildTVSymbol === "function" ? buildTVSymbol(d) : d.tvSymbol || d.marketSymbol || ""
+        mapaDiaOcultarTv()
+        const tvSym = hmSimboloTv(d)
         if (tvSym && typeof openTVChartModal === "function") openTVChartModal(tvSym, d.name || d.symbol)
     })
+}
+
+function hmSimboloTv(d) {
+    return typeof buildTVSymbol === "function" ? buildTVSymbol(d) : d.tvSymbol || d.marketSymbol || ""
 }
 
 function hmGetTooltip() {

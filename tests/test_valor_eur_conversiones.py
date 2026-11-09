@@ -14,7 +14,7 @@ import pytest
 
 
 @pytest.fixture
-def cliente(clienteAutenticado, tempDb, monkeypatch):
+def cliente(clienteAutenticado, datosAislados, tempDb, monkeypatch):
     from routes.activos import activosBp
     from routes.ajustes import ajustesBp
 

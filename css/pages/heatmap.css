@@ -392,3 +392,84 @@
 .hmTipVal.hmTipNeg {
     color: #f87171;
 }
+
+/* ── Minigráfico del día y vista previa de TradingView (js/core/mapa-dia.js) ──
+   La línea solo sale en el widget «Mapa» de Paneles; la vista previa, también
+   en este mapa. La línea ocupa la parte de abajo de la baldosa, detrás de los
+   rótulos. */
+.mapaDiaLinea {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 46%;
+    pointer-events: none;
+}
+
+.mapaDiaTrazo {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.6);
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+}
+
+.mapaDiaArea {
+    fill: rgba(255, 255, 255, 0.1);
+}
+
+/* Posicionados para pintarse por encima de la línea, que es absoluta, y con
+   sombra para que se lean donde la línea les pasa por detrás. */
+.pnCelda > span {
+    position: relative;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* Sin eventos de ratón: si tapa parte del mapa, las baldosas de debajo siguen
+   respondiendo al cursor. */
+.mapaDiaTv {
+    position: fixed;
+    z-index: 10000;
+    /* Las mismas medidas que MAPA_DIA_TV_ANCHO y MAPA_DIA_TV_ALTO en mapa-dia.js. */
+    width: 440px;
+    height: 280px;
+    overflow: hidden;
+    pointer-events: none;
+    background: #0b1120;
+    border: 1px solid #1e2d45;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    visibility: hidden;
+    transition:
+        opacity 0.12s ease,
+        visibility 0.12s;
+}
+
+.mapaDiaTv.mapaDiaTvVisible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Varias vistas previas cargadas a la vez (ver MAPA_DIA_TV_MAX_MARCOS en
+   mapa-dia.js), apiladas: solo se ve la activa. visibility y no display: con
+   display:none el gráfico de TradingView se monta sin medidas. */
+.mapaDiaTv iframe {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    visibility: hidden;
+}
+
+.mapaDiaTv iframe.mapaDiaTvActivo {
+    visibility: inherit;
+}
+
+html[data-theme="light"] .mapaDiaTv {
+    background: #fff;
+    border-color: #cbd5e1;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}

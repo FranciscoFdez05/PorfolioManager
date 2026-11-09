@@ -1,0 +1,47 @@
+<section class="mvcPage">
+    <div class="mvcTopBar">
+        <div class="overviewSearch tablaBusqueda" data-busca-en="#mvcBody">
+            <button class="overviewSearchBtn" type="button" aria-label="Buscar en la tabla" title="Buscar en la tabla">
+                <span class="icono iconoBuscar" aria-hidden="true"></span>
+            </button>
+            <input type="text" class="overviewSearchInput" aria-label="Buscar en la tabla" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        </div>
+        <div class="overviewDivider tablaBusquedaDivisor"></div>
+        <div class="mvcYearList" id="mvcYearList"></div>
+        <div class="overviewDivider"></div>
+        <div class="mvcCuentaList" id="mvcCuentaList" aria-label="Filtrar por cuenta"></div>
+        <button id="mvcAddRowBtn" class="primaryButton" type="button">Nueva transferencia</button>
+        <div class="pageActionsMenu" id="mvcActionsMenu">
+            <button class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true">···</button>
+            <div class="pageActionsDropdown" id="mvcActionsDropdown">
+                <button id="mvcGrafoBtn" class="pageActionsItem" type="button">Ver movimientos en gráfico</button>
+                <button id="mvcCsvBtn" class="pageActionsItem" type="button">Descargar CSV</button>
+                <button id="mvcInformeBtn" class="pageActionsItem" type="button">Descargar informe (PDF)</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="mvcLayout">
+        <div class="gastosMovementsWrapper mvcTableWrapper">
+            <table class="gastosMovementsTable" id="mvcTable">
+                <thead id="mvcHead"></thead>
+                <tbody id="mvcBody"></tbody>
+            </table>
+            <p class="overviewEmpty hidden" id="mvcEmpty"></p>
+        </div>
+
+        <aside class="mvcSide">
+            <div class="summaryCard mvcTotalCard">
+                <div class="mvcTotalBloque" title="Suma de todas las cuentas a día de hoy. La bancaria incluye lo apuntado en Gastos e Ingresos.">
+                    <div class="summaryCardTitle">Total cuentas</div>
+                    <div class="summaryCardValue" id="mvcTotal">—</div>
+                </div>
+                <div class="mvcTotalBloque" title="Comisiones de las transferencias que se están viendo (año y cuenta elegidos).">
+                    <div class="summaryCardTitle">Comisiones</div>
+                    <div class="summaryCardValue cuentasNeg" id="mvcComisiones">—</div>
+                </div>
+            </div>
+            <div class="mvcCuentas" id="mvcCuentas"></div>
+        </aside>
+    </div>
+</section>

@@ -22,6 +22,115 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.2.0] — 2026-11-09
+
+**Esquema de base de datos:** lo sube al **28** (columna `etiquetas` en `cuentas`). La
+migración se aplica sola al arrancar y antes guarda la copia
+`data/backups/auto/<portfolio>_pre-esquema-27-a-28_*.db`. Para deshacer la actualización,
+vuelve a la imagen anterior y restaura esa copia.
+
+### Añadido
+
+- **Varias etiquetas por cuenta.** Una cuenta puede ser a la vez banco, broker, exchange…
+  El tipo de siempre pasa a ser la etiqueta principal (ahora también se puede cambiar al
+  editar) y las demás se marcan en «Otras etiquetas». Se ven en la tarjeta y en la
+  ventana de la cuenta.
+- **Histórico diario del saldo de cada cuenta** (`GET /api/cuentas/historico`). Gastos,
+  ingresos y transferencias cuentan el día de su fecha; mensualidades e ingresos
+  recurrentes, el día 1 de su mes; intereses y dividendos, el día de su fecha o el 1 si
+  solo tienen mes. El último punto coincide con el saldo actual.
+- **Movimientos de una cuenta** (`GET /api/cuentas/<id>/movimientos`): sus
+  transferencias, gastos e ingresos.
+- **Ventana de cada cuenta**, al pulsar su tarjeta, con pestañas: **Resumen** (entradas,
+  salidas, neto y variación del periodo y la gráfica del saldo), **Ingresos y gastos**
+  (con buscador y filtros por tipo, año y mes), **Transferencias** (con buscador; se
+  crean, editan y borran desde ahí) y **Gráficos** (saldo y entradas/salidas por mes con
+  la línea del neto). Periodos 1 mes, 3 meses, 6 meses, 1 año, YTD y Todo.
+- **La web se reinicia sola si deja de estar sana.** Docker no reinicia un contenedor
+  «unhealthy», solo uno cuyo proceso termina. Un supervisor (`python/admin/supervisor_web.py`)
+  arranca gunicorn, pregunta a `/api/health` y, tras 6 fallos seguidos (unos 3 minutos),
+  lo para para que Docker lo levante de nuevo. Se ajusta en `[gunicorn] salud_*` de
+  `config.ini` (env `SUPERVISOR_*`). El contenedor web usa `init: true`.
+- **Reciclado de workers de gunicorn** cada ~10.000 peticiones (`[gunicorn] max_requests`,
+  env `GUNICORN_MAX_REQUESTS`), contra fugas de memoria lentas.
+- **`/api/health` detecta tareas de fondo atascadas** cuando corren dentro de la web (sin
+  el servicio worker): responde 503 con `fallo: "tareas"`.
+- **El navegador se recupera solo de las caídas.** Los errores no capturados se avisan
+  (como mucho uno cada 10 s) en vez de dejar la pantalla sin responder. Si el servidor o
+  la red se caen, aparece «Sin conexión», se reintenta con espera creciente y la vista que
+  falló se vuelve a abrir al volver (`js/core/recuperacion.js`).
+- **Mi dinero › Movimientos.** Todas las transferencias entre cuentas, con filtros por año
+  y por cuenta, búsqueda, el total y las comisiones del periodo y una tarjeta por cuenta
+  con lo que entró y salió. Se crean, editan y borran con los mismos modales de Cuentas.
+- **Mi dinero › Cuenta remunerada.** Lo que entra en cada cuenta remunerada sin ser una
+  aportación: intereses y dividendos cobrados en ella, con el acumulado del año y la tabla
+  de movimientos. Es de solo lectura.
+- **Minigráfico del día en los mapas de calor de Paneles.** Cada baldosa lleva la línea
+  de hoy, de 00:00 a 24:00, que se completa a lo largo del día y se refresca sola. Sale de
+  los snapshots, con una sola consulta para toda la cartera.
+- **Vista previa de TradingView en los mapas de calor** (Análisis y Paneles): al pasar
+  por una baldosa con símbolo se ve su gráfico en lugar del tooltip.
+- **Los widgets de Paneles se estiran casi sin saltos.** La rejilla se parte en pistas
+  finas; los tamaños se guardan en columnas y filas con fracciones, así que los paneles
+  guardados y las plantillas no cambian.
+- **Cambiar de ventana es más rápido.** El HTML de cada ventana se descarga una vez por
+  pestaña y las demás se precargan cuando el navegador está libre
+  (`js/core/cache-paginas.js`). Las lecturas a la API de una lista blanca de rutas se
+  guardan unos segundos en memoria, y cualquier escritura vacía esa caché
+  (`js/core/cache-api.js`).
+
+### Cambiado
+
+- **Una sesión dura como mucho 30 días desde el login** (`[seguridad] sesion_maxima_minutos`
+  pasa de 0 a 43200, env `SESION_MAXIMA_MINUTOS`). La cookie dura 365 días, y sin tope
+  una cookie robada seguía valiendo hasta un logout o un cambio de contraseña. Al
+  actualizar, las sesiones abiertas hace más de 30 días piden volver a entrar. 0 vuelve
+  al comportamiento anterior.
+- **Ventana Cuentas rehecha.** Arriba, el total en cuentas, la variación en el año, las
+  comisiones pagadas y el número de cuentas. Una tarjeta por cuenta con su saldo, la
+  variación en el año, una miniatura del saldo del año y su peso en el total; con muchas
+  cuentas solo hace scroll la rejilla de tarjetas. A la derecha, la evolución del dinero
+  total con su propio selector de periodo.
+- La tabla de todas las transferencias y la tira de años salen de Cuentas: las de cada
+  cuenta están en su ventana. El CSV y el gráfico de movimientos del menú ··· abarcan
+  ahora todos los años.
+- **Código reorganizado, sin cambios de comportamiento.** `paneles.js`,
+  `wallets-seguimiento.js`, `herramientas.js` y `metricas-flujos.js` se parten por
+  secciones en ficheros `<nombre>-<parte>.js` que se cargan seguidos desde `index.html`.
+  La lectura y escritura de `ajustes.json` y de los `prefs_<id>.json` pasa de
+  `routes/ajustes.py` a `stores/ajustes_store.py`, así que las rutas ya no importan
+  unas de otras.
+
+### Eliminado
+
+- Funciones sin ningún uso: `planFechaADate`, `planFormatearFecha`, `planHoy` y
+  `planDiasEntre` (`planes.js`), `cntVinculosTexto` (`cuentas.js`), `cuantizarCantidad`
+  (`core/fifo.py`), `_columna` (`routes/activos.py`), `_readFirstApiKey`
+  (`stores/app_data.py`), `updateAssetMarketData` (`stores/asset_store.py`) y
+  `cuentasDeTipo` (`stores/cuentas_store.py`).
+
+### Corregido
+
+- **Minigráfico del día en las baldosas de Paneles sin posición.** Los activos sin
+  participaciones y las entradas propias de Seguimiento se quedaban sin línea (ni máximo
+  y mínimo), porque el histórico por activo solo guarda el valor de la posición. El hilo
+  de snapshots cotiza ahora también lo que no está en cartera y guarda su precio en
+  euros en la tabla nueva `asset_price_snapshots` (se crea sola, sin subir el esquema;
+  solo conserva dos días). Cuesta una cotización más por cada uno de esos activos en
+  cada snapshot. La línea empieza a llenarse desde la actualización.
+- **Un fallo al guardar un snapshot ya no pierde ese punto.** El hilo del servidor
+  libera el hueco horario que había reservado y lo reintenta una vez, sin entrar en
+  bucle si el fallo persiste.
+- **El escucha de Telegram no se cae** con un `config` ilegible ni con un mensaje sin
+  `update_id` válido.
+- **La suite de pytest escribía en los datos reales.** Un test importaba por
+  `/api/import/json` sin aislar los datos y en cada ejecución dejaba una copia en
+  `data/pre_restore/` y reescribía `ajustes.json` y los `prefs_*.json` de quien la
+  lanzaba. Además del arreglo del test, `tests/conftest.py` apunta ahora `data/`, `API/`
+  y `logs/` a una carpeta temporal antes de importar nada, así que un test mal aislado
+  ya no puede tocarlos. Las carpetas de `data/pre_restore/` que dejaron ejecuciones
+  anteriores se pueden borrar a mano.
+
 ## [5.1.2] — 2026-11-06
 
 **Esquema de base de datos:** no lo toca (sigue en la **27**). Para deshacer la

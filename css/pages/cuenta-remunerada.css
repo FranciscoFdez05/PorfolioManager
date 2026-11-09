@@ -1,0 +1,170 @@
+/* Cuenta remunerada: gráfico de lo acumulado en el año a la izquierda y tabla
+   de movimientos (intereses y dividendos) a la derecha. La barra de búsqueda,
+   años y cuentas está en components.css y dividendos.css. */
+
+/* Las pestañas de cuenta son <button> (solo se eligen, no se editan): sin esto
+   heredan la fuente del navegador y no la de las demás barras de cuentas. */
+.crLayout .cuentaItem {
+    font-family: inherit;
+}
+
+.crPanel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+    gap: 16px;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-surface);
+}
+
+/* ── Gráfico ── */
+.crGraficoSeccion {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.crGraficoWrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 320px;
+}
+
+.crGraficoSeccion .overviewEmpty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+}
+
+.crGraficoSeccion .overviewEmpty.hidden {
+    display: none;
+}
+
+/* ── Movimientos ── */
+.crMovimientos {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-panel);
+    overflow: hidden;
+}
+
+.crMovimientosCabecera {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.crMovimientosTotal {
+    font-size: 15px;
+    font-weight: 700;
+    color: #34d399;
+    white-space: nowrap;
+}
+
+.crMovimientosLista {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+}
+
+.crMovimientosTabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.crMovimientosTabla td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border-soft);
+    color: var(--text-subtle);
+    vertical-align: baseline;
+}
+
+.crMovimientosTabla tr:last-child td {
+    border-bottom: none;
+}
+
+.crMovimientoFecha {
+    width: 1%;
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Una línea por fila: un nombre largo se corta con "…" (el completo va en el
+   title). max-width: 0 + width: 100% es lo que deja a una celda de tabla
+   encoger por debajo de su contenido sin pasar la tabla a layout fijo. */
+.crMovimientoConcepto {
+    width: 100%;
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.crMovimientoImporte {
+    width: 1%;
+    text-align: right;
+    white-space: nowrap;
+    font-weight: 700;
+    color: #34d399;
+    font-variant-numeric: tabular-nums;
+}
+
+.crMovimientoImporte.crImporteNeg {
+    color: #f87171;
+}
+
+.crMovimientosTabla tr:hover td {
+    background: var(--bg-elevated);
+}
+
+/* Tema claro: verdes y rojos con el contraste de las tarjetas de ese tema. */
+html[data-theme="light"] .crMovimientoImporte,
+html[data-theme="light"] .crMovimientosTotal {
+    color: #059669;
+}
+
+html[data-theme="light"] .crMovimientoImporte.crImporteNeg {
+    color: #dc2626;
+}
+
+/* Ajustada al alto visible (fitPageActive, ver base.css): el gráfico ocupa el
+   hueco que deja la barra y la tabla hace scroll por dentro. */
+@media (min-width: 1201px) {
+    .fitPageActive .crLayout {
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .fitPageActive .crPanel {
+        min-height: 360px;
+    }
+}
+
+@media (max-width: 1100px) {
+    .crPanel {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .crMovimientosLista {
+        max-height: 420px;
+    }
+}
