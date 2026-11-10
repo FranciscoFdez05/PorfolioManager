@@ -94,6 +94,9 @@ CATEGORIAS_AVISO = {
     # «backup», encendido por defecto, en cuanto se configuraba el bot.
     "backupFichero": ("Enviar el fichero de las copias automáticas y al actualizar", False),
     "precios": ("Alertas de precio", True),
+    "movimientos": ("Caídas y subidas bruscas", True),
+    "posicion": ("Rentabilidad y precio medio", True),
+    "cartera": ("Valor y peso de la cartera", True),
     # Además de esto, cada wallet tiene su propio interruptor de avisos
     # (Cripto > Seguimiento), apagado al enlazarla.
     "wallets": ("Movimientos en las wallets", True),
@@ -109,6 +112,15 @@ PRESENTACION_AVISO = {
     "precios": ("Cartera y mercado", "Un activo llega al precio que fijaste, por arriba o por abajo, o se mueve en "
                                      "el día el % que pediste. Se configuran en la ficha del activo y cada alerta "
                                      "salta una sola vez"),
+    "movimientos": ("Cartera y mercado", "Un activo cae o sube el % que fijaste dentro de la ventana elegida "
+                                         "(15 min a 24 h), medido desde el máximo o el mínimo de esa ventana. Se "
+                                         "configuran en Alertas y no repiten aviso del mismo activo hasta pasado "
+                                         "el enfriamiento"),
+    "posicion": ("Cartera y mercado", "Tu posición en un activo gana o pierde el % o los euros que fijaste, o su "
+                                      "precio se aleja de tu precio medio el % pedido. Avisan al cruzar el umbral "
+                                      "y no repiten hasta volver a cruzarlo"),
+    "cartera": ("Cartera y mercado", "El valor total de la cartera baja o sube del importe fijado, cae el % pedido "
+                                     "en una ventana, o un activo supera el % de la cartera que fijaste"),
     "wallets": ("Cartera y mercado", "Movimientos nuevos, saldo fuera de tus límites, wallet que despierta o "
                                      "actividad sospechosa, solo de las wallets con su interruptor encendido en "
                                      "Cripto > Seguimiento. También monedas de Satoshi gastadas, si lo vigilas"),
@@ -117,7 +129,8 @@ PRESENTACION_AVISO = {
     "proveedores": ("Cartera y mercado", "Un proveedor agota la cuota, o lleva un rato sin responder o fallando al "
                                          "pedir precios, y cuando vuelve a responder; el mismo problema no se repite en "
                                          f"{_COOLDOWN_SEGUNDOS // 60} min. También si un activo lleva horas "
-                                         "valorado con un valor de reserva"),
+                                         "valorado con un valor de reserva, o si salta una alerta «Sin "
+                                         "cotización» de las que pones en Alertas"),
     "backup": ("Copias de seguridad", "Copia manual o automática creada (nombre, tamaño y copias guardadas), copia "
                                       "o restauración fallida, copia restaurada y copia eliminada"),
     "backupFichero": ("Copias de seguridad", "Cada copia automática, y la que se hace al pulsar Actualizar, llega "

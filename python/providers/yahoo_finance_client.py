@@ -87,6 +87,9 @@ def _scoreResult(item, normalizedQuery, normalizedAssetName="", preferredAssetTy
     elif preferredAssetType == "comoditis":
         if any(t in normalizedName for t in ("gold", "silver", "oil", "brent", "crude", "commodity")):
             score += 280
+    elif preferredAssetType == "indices":
+        if quoteType == "INDEX":
+            score += 280
 
     return score
 

@@ -9,6 +9,8 @@ const _PAGE_DIRS = {
     privateMarket: "cartera",
     planesInversion: "cartera",
     paneles: "cartera",
+    alertas: "cartera",
+    alertasAvisos: "cartera",
 
     gastos: "finanzas",
     ingresos: "finanzas",
@@ -44,10 +46,19 @@ const _PAGE_DIRS = {
     ajustes: "sesion"
 }
 
+// Páginas que no tienen fragmento propio y reutilizan el de otra. Mensualidades
+// es la misma vista que la pestaña de Gastos; duplicar el HTML obligaría a
+// mantener dos copias de la tabla, el calendario y los filtros.
+const _PAGE_FRAGMENT_ALIAS = {
+    mensualidades: "gastos",
+    ingresosRecurrentes: "ingresos"
+}
+
 // El identificador de página (data-page, ajustes guardados, módulos) no cambia,
 // pero los ficheros van en kebab-case: "vistaGeneral" → vista-general.html,
 // "Earn" → earn.html.
 function pageHtmlPath(page) {
+    page = _PAGE_FRAGMENT_ALIAS[page] || page
     const dir = _PAGE_DIRS[page]
     const fichero = page.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase()
     return dir ? `./html/${dir}/${fichero}.html` : `./html/${fichero}.html`
@@ -113,6 +124,8 @@ const _MODULE_PAGES = {
     gastos: [
         "gastos",
         "ingresos",
+        "mensualidades",
+        "ingresosRecurrentes",
         "ahorro",
         "cuentas",
         "movimientosCuentas",
@@ -133,7 +146,8 @@ const _MODULE_PAGES = {
     ],
     planes: ["planesInversion"],
     herramientas: ["herramientas"],
-    metricas: ["metricas"]
+    metricas: ["metricas"],
+    alertas: ["alertas", "alertasAvisos"]
 }
 
 const _TOP_METRICS_DEFAULT_HIDDEN = new Set([
@@ -200,6 +214,58 @@ function paginaDeInicio() {
     const boton = botones.find((item) => moduloDePagina(item.dataset.page) === principal)
 
     return boton?.dataset.page ?? primeraPaginaVisible()
+}
+
+// Página abierta, para volver a ella al recargar (F5). Va en sessionStorage y
+// no en localStorage: es por pestaña y se pierde al cerrarla, así que abrir la
+// app de nuevo sigue empezando en la página de inicio elegida en Ajustes.
+const CLAVE_PAGINA_RECARGA = "paginaAlRecargar"
+
+function recordarPaginaActual(page) {
+    try {
+        sessionStorage.setItem(CLAVE_PAGINA_RECARGA, page)
+    } catch (_) {
+        // Sin sessionStorage (modo privado estricto) la recarga va al inicio.
+    }
+}
+
+function olvidarPaginaActual() {
+    try {
+        sessionStorage.removeItem(CLAVE_PAGINA_RECARGA)
+    } catch (_) {
+        // Igual que arriba: sin almacenamiento no hay nada que olvidar.
+    }
+}
+
+// El navegador no distingue una recarga normal de una forzada (Ctrl+F5) en
+// performance.getEntriesByType("navigation"): las dos son "reload". Por eso se
+// escucha el atajo de teclado y se borra la página guardada antes de recargar.
+function esRecargaForzada(e) {
+    const tecla = e.key?.toLowerCase()
+    const conModificador = e.ctrlKey || e.metaKey || e.shiftKey
+    return (tecla === "f5" && conModificador) || ((e.ctrlKey || e.metaKey) && e.shiftKey && tecla === "r")
+}
+
+window.addEventListener("keydown", (e) => {
+    if (esRecargaForzada(e)) olvidarPaginaActual()
+})
+
+// Solo se restaura en una recarga real de la pestaña; si se llega a la URL de
+// nuevo (enlace, barra de direcciones) se abre la página de inicio.
+function paginaRestaurada() {
+    const navegacion = performance.getEntriesByType?.("navigation")?.[0]
+    if (navegacion?.type !== "reload") return null
+
+    let page = null
+    try {
+        page = sessionStorage.getItem(CLAVE_PAGINA_RECARGA)
+    } catch (_) {
+        return null
+    }
+
+    // La página puede haber dejado de existir o su módulo estar apagado.
+    const existe = page && document.querySelector(`.navButtons [data-page="${CSS.escape(page)}"]`)
+    return existe && page !== "ajustes" && paginaVisible(page) ? page : null
 }
 
 function activarBotonNav(page) {
@@ -306,7 +372,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initMoneyToggle()
     applyAssetRotation()
 
-    const paginaInicial = paginaDeInicio()
+    const paginaInicial = paginaRestaurada() ?? paginaDeInicio()
     if (paginaInicial) {
         activarBotonNav(paginaInicial)
         loadPage(paginaInicial)
@@ -340,7 +406,8 @@ async function loadGlobalSettings() {
             window._seguimientoDatos = {
                 lista: data.seguimientoLista ?? [],
                 ocultos: data.seguimientoOcultos ?? [],
-                overrides: data.seguimientoOverrides ?? {}
+                overrides: data.seguimientoOverrides ?? {},
+                orden: data.seguimientoOrden ?? []
             }
             await window.segMigrarAlServidor?.(data.portfolioId)
             window._sidebarCollapsed = data.sidebarCollapsed ?? false
@@ -356,6 +423,7 @@ async function loadGlobalSettings() {
             window._precioDecimales_acciones = data.precioDecimalesAcciones ?? 2
             window._precioDecimales_etfs = data.precioDecimalesEtf ?? 2
             window._precioDecimales_comoditis = data.precioDecimalesComoditis ?? 2
+            window._precioDecimales_indices = data.precioDecimalesIndices ?? 2
             window._precioDecimales_cripto = data.precioDecimalesCripto ?? 4
             window._numLocale = data.numLocale ?? "es-ES"
             window._dateFormat = data.dateFormat ?? "DD/MM/YYYY"
@@ -386,6 +454,7 @@ async function loadGlobalSettings() {
         window._precioDecimales_acciones = 2
         window._precioDecimales_etfs = 2
         window._precioDecimales_comoditis = 2
+        window._precioDecimales_indices = 2
         window._precioDecimales_cripto = 4
         window._numLocale = "es-ES"
         window._dateFormat = "DD/MM/YYYY"
@@ -1157,6 +1226,7 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
     if (window._paginaActual !== page && typeof closePersistentToasts === "function") closePersistentToasts()
     if (window._paginaActual !== page) window._paginaAnterior = window._paginaActual
     window._paginaActual = page
+    recordarPaginaActual(page)
 
     try {
         if (typeof window._hmResizeCleanup === "function") {
@@ -1207,7 +1277,9 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
                 "vistaGeneral",
                 "cuentaRemunerada",
                 "gastos",
+                "mensualidades",
                 "ingresos",
+                "ingresosRecurrentes",
                 "calendario",
                 "movimientosCuentas",
                 "ventas",
@@ -1232,8 +1304,12 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initDividendosLogic()
         } else if (page === "gastos") {
             await initGastosLogic()
+        } else if (page === "mensualidades") {
+            await initGastosLogic({ soloMensualidades: true })
         } else if (page === "ingresos") {
             await initIngresosLogic()
+        } else if (page === "ingresosRecurrentes") {
+            await initIngresosLogic({ soloRecurrentes: true })
         } else if (page === "ventas") {
             await initVentasLogic()
         } else if (page === "stablecoins") {
@@ -1288,6 +1364,10 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initCalendarioLogic()
         } else if (page === "planesInversion") {
             await initPlanesInversionLogic()
+        } else if (page === "alertas") {
+            await initAlertasPageLogic()
+        } else if (page === "alertasAvisos") {
+            await initAlertasAvisosLogic()
         }
     } catch (error) {
         console.error(error)

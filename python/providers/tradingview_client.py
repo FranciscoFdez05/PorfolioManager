@@ -16,6 +16,7 @@ pide explícitamente, igual que ya pasa con la sintaxis de Finnhub para
 cripto/forex.
 """
 
+import logging
 import re
 from datetime import datetime
 from urllib.error import HTTPError, URLError
@@ -27,8 +28,11 @@ from providers import (
     formatDecimal as _formatDecimal,
     formatPercent as _formatPercent,
     normalizeText as _normalizeText,
+    tradingview_feed,
 )
 from providers.http import motivoConexion
+
+log = logging.getLogger(__name__)
 
 TRADINGVIEW_SCAN_URL = "https://scanner.tradingview.com/global/scan"
 TRADINGVIEW_SEARCH_URL = "https://symbol-search.tradingview.com/symbol_search/v3/"
@@ -230,6 +234,29 @@ def _scan(tickers, timeout=None):
     return cotizados
 
 
+def _feedQuotes(tickers: list[str], timeout: float | None = None) -> dict[str, tuple[float, float, str]]:
+    """Los tickers que el scanner no tiene, pedidos al feed de los gráficos.
+
+    Índices (`TVC:SPX`) y CFD de brókers (`VANTAGE:SP500`) no salen en el
+    scanner pero sí en el feed. Un fallo aquí no es un error que enseñar: el
+    ticker sigue su camino (cruce calculado o "sin cotización").
+
+    Args:
+        tickers: Tickers con mercado que faltan.
+        timeout: Plazo total en segundos.
+
+    Returns:
+        `{ticker: (precio, variación %, divisa)}`, vacío si el feed falla.
+    """
+    if not tickers:
+        return {}
+    try:
+        return tradingview_feed.fetchQuotes(tickers, timeout)
+    except OSError as error:  # incluye URLError, FeedError, TimeoutError y ssl.SSLError
+        log.warning("Feed de TradingView no disponible para %s: %s", ", ".join(tickers), error)
+        return {}
+
+
 def fetchQuotes(tickers, timeout=None):
     """Envoltorio público de `_scan`, para catálogos curados (índices, ETF de
     sector) que no son un activo del usuario y no necesitan los cruces
@@ -396,6 +423,9 @@ def fetchQuote(symbol, timeout=None):
     except URLError as error:
         return None, f"No se pudo conectar con TradingView: {motivoConexion(error, 'TradingView')}"
 
+    if normalizedSymbol not in cotizados:
+        cotizados.update(_feedQuotes([normalizedSymbol], timeout))
+
     status = "Cotización actualizada"
     if normalizedSymbol in cotizados:
         currentPrice, percentChange, currency = cotizados[normalizedSymbol]
@@ -436,6 +466,7 @@ _TIPOS_API_POR_CATEGORIA = {
     "etfs": {"fund", "structured"},
     "cripto": {"crypto", "spot"},
     "comoditis": {"commodity", "futures", "cfd"},
+    "indices": {"index"},
 }
 
 
@@ -481,6 +512,10 @@ def _batchFetchQuotes(symbols, timeout=None):
         cotizados = _scan(symbols, timeout)
     except (HTTPError, URLError):
         return {}
+
+    # Los que el scanner no tiene (índices, CFD de brókers) se piden al feed en
+    # una sola sesión para todos.
+    cotizados.update(_feedQuotes([symbol for symbol in symbols if symbol not in cotizados], timeout))
 
     # Los que el scanner no tiene y son un cruce calculable con piezas del mismo
     # mercado (OANDA:XAUEUR) salen con precio en vez de "sin cotización".

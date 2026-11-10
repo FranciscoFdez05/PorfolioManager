@@ -40,7 +40,7 @@ function mRenderDistTipos(
     metric = "netoActualEur",
     privateMarket = []
 ) {
-    const types = ["cripto", "acciones", "etfs", "comoditis"]
+    const types = ["cripto", "acciones", "etfs", "comoditis", "indices"]
     const rfTotal =
         bonos.reduce((s, r) => s + mDistBonoVal(r, metric), 0) +
         rentaFija.reduce((s, r) => s + mDistBonoVal(r, metric), 0)
@@ -282,7 +282,7 @@ function mRenderDonutLeyenda(chartId, labels, colors, values, total) {
 }
 
 function mRenderRendTipos(summaries) {
-    const types = ["cripto", "acciones", "etfs", "comoditis"]
+    const types = ["cripto", "acciones", "etfs", "comoditis", "indices"]
     const pairs = types
         .map((t) => ({
             label: M_TYPE_LABELS[t],

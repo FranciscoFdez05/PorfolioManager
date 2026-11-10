@@ -515,6 +515,49 @@ class TestSerieDelDiaSinPosicion:
         assert serieDelDia()["series"]["acme"] == [[marca(HOY, 9), 11], [marca(HOY, 10), 12]]
 
 
+def seriePeriodo(periodo):
+    return grafico_activo.seriesDelPeriodo(periodo, ahora=AHORA)
+
+
+@pytest.mark.usefixtures("tempDb", "sinRed")
+class TestSeriePeriodo:
+    def testLaSemanaVaDeHaceSieteDiasHastaAhora(self):
+        datos = seriePeriodo("semana")
+
+        assert datos["periodo"] == "semana"
+        assert datos["inicio"] == int(AHORA - 7 * 86400)
+        assert datos["fin"] == int(AHORA)
+        assert datos["segundosHueco"] == grafico_activo.RANGOS["7D"]["hueco"]
+
+    def testLineaDeVariosDiasSinLoAnteriorAlPeriodo(self):
+        crearActivo([compra(HOY - timedelta(days=20), 10, 10)])
+        snapshot(marca(HOY - timedelta(days=10)), 80, 100)
+        snapshot(marca(HOY - timedelta(days=5)), 110, 100)
+        snapshot(marca(HOY - timedelta(days=1)), 120, 100)
+
+        assert seriePeriodo("semana")["series"] == {
+            "acme": [[marca(HOY - timedelta(days=5)), 11], [marca(HOY - timedelta(days=1)), 12]]
+        }
+
+    def testIncluyeLosActivosSinPosicion(self):
+        precioSinPosicion(marca(HOY - timedelta(days=3)), 10)
+        precioSinPosicion(marca(HOY - timedelta(days=2)), 11)
+
+        assert seriePeriodo("mes")["series"]["wl:s1"] == [
+            [marca(HOY - timedelta(days=3)), 10], [marca(HOY - timedelta(days=2)), 11]
+        ]
+
+    def testElYtdEmpiezaElUnoDeEnero(self):
+        assert seriePeriodo("ytd")["inicio"] == marca(date(HOY.year, 1, 1), 0)
+
+    def testDiaEsLaSerieDelDia(self):
+        assert seriePeriodo("dia") == serieDelDia()
+
+    def testPeriodoInvalido(self):
+        with pytest.raises(grafico_activo.RangoInvalido):
+            seriePeriodo("siglo")
+
+
 class TestRuta:
     @pytest.fixture
     def cliente(self, clienteAutenticado, tempDb, sinRed):
@@ -534,6 +577,22 @@ class TestRuta:
         assert cuerpo["ok"] is True
         assert cuerpo["inicio"] == inicioHoy
         assert [precio for _ts, precio in cuerpo["series"]["acme"]] == [10, 11]
+
+    def testSerieDeLaSemana(self, cliente):
+        crearActivo([compra(date.today() - timedelta(days=10), 1, 10)])
+        ahora = int(datetime.now().timestamp())
+        snapshot(ahora - 3 * 86400, 10, 10)
+        snapshot(ahora - 86400, 12, 10)
+
+        respuesta = cliente.get("/api/activos-serie-dia?periodo=semana")
+
+        assert respuesta.status_code == 200
+        cuerpo = respuesta.get_json()
+        assert cuerpo["periodo"] == "semana"
+        assert [precio for _ts, precio in cuerpo["series"]["acme"]] == [10, 12]
+
+    def testPeriodoInvalidoEs400(self, cliente):
+        assert cliente.get("/api/activos-serie-dia?periodo=siglo").status_code == 400
 
     def testDevuelveLaSerie(self, cliente):
         crearActivo([compra(date.today() - timedelta(days=2), 1, 10)])

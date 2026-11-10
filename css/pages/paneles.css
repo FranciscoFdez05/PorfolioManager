@@ -603,6 +603,35 @@ body.pnPantallaCompleta {
     font-size: 0.7rem;
 }
 
+/* Botón de precarga del mapa: pulsado lleva el borde de acento y, mientras
+   carga, una barra de fondo con lo que lleva hecho. */
+.pnPrecargaBtn {
+    position: relative;
+    overflow: hidden;
+}
+
+.pnPrecargaBtn[aria-pressed="true"] {
+    border-color: var(--accent);
+}
+
+.pnPrecargaBarra {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0;
+    background: var(--accent-glow);
+    transition: width 0.3s ease;
+    pointer-events: none;
+}
+
+.pnPrecargaBtn:not(.pnPrecargando) .pnPrecargaBarra {
+    display: none;
+}
+
+.pnPrecargaTexto {
+    position: relative;
+    font-variant-numeric: tabular-nums;
+}
+
 .pnChipActivo > span:first-child {
     max-width: 180px;
     overflow: hidden;
@@ -1295,6 +1324,23 @@ body.money-hidden .pnMoney {
     background: #facc15;
     text-shadow: none;
     opacity: 1;
+}
+
+/* El mercado del activo está cerrado ahora (mapaDiaSesion). */
+.pnRjCerrado {
+    padding: 0 4px;
+    border-radius: 2px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: rgba(0, 0, 0, 0.28);
+}
+
+.pnRjCerrado:empty {
+    display: none;
 }
 
 /* La línea entre la cabecera y las horas, más marcada que en el treemap porque

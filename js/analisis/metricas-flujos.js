@@ -14,6 +14,33 @@ function isMensualidadMonthActive(yearData, monthKey) {
     return M_GASTOS_KEYS.indexOf(monthKey) <= now.getMonth()
 }
 
+/**
+ * Lo apuntado en un mes en las categorías que el usuario marcó como inversión
+ * (ahorroConfig.categoriasInversion), que la tasa de ahorro trata como dinero
+ * apartado y no como gasto: mismo criterio que la página Ahorro
+ * (AhorroCalculos.detectorDeInversion). Las mensualidades de meses futuros no
+ * cuentan, igual que en mComputeGastosData, para restar solo lo que allí se sumó.
+ * @param {object|null} yearData Gastos del año.
+ * @param {string} monthKey Mes en minúsculas.
+ * @param {object} [ahorroConfig] ahorroConfig de los ajustes.
+ * @returns {number}
+ */
+function mInversionDelMes(yearData, monthKey, ahorroConfig) {
+    const categorias = ahorroConfig?.categoriasInversion
+    if (!yearData || !Array.isArray(categorias) || !categorias.length) return 0
+    const esInversion = AhorroCalculos.detectorDeInversion(categorias)
+    let total = 0
+    ;(yearData.months?.[monthKey]?.rows || []).forEach((row) => {
+        if (esInversion(row.tipo)) total += parseEuroNumber(row.cantidad || "")
+    })
+    if (isMensualidadMonthActive(yearData, monthKey)) {
+        ;(yearData.mensualidades || []).forEach((m) => {
+            if (esInversion(m.categoria)) total += parseEuroNumber(m.meses?.[monthKey] || "")
+        })
+    }
+    return total
+}
+
 function mComputeGastosData(yearData) {
     const totalMes = Object.fromEntries(M_GASTOS_KEYS.map((k) => [k, 0]))
     const totalTipo = {}

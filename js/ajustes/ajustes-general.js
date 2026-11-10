@@ -630,6 +630,7 @@ function _initAjustesApariencia(settings) {
         acciones: "precioDecimalesAcciones",
         etfs: "precioDecimalesEtf",
         comoditis: "precioDecimalesComoditis",
+        indices: "precioDecimalesIndices",
         cripto: "precioDecimalesCripto"
     }
     function initDecimalesTipo(grid) {

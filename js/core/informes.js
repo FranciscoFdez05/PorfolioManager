@@ -464,7 +464,7 @@ function infAbrirAvisoProgreso(texto) {
 
 // ── informe del portfolio ──────────────────────────────────────────────────
 
-const INF_TIPOS = ["cripto", "acciones", "etfs", "comoditis"]
+const INF_TIPOS = ["cripto", "acciones", "etfs", "comoditis", "indices"]
 
 async function infDatosPortfolio() {
     const assets = await loadAssetsList()

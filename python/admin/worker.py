@@ -32,6 +32,10 @@ from dotenv import load_dotenv
 # .env antes que los ajustes, como en server.py: admiten override por variable.
 load_dotenv()
 
+from core.zona_horaria import descartarTzIanaEnWindows  # noqa: E402
+
+descartarTzIanaEnWindows()
+
 from admin import avisos_scheduler, snapshot_scheduler, telegram_listener  # noqa: E402
 from admin.backup_manager import (  # noqa: E402
     esperarCopiaEnCurso,

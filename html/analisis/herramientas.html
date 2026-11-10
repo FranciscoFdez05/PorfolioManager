@@ -30,6 +30,7 @@
             <button class="herramientaBtn hidden" data-cat="fiscal" data-tool="simularVenta">Simular venta</button>
 
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="ratioOroPlata">Ratio Oro/Plata</button>
+            <button class="herramientaBtn hidden" data-cat="mercado" data-tool="metales">Oro y plata</button>
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="ratioOroBtc">Oro / Bitcoin</button>
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="divisas">Divisas</button>
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="capitalizacion">Capitalización objetivo</button>
@@ -676,6 +677,96 @@
                     <div class="hPlaceholder">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M3 18h18"/><circle cx="8" cy="6" r="2.5"/><circle cx="16" cy="18" r="2.5"/></svg>
                         <p>Carga los precios de tu cartera o introdúcelos a mano y pulsa <strong>Calcular</strong>.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Oro y plata ───────────────────────────────────────────── -->
+        <div class="herramientaPanel hidden" id="toolMetales">
+            <div class="hPanelHead">
+                <div class="hPanelHeadText">
+                    <h3 class="herramientaPanelTitle">Oro y plata</h3>
+                    <p class="hPanelDesc">Escribe el peso y verás su valor y sus onzas troy (31,1035 g), o escribe un importe y verás cuánto metal compra.</p>
+                </div>
+                <div class="hPanelActions">
+                    <button class="herramientaSecBtn" id="hMetCargarBtn">Precio en vivo</button>
+                </div>
+            </div>
+            <div class="herramientaBody">
+                <div class="hCard herramientaInputs">
+                    <div class="hCardTitle">Datos</div>
+                    <div class="herramientaField">
+                        <label for="hMetMetal">Metal</label>
+                        <select id="hMetMetal">
+                            <option value="oro">Oro</option>
+                            <option value="plata">Plata</option>
+                        </select>
+                    </div>
+                    <div class="herramientaField">
+                        <label for="hMetPureza">Pureza</label>
+                        <!-- Las opciones las pone herramientas-metales.js según el metal. -->
+                        <select id="hMetPureza"></select>
+                    </div>
+                    <div class="herramientaField">
+                        <label for="hMetPrecio">Precio por onza troy</label>
+                        <div class="hInputWrap">
+                            <input type="number" id="hMetPrecio" value="" min="0" step="0.01" placeholder="Cargando precio en vivo…">
+                            <span class="hInputUnit"><span class="hMetMonedaLabel">EUR</span>/oz</span>
+                        </div>
+                    </div>
+                    <div class="hRatioFuenteMsg" id="hMetFuenteMsg"></div>
+
+                    <div class="hCardTitle hMetSeparador">Peso o importe</div>
+                    <div class="herramientaField">
+                        <label for="hMetCantidad">Peso</label>
+                        <div class="hMetPesoFila">
+                            <input type="number" id="hMetCantidad" value="100" min="0" step="any">
+                            <select id="hMetUnidad" aria-label="Unidad del peso">
+                                <option value="g">gramos</option>
+                                <option value="kg">kilos</option>
+                                <option value="oz">onzas troy</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="hMetEquivale" aria-hidden="true">equivale a</div>
+                    <div class="herramientaField">
+                        <label for="hMetImporte">Importe</label>
+                        <div class="hInputWrap">
+                            <input type="number" id="hMetImporte" value="" min="0" step="0.01" placeholder="Cuánto quieres gastar">
+                            <span class="hInputUnit hMetMonedaLabel">EUR</span>
+                        </div>
+                    </div>
+                    <div class="hPrecargaMsg">Escribe en cualquiera de los dos y el otro se calcula solo.</div>
+                    <div class="hBtnRow">
+                        <button class="herramientaResetBtn" data-panel="toolMetales">Reiniciar</button>
+                    </div>
+                </div>
+                <div class="hResultsCol">
+                    <div class="herramientaResults hidden" id="hMetResults">
+                        <div class="herramientaResultGrid">
+                            <div class="herramientaResultCard hResultCardAccent">
+                                <div class="hResultLabel">Valor</div>
+                                <div class="hResultValue hResultPositive" id="hMetValor">---</div>
+                            </div>
+                            <div class="herramientaResultCard">
+                                <div class="hResultLabel">Onzas troy de metal puro</div>
+                                <div class="hResultValue" id="hMetOnzas">---</div>
+                            </div>
+                            <div class="herramientaResultCard">
+                                <div class="hResultLabel">Gramos de metal puro</div>
+                                <div class="hResultValue" id="hMetGramos">---</div>
+                            </div>
+                            <div class="herramientaResultCard">
+                                <div class="hResultLabel">Precio por gramo</div>
+                                <div class="hResultValue" id="hMetPrecioGramo">---</div>
+                            </div>
+                        </div>
+                        <div class="hRatioInterpretacion" id="hMetNota"></div>
+                    </div>
+                    <div class="hPlaceholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18h16l-2-6H6z"/><path d="M8 12l1.5-5h5L16 12"/></svg>
+                        <p>Cargando el precio en vivo… Si no llega, escribe el precio de la onza a mano.</p>
                     </div>
                 </div>
             </div>

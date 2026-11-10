@@ -167,9 +167,12 @@ function pnGrupoSelector(o) {
  * @returns {Array<object>} Los activos seguidos que existen.
  */
 function pnActivosSeguimiento() {
-    const lista = typeof segLoadCustomItems === "function" ? segLoadCustomItems() : []
+    let lista = typeof segLoadCustomItems === "function" ? segLoadCustomItems() : []
+    lista = Array.isArray(lista) ? lista : []
+    // El orden en que se arrastraron las tarjetas en Seguimiento, si lo hay; si no, el de alta.
+    if (typeof segAplicarOrden === "function") lista = segAplicarOrden(lista, window._seguimientoDatos?.orden)
     const nuevos = new Map(pnActivosWatchlist().map((a) => [a.id, a]))
-    return (Array.isArray(lista) ? lista : [])
+    return lista
         .map((entrada) => {
             if (!entrada?._segId) return null
             const activo = entrada.assetId ? _pnDatos?.porId.get(entrada.assetId) : nuevos.get("wl:" + entrada._segId)

@@ -58,6 +58,7 @@
     <link rel="stylesheet" href="css/pages/gastos-popup.css">
     <link rel="stylesheet" href="css/components/privacidad.css">
     <link rel="stylesheet" href="css/pages/heatmap.css">
+    <link rel="stylesheet" href="css/pages/alertas.css">
     <link rel="stylesheet" href="css/pages/paneles.css">
     <link rel="stylesheet" href="css/components/selector-portfolios.css">
     <!-- Temas Claro y Oscuro (Noche clara va arriba, es la base). Van
@@ -279,6 +280,13 @@
                 </div>
 
                 <button class="navBtn" data-page="planesInversion" data-module="planes">Planes</button>
+                <div class="navDropdown" data-module="alertas">
+                    <button class="navDropdownBtn" type="button">Alertas ▾</button>
+                    <div class="navDropdownMenu">
+                        <button class="navBtn navDropdownItem" data-page="alertas">Todas las alertas</button>
+                        <button class="navBtn navDropdownItem" data-page="alertasAvisos">Últimos avisos</button>
+                    </div>
+                </div>
                 <button class="navBtn" data-page="herramientas" data-module="herramientas">Herramientas</button>
                 <button class="navBtn" data-page="metricas" data-module="metricas">Métricas</button>
                 <button id="toggleMoneyBtn" class="navMoneyToggleBtn" type="button" title="Ocultar valores"><span class="icono iconoOjo" aria-hidden="true"></span></button>
@@ -294,6 +302,8 @@
                     <div class="navDropdownMenu">
                         <button class="navBtn navDropdownItem" data-page="gastos">Gastos</button>
                         <button class="navBtn navDropdownItem" data-page="ingresos">Ingresos</button>
+                        <button class="navBtn navDropdownItem" data-page="mensualidades">Mensualidades</button>
+                        <button class="navBtn navDropdownItem" data-page="ingresosRecurrentes">Ingresos recurrentes</button>
                         <button class="navBtn navDropdownItem" data-page="calendario">Calendario</button>
                         <button class="navBtn navDropdownItem" data-page="ahorro">Ahorro</button>
                         <button class="navBtn navDropdownItem" data-page="cuentas">Cuentas</button>
@@ -455,10 +465,12 @@
             <div class="modalCampo">
                 <label class="assetModalLabel" for="assetTypeSelect">Tipo del activo</label>
                 <select id="assetTypeSelect" class="assetModalSelect" data-no-custom="true">
+                    <option value="">Detectar automáticamente</option>
                     <option value="cripto">Cripto</option>
                     <option value="acciones">Acciones</option>
                     <option value="etfs">ETFs</option>
                     <option value="comoditis">Comoditis</option>
+                    <option value="indices">Índices</option>
                 </select>
 
                 <div id="assetCosteAnualField" class="hidden">
@@ -1411,6 +1423,13 @@
                         </div>
                     </div>
                     <div class="ajustesDectipo">
+                        <span class="ajustesDectipo-label">Índices</span>
+                        <div class="ajustesRefreshGrid" data-tipo="indices">
+                            <button class="ajustesRefreshBtn active" data-dec="2" type="button">2 dec.</button>
+                            <button class="ajustesRefreshBtn" data-dec="4" type="button">4 dec.</button>
+                        </div>
+                    </div>
+                    <div class="ajustesDectipo">
                         <span class="ajustesDectipo-label">Cripto</span>
                         <div class="ajustesRefreshGrid" data-tipo="cripto">
                             <button class="ajustesRefreshBtn active" data-dec="2" type="button">2 dec.</button>
@@ -1572,6 +1591,13 @@
                         <span class="ajustesDectipo-label">Comoditis<small>Mercado bursátil</small></span>
                         <label class="ajustesSwitch">
                             <input type="checkbox" id="soloMercadoComoditis" data-tipo="comoditis">
+                            <span class="ajustesSwitchTrack"></span>
+                        </label>
+                    </div>
+                    <div class="ajustesDectipo">
+                        <span class="ajustesDectipo-label">Índices<small>Mercado bursátil</small></span>
+                        <label class="ajustesSwitch">
+                            <input type="checkbox" id="soloMercadoIndices" data-tipo="indices">
                             <span class="ajustesSwitchTrack"></span>
                         </label>
                     </div>
@@ -2392,6 +2418,7 @@
 <script defer src="js/analisis/herramientas-calculadoras.js"></script>
 <script defer src="js/analisis/herramientas-ratios.js"></script>
 <script defer src="js/analisis/herramientas-capitalizacion.js"></script>
+<script defer src="js/analisis/herramientas-metales.js"></script>
 <script defer src="js/analisis/herramientas-divisas.js"></script>
 <script defer src="js/finanzas/bonos.js"></script>
 <script defer src="js/analisis/metricas.js"></script>
@@ -2435,6 +2462,9 @@
 <script defer src="js/cartera/planes.js"></script>
 <script defer src="js/cartera/planes-inversion.js"></script>
 <script defer src="js/cartera/alertas-precio.js"></script>
+<script defer src="js/cartera/alertas-panel.js"></script>
+<script defer src="js/cartera/alertas-pagina.js"></script>
+<script defer src="js/finanzas/ahorro-calculos.js"></script>
 <script defer src="js/finanzas/ahorro.js"></script>
 <script defer src="js/finanzas/cuenta-ahorro.js"></script>
 <script defer src="js/finanzas/cuenta-remunerada.js"></script>

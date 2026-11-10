@@ -735,6 +735,7 @@ const _MODULOS_PRESENTACION = {
     planes: { icono: "iconoMarcado", descripcion: "Qué activos comprar y con qué operaciones" },
     herramientas: { icono: "iconoDecimales", descripcion: "Calculadoras y utilidades" },
     metricas: { icono: "iconoGraficoBarras", descripcion: "Gráficos y análisis del portfolio" },
+    alertas: { icono: "iconoAviso", descripcion: "Caídas bruscas y alertas de precio por Telegram" },
     gastos: { icono: "iconoBillete" }
 }
 

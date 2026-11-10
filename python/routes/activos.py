@@ -286,8 +286,17 @@ def getActivoGrafico(assetId):
 
 @activosBp.route("/api/activos-serie-dia", methods=["GET"])
 def getActivosSerieDia():
-    """Evolución de hoy de todos los activos, para los minigráficos de los mapas."""
-    return jsonify({"ok": True, **grafico_activo.seriesDelDia()})
+    """Evolución de todos los activos, para los minigráficos de los mapas.
+
+    `?periodo=` elige la ventana: «dia» (por defecto, el día natural de hoy),
+    «semana», «mes», «anyo» o «ytd».
+    """
+    periodo = request.args.get("periodo", "dia").strip().lower()
+    try:
+        datos = grafico_activo.seriesDelPeriodo(periodo)
+    except grafico_activo.RangoInvalido as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
+    return jsonify({"ok": True, **datos})
 
 
 # Tope de ids por lote: el frontend los parte en trozos de 50, y sin tope una

@@ -3,7 +3,7 @@ import re
 from core import dinero
 from core.errors import ValidationError
 
-ALLOWED_ASSET_TYPES = {"cripto", "acciones", "etfs", "comoditis"}
+ALLOWED_ASSET_TYPES = {"cripto", "acciones", "etfs", "comoditis", "indices"}
 _HEX_COLOR_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
 
 

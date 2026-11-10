@@ -781,9 +781,11 @@ function addNewDividendosRow() {
 }
 
 function addDividendosYear() {
-    const yearStr = prompt("Introduce el año (ej: 2027):")?.trim()
-    if (!yearStr || !/^\d{4}$/.test(yearStr)) return
-    openDividendosModal(-1, `01-01-${yearStr}`)
+    openYearModal({
+        title: "Añadir año",
+        submitLabel: "Continuar",
+        onConfirm: (yearStr) => openDividendosModal(-1, `01-01-${yearStr}`)
+    })
 }
 
 function deleteCurrentDividendosYear() {

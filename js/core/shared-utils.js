@@ -327,6 +327,66 @@ function getAssetParticipationDecimals(assetType) {
     return 6
 }
 
+// Tipo que da cada API de búsqueda (TradingView, Yahoo y Alpha Vantage ya
+// normalizado; Finnhub y EODHD en bruto) traducido al tipo de activo de la
+// app. Es vocabulario de las APIs, no una lista de activos. Lo que no encaja
+// en ningún tipo (divisas, bonos, perpetuos…) no se adivina: queda sin tipo y
+// el usuario lo elige a mano. Futuros y CFD van a Comoditis, igual que en la
+// búsqueda de TradingView del servidor.
+const TIPO_ACTIVO_POR_TIPO_API = {
+    stock: "acciones",
+    "common stock": "acciones",
+    equity: "acciones",
+    dr: "acciones",
+    adr: "acciones",
+    gdr: "acciones",
+    "preferred stock": "acciones",
+    reit: "acciones",
+    etf: "etfs",
+    etp: "etfs",
+    fund: "etfs",
+    "mutual fund": "etfs",
+    structured: "etfs",
+    crypto: "cripto",
+    cryptocurrency: "cripto",
+    commodity: "comoditis",
+    futures: "comoditis",
+    future: "comoditis",
+    cfd: "comoditis",
+    index: "indices"
+}
+
+/**
+ * Tipo de activo de la app que corresponde a un resultado de búsqueda.
+ *
+ * @param {{type?: string}} resultado Resultado de cualquier buscador de mercado.
+ * @returns {string} "acciones", "etfs", "cripto", "comoditis", "indices" o "" si no se puede saber.
+ */
+function detectarTipoActivo(resultado) {
+    const tipoApi = String(resultado?.type || "")
+        .trim()
+        .toLowerCase()
+    return TIPO_ACTIVO_POR_TIPO_API[tipoApi] || ""
+}
+
+/**
+ * Con "Detectar automáticamente" elegido (valor ""), pone en el desplegable el
+ * tipo del resultado y avisa con "change" para que se repinte. Si el usuario ya
+ * eligió un tipo a mano, no se toca.
+ *
+ * @param {HTMLSelectElement|null} select Desplegable de tipo de activo.
+ * @param {{type?: string}} resultado Resultado de búsqueda elegido.
+ * @returns {boolean} true si se ha rellenado el tipo.
+ */
+function autorrellenarTipoActivo(select, resultado) {
+    if (!select || select.value) return false
+    const tipo = detectarTipoActivo(resultado)
+    if (!tipo || ![...select.options].some((opt) => opt.value === tipo)) return false
+    select.value = tipo
+    select.dispatchEvent(new Event("change", { bubbles: true }))
+    return true
+}
+
 function getCurrentAssetType() {
     return document.querySelector(".assetTablePage")?.dataset.assetType || "acciones"
 }

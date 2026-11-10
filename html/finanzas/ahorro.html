@@ -1,105 +1,122 @@
-<section class="ahorroPage">
+<section class="ahorroPage" aria-labelledby="ahorroTitulo">
 
-    <div class="ahorroTopBar">
-        <div class="ahorroYearList" id="ahorroYearList"></div>
-        <div class="ahorroMonthTabs" id="ahorroMonthTabs"></div>
-        <button id="ahorroConfigBtn" class="ahorroConfigBtn" type="button" title="Configurar presupuesto">
-            <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
-                <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
-                <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <header class="ahorroHeader">
+        <div class="ahorroHeaderText">
+            <!-- El nombre de la página ya sale en la cabecera de la app: aquí va el periodo elegido. -->
+            <h2 class="ahorroTitulo" id="ahorroTitulo">&nbsp;</h2>
+            <p class="ahorroSubtitulo" id="ahorroSubtitulo"></p>
+        </div>
+        <div class="ahorroHeaderActions">
+            <div class="ahorroYearPicker">
+                <!-- Tira desplazable: los años de Gastos e Ingresos, del más reciente al más antiguo. -->
+                <div class="ahorroYearList" id="ahorroYearList" role="group" aria-label="Año"></div>
+            </div>
+            <button id="ahorroConfigBtn" class="ahorroConfigBtn" type="button" title="Objetivo de ahorro y presupuesto por categoría">
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true">
+                    <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                Presupuesto
+            </button>
+        </div>
+    </header>
+
+    <nav class="ahorroMonthTabs" id="ahorroMonthTabs" aria-label="Periodo"></nav>
+
+    <p class="ahorroLoadError hidden" id="ahorroLoadError" role="alert"></p>
+
+    <div class="ahorroHero" id="ahorroHero">
+        <div class="ahorroHeroMain">
+            <span class="ahorroEyebrow" id="ahorroHeroLabel">Ahorro del mes</span>
+            <span class="ahorroHeroValue ahorroKpiValue" id="ahorroHeroValue">---</span>
+            <div class="ahorroHeroDesglose hidden" id="ahorroHeroDesglose"></div>
+            <div class="ahorroHeroDeltas" id="ahorroHeroDeltas"></div>
+            <div class="ahorroMeta">
+                <div class="ahorroMetaTrack" aria-hidden="true">
+                    <div class="ahorroMetaFill" id="ahorroMetaFill"></div>
+                </div>
+                <p class="ahorroMetaText" id="ahorroMetaText"></p>
+            </div>
+        </div>
+        <div class="ahorroHeroGauge">
+            <svg id="ahorroGaugeSvg" class="ahorroGaugeSvg" viewBox="0 0 200 118" role="img" aria-labelledby="ahorroGaugeTitle">
+                <title id="ahorroGaugeTitle">Tasa de ahorro frente al objetivo</title>
             </svg>
-            Configurar
-        </button>
-    </div>
-
-    <div class="ahorroKpiGrid" id="ahorroKpiGrid">
-        <div class="ahorroKpiCard" id="ahorroKpiIngresos">
-            <div class="ahorroKpiIcon ahorroKpiIconIngresos">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3v14M6 7l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-            <div class="ahorroKpiBody">
-                <span class="ahorroKpiLabel">Ingresos del mes</span>
-                <span class="ahorroKpiValue" id="ahorroKpiIngresosVal">---</span>
-                <span class="ahorroKpiSub" id="ahorroKpiIngresosSub"></span>
-            </div>
-        </div>
-        <div class="ahorroKpiCard" id="ahorroKpiGastos">
-            <div class="ahorroKpiIcon ahorroKpiIconGastos">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3v14M14 13l-4 4-4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-            <div class="ahorroKpiBody">
-                <span class="ahorroKpiLabel">Gastos del mes</span>
-                <span class="ahorroKpiValue" id="ahorroKpiGastosVal">---</span>
-                <span class="ahorroKpiSub" id="ahorroKpiGastosSub"></span>
-            </div>
-        </div>
-        <div class="ahorroKpiCard" id="ahorroKpiAhorro">
-            <div class="ahorroKpiIcon ahorroKpiIconAhorro">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 10a7 7 0 1 0 14 0A7 7 0 0 0 3 10ZM10 7v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-            <div class="ahorroKpiBody">
-                <span class="ahorroKpiLabel">Ahorro real</span>
-                <span class="ahorroKpiValue" id="ahorroKpiAhorroVal">---</span>
-                <span class="ahorroKpiSub" id="ahorroKpiAhorroSub"></span>
-            </div>
-        </div>
-        <div class="ahorroKpiCard" id="ahorroKpiTasa">
-            <div class="ahorroKpiIcon ahorroKpiIconTasa">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 15L15 5M6.5 6.5h.01M13.5 13.5h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="6.5" cy="6.5" r="1.5" stroke="currentColor" stroke-width="1.3"/><circle cx="13.5" cy="13.5" r="1.5" stroke="currentColor" stroke-width="1.3"/></svg>
-            </div>
-            <div class="ahorroKpiBody">
-                <span class="ahorroKpiLabel">Tasa de ahorro</span>
-                <span class="ahorroKpiValue" id="ahorroKpiTasaVal">---</span>
-                <span class="ahorroKpiSub" id="ahorroKpiTasaSub"></span>
-            </div>
+            <span class="ahorroGaugeCaption" id="ahorroGaugeCaption"></span>
         </div>
     </div>
 
-    <div class="ahorroObjetivoSection" id="ahorroObjetivoSection">
-        <div class="ahorroObjetivoHeader">
-            <span class="ahorroObjetivoTitle">Objetivo de ahorro</span>
-            <span class="ahorroObjetivoPct" id="ahorroObjetivoPct">30%</span>
-        </div>
-        <div class="ahorroObjetivoTrack">
-            <div class="ahorroObjetivoFill" id="ahorroObjetivoFill"></div>
-            <div class="ahorroObjetivoTarget" id="ahorroObjetivoTarget"></div>
-        </div>
-        <div class="ahorroObjetivoMeta" id="ahorroObjetivoMeta"></div>
+    <div class="ahorroKpiGrid" id="ahorroKpiGrid"></div>
+
+    <div class="ahorroGrid">
+        <article class="ahorroCard ahorroCardWide">
+            <header class="ahorroCardHeader">
+                <div>
+                    <h3 class="ahorroCardTitle">Evolución mensual</h3>
+                    <p class="ahorroCardSub" id="ahorroEvolucionSub">Pulsa un mes para verlo en detalle</p>
+                </div>
+                <div class="ahorroLegend" aria-hidden="true">
+                    <span class="ahorroLegendItem"><span class="ahorroLegendSwatch ahorroSwatchIngresos"></span>Ingresos</span>
+                    <span class="ahorroLegendItem"><span class="ahorroLegendSwatch ahorroSwatchGastos"></span>Gastos</span>
+                    <span class="ahorroLegendItem"><span class="ahorroLegendLine"></span>Ahorro</span>
+                    <span class="ahorroLegendItem"><span class="ahorroLegendLine ahorroLegendLineDash"></span>Ahorro objetivo</span>
+                </div>
+            </header>
+            <div class="ahorroChartBox">
+                <canvas id="ahorroEvolucionChart" aria-label="Ingresos, gastos y ahorro de cada mes del año"></canvas>
+            </div>
+        </article>
+
+        <article class="ahorroCard">
+            <header class="ahorroCardHeader">
+                <div>
+                    <h3 class="ahorroCardTitle" id="ahorroAnioTitulo">Resumen del año</h3>
+                    <p class="ahorroCardSub" id="ahorroAnioSub"></p>
+                </div>
+            </header>
+            <dl class="ahorroStatList" id="ahorroStatList"></dl>
+        </article>
     </div>
 
-    <div class="ahorroPresupuestoSection">
-        <div class="ahorroPresupuestoHeader">
-            <span class="ahorroPresupuestoTitle">Distribución del gasto por categoría</span>
-            <span class="ahorroPresupuestoHint" id="ahorroPresupuestoHint"></span>
-        </div>
-        <div class="ahorroPresupuestoList" id="ahorroPresupuestoList">
-            <div class="ahorroEmptyState" id="ahorroEmptyState">
-                <p>No hay datos de gastos para este mes.</p>
-                <p>Configura tu presupuesto con el botón <strong>Configurar</strong>.</p>
-            </div>
-        </div>
-    </div>
+    <div class="ahorroGrid ahorroGridAjustada">
+        <article class="ahorroCard ahorroCardWide">
+            <header class="ahorroCardHeader">
+                <div>
+                    <h3 class="ahorroCardTitle">Presupuesto por categoría</h3>
+                    <p class="ahorroCardSub" id="ahorroPresupuestoSub"></p>
+                </div>
+                <div class="ahorroFiltros" id="ahorroFiltros" role="group" aria-label="Filtrar categorías">
+                    <button type="button" class="ahorroFiltro active" data-filtro="todas">Todas</button>
+                    <button type="button" class="ahorroFiltro" data-filtro="presupuesto">Con presupuesto</button>
+                    <button type="button" class="ahorroFiltro" data-filtro="excedidas">Excedidas</button>
+                </div>
+            </header>
+            <div class="ahorroTablaWrap" id="ahorroPresupuestoBody"></div>
+        </article>
 
-    <div class="ahorroChartsRow">
-        <div class="ahorroChartCard">
-            <div class="ahorroChartCardHeader">
-                <span class="ahorroChartCardTitle">Distribución de gastos</span>
-                <span class="ahorroChartCardSub" id="ahorroDonutSubtitle"></span>
-            </div>
-            <div class="ahorroChartDonutBody">
-                <svg id="ahorroDonutSvg" class="ahorroChartSvgFixed" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg"></svg>
-                <div class="ahorroDonutLegend" id="ahorroDonutLegend"></div>
-            </div>
-        </div>
-        <div class="ahorroChartCard">
-            <div class="ahorroChartCardHeader">
-                <span class="ahorroChartCardTitle">Ahorro vs Gastos</span>
-                <span class="ahorroChartCardSub" id="ahorroSplitSubtitle"></span>
-            </div>
-            <div class="ahorroChartDonutBody">
-                <svg id="ahorroSplitSvg" class="ahorroChartSvgFixed" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg"></svg>
-                <div class="ahorroSplitLegend" id="ahorroSplitLegend"></div>
-            </div>
+        <div class="ahorroSideColumn">
+            <article class="ahorroCard">
+                <header class="ahorroCardHeader">
+                    <div>
+                        <h3 class="ahorroCardTitle">Distribución del gasto</h3>
+                        <p class="ahorroCardSub" id="ahorroDonutSub"></p>
+                    </div>
+                </header>
+                <div class="ahorroDonutBody">
+                    <svg id="ahorroDonutSvg" class="ahorroDonutSvg" viewBox="0 0 180 180" role="img" aria-label="Reparto del gasto por categoría"></svg>
+                    <div class="ahorroDonutLegend" id="ahorroDonutLegend"></div>
+                </div>
+            </article>
+
+            <article class="ahorroCard">
+                <header class="ahorroCardHeader">
+                    <div>
+                        <h3 class="ahorroCardTitle">Observaciones</h3>
+                        <p class="ahorroCardSub">Calculadas con tus movimientos</p>
+                    </div>
+                </header>
+                <ul class="ahorroInsights" id="ahorroInsights"></ul>
+            </article>
         </div>
     </div>
 

@@ -6,6 +6,10 @@ pestaña abierta. Cada tarea corre a su ritmo dentro del mismo hilo:
   * **Alertas de precio** — cada `[avisos] alertas_intervalo_minutos`, pide la
     cotización de los activos que tienen alguna alerta activa (y solo esos) y
     evalúa las alertas de todos los portfolios.
+  * **Reglas de alerta** — cada `[avisos] reglas_intervalo_minutos`, guarda
+    una muestra de precio de los activos vigilados por alguna regla y evalúa
+    las reglas (caídas, subidas, rentabilidad, cartera…) de todos los
+    portfolios (ver `stores.reglas_alerta_motor`).
   * **Resumen diario** — a la hora elegida en Ajustes > Telegram, si el usuario
     lo ha activado.
   * **Versión nueva** — una vez por versión publicada, leyendo la caché de
@@ -85,6 +89,26 @@ def _pasadaAlertas() -> int:
             # Un portfolio con problemas no puede impedir vigilar los demás.
             log.warning("[avisos] Alertas de %s: %s", pid, error)
     return saltadas
+
+
+def _pasadaReglas() -> int:
+    """Evalúa las reglas de alerta de todos los portfolios. Devuelve cuántos avisos."""
+    from stores import reglas_alerta_motor
+
+    intervalo = settings.reglasIntervaloSegundos()
+    if intervalo <= 0 or not reclamo.reclamar("reglas-pasada", intervalo * 0.8):
+        return 0
+
+    avisos = 0
+    for pid, _nombre, ruta in rutasDePortfolios():
+        try:
+            with useDbPath(ruta):
+                # Sin reglas no se cotiza nada, pero el historial viejo se purga igual.
+                avisos += reglas_alerta_motor.comprobar(cartera=pid, maxEdadSegundos=intervalo)
+        except Exception as error:
+            # Un portfolio con problemas no puede impedir vigilar los demás.
+            log.warning("[avisos] Reglas de %s: %s", pid, error)
+    return avisos
 
 
 def textoResumen() -> str:
@@ -206,6 +230,7 @@ def _bucle():
     while not _parada.is_set():
         pulso.marcar("avisos", _plazoVueltaSegundos)
         _ejecutar("alertas", _pasadaAlertas)
+        _ejecutar("reglas", _pasadaReglas)
         _ejecutar("resumen", _pasadaResumen)
         _ejecutar("wallets", _pasadaWallets)
 

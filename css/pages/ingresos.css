@@ -477,3 +477,92 @@
         max-height: 500px;
     }
 }
+
+/* ── Pagas extra de los ingresos recurrentes ────────────────────────────────
+   Se marcan en ámbar en la tabla, el calendario y el formulario: es dinero
+   que entra solo algunos meses y conviene distinguirlo del cobro normal. */
+
+.recPagasList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.recPagasList:empty {
+    display: none;
+}
+
+.recPagaRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 34px;
+    gap: 8px;
+    align-items: center;
+}
+
+.recPagaRow .assetModalInput,
+.recPagaRow .assetModalSelect {
+    margin: 0;
+}
+
+.recPagaQuitar {
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.recPagaQuitar:hover {
+    border-color: rgba(248, 113, 113, 0.5);
+    color: #f87171;
+}
+
+.recPagasBadge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(251, 191, 36, 0.14);
+    color: #fbbf24;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.recPagasBadgeMini {
+    margin-left: 6px;
+    padding: 1px 6px;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    vertical-align: 1px;
+}
+
+.recPagasTotal {
+    display: block;
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.recCalDayExtra {
+    box-shadow: inset 0 -2px 0 rgba(251, 191, 36, 0.85);
+}
+
+.recCalSideItemExtra .mensCalSideName,
+.recCalSideItemExtra .mensCalSideAmount {
+    color: #fbbf24;
+}
+
+@media (max-width: 640px) {
+    .recPagaRow {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px;
+    }
+
+    .recPagaNombre {
+        grid-column: 1 / -1;
+    }
+}

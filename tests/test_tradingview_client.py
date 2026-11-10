@@ -286,6 +286,25 @@ def testLosPerpetuosQuedanDetrasDelActivo(monkeypatch):
     assert [r["symbol"] for r in results] == ["OANDA:XAGUSD", "BINANCE:XAGUSDT.P"]
 
 
+def testConTipoIndicesElIndiceVaAntesQueSusDerivados(monkeypatch):
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        if jsonBody is None:
+            return {"symbols": [
+                {"symbol": "ES1!", "exchange": "CME_MINI", "description": "S&P 500 E-mini Futures",
+                 "type": "futures", "currency_code": "USD"},
+                {"symbol": "SPX", "exchange": "SP", "description": "S&P 500 Index",
+                 "type": "index", "currency_code": "USD"},
+            ]}
+        return {"data": [{"s": t, "d": [6000.0, 0.1, "USD"]} for t in jsonBody["symbols"]["tickers"]]}
+
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
+
+    results, _ = tradingview_client.searchSymbol("S&P 500", preferredAssetType="indices")
+
+    assert results[0]["symbol"] == "SP:SPX"
+    assert results[0]["type"] == "index"
+
+
 # ── Screener real (subidas/bajadas, amplitud de mercado) ────────────────────
 
 def testFetchScreenerMandaFiltroOrdenYRango(monkeypatch):

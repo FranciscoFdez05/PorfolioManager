@@ -72,6 +72,24 @@ def testUnTipoDeActivoInvalidoSeRechaza(cliente):
     assert respuesta.status_code == 400
 
 
+def testSePuedeCrearUnIndice(cliente):
+    client, cabeceras = cliente
+    respuesta = _crear(client, cabeceras, "S&P 500", tipo="indices", marketSymbol="SP:SPX",
+                       marketProvider="tradingview")
+
+    assert respuesta.status_code == 201
+    assert respuesta.get_json()["asset"]["type"] == "indices"
+
+
+def testSinTipoNoSeCreaElActivo(cliente):
+    # "Detectar automáticamente" manda el tipo vacío si no se pudo detectar: el
+    # servidor no se inventa uno.
+    client, cabeceras = cliente
+    respuesta = _crear(client, cabeceras, "Algo", tipo="")
+
+    assert respuesta.status_code == 400
+
+
 def testNoSePuedeCrearDosVecesElMismoActivo(cliente):
     client, cabeceras = cliente
     _crear(client, cabeceras, "Apple")

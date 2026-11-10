@@ -10,13 +10,15 @@ const AV_TYPE_COLORS = {
     cripto: "#f7931a",
     acciones: "#3a7bd5",
     etfs: "#2ecc71",
-    comoditis: "#e0c068"
+    comoditis: "#e0c068",
+    indices: "#e8618c"
 }
 const AV_TYPE_LABELS = {
     cripto: "Cripto",
     acciones: "Acciones",
     etfs: "ETFs",
-    comoditis: "Comoditis"
+    comoditis: "Comoditis",
+    indices: "Índices"
 }
 
 let _activosAllAssets = []

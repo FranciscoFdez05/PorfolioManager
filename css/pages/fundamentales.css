@@ -166,6 +166,11 @@
     border-color: #e0c06855;
     color: #ddc584;
 }
+.fnTypeBadge[data-type="indices"] {
+    background: #e8618c1f;
+    border-color: #e8618c55;
+    color: #f08fb0;
+}
 .fnTypeBadge[data-type="rentafija"],
 .fnTypeBadge[data-type="rentaFija"] {
     background: #1abc9c1f;

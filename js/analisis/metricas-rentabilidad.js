@@ -397,7 +397,10 @@ function mRenderAhorro(ingresosYearData, gastosYearData, ahorroConfig) {
     })
 
     const { totalMes: gastosMes } = mComputeGastosData(gastosYearData)
-    const gastosMonthly = M_GASTOS_KEYS.map((k) => gastosMes[k] || 0)
+    // La inversión cuenta como ahorro, no como gasto (ver mInversionDelMes).
+    const gastosMonthly = M_GASTOS_KEYS.map(
+        (k) => (gastosMes[k] || 0) - mInversionDelMes(gastosYearData, k, ahorroConfig)
+    )
 
     const ahorroMonthly = ingMonthly.map((ing, i) => ing - gastosMonthly[i])
     const tasaMonthly = ingMonthly.map((ing, i) => (ing > 0 ? ((ing - gastosMonthly[i]) / ing) * 100 : null))
@@ -516,11 +519,15 @@ function mRenderAhorro(ingresosYearData, gastosYearData, ahorroConfig) {
 let _metricasAnualMode = getChartPref("metricasAnualMode", "eur")
 let _mAnualResumenCache = []
 
-function mComputeResumenAnual(anualData) {
+function mComputeResumenAnual(anualData, ahorroConfig) {
     return (anualData || [])
         .map(({ year, gastosData, ingresosData }) => {
             const { totalMes } = mComputeGastosData(gastosData)
-            const gastado = M_GASTOS_KEYS.reduce((s, k) => s + (totalMes[k] || 0), 0)
+            // Sin la inversión, que cuenta como ahorro (ver mInversionDelMes).
+            const gastado = M_GASTOS_KEYS.reduce(
+                (s, k) => s + (totalMes[k] || 0) - mInversionDelMes(gastosData, k, ahorroConfig),
+                0
+            )
             const ingMes = mComputeIngresosMonthly(ingresosData)
             const ingresos = M_ING_KEYS.reduce((s, k) => s + (ingMes[k] || 0), 0)
             const ahorrado = ingresos - gastado
@@ -536,11 +543,11 @@ function mComputeResumenAnual(anualData) {
         .filter((r) => r.ingresos > 0 || r.gastado > 0)
 }
 
-function mRenderAnual(anualData) {
+function mRenderAnual(anualData, ahorroConfig) {
     const section = document.getElementById("mSectionAnual")
     const kpiRow = document.getElementById("mkpiRowAnual")
 
-    const resumen = mComputeResumenAnual(anualData)
+    const resumen = mComputeResumenAnual(anualData, ahorroConfig)
     _mAnualResumenCache = resumen
 
     // Se oculta con "hidden" y no con style.display porque el filtro de

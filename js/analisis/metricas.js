@@ -39,7 +39,7 @@ let _metricasSortKey = getChartPref("metricasSortKey", "netoActualEur")
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
 let _metricasSortDir = getChartPref("metricasSortDir", "desc")
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
-let _metricasActivosFilter = new Set(["cripto", "acciones", "etfs", "comoditis", "rentaFija", "privateMarket"])
+let _metricasActivosFilter = new Set(["cripto", "acciones", "etfs", "comoditis", "indices", "rentaFija", "privateMarket"])
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
 let _metricasGastosTipoFilter = new Set()
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
@@ -134,6 +134,7 @@ const M_TYPE_COLORS = {
     acciones: "#3a7bd5",
     etfs: "#2ecc71",
     comoditis: "#e0c068",
+    indices: "#e8618c",
     rentaFija: "#00bcd4",
     privateMarket: "#a78bfa"
 }
@@ -143,6 +144,7 @@ const M_TYPE_LABELS = {
     acciones: "Acciones",
     etfs: "ETFs",
     comoditis: "Comoditis",
+    indices: "Índices",
     rentaFija: "Renta Fija",
     privateMarket: "Private Market"
 }
@@ -497,7 +499,7 @@ function mUpdateKpis(payload) {
     // ── Rendimiento por tipo de activo ───────────────────────────────
     const activosRendContainer = document.getElementById("mkpiActivosRendCards")
     if (activosRendContainer) {
-        const TYPE_ORDER = ["acciones", "etfs", "comoditis", "cripto"]
+        const TYPE_ORDER = ["acciones", "etfs", "comoditis", "indices", "cripto"]
         activosRendContainer.innerHTML = TYPE_ORDER.map((type) => {
             const group = summaries.filter((s) => s.type === type)
             if (!group.length) return ""

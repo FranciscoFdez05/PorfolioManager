@@ -232,24 +232,18 @@ function bindVentasEvents() {
 
     if (addYearButton && !addYearButton.dataset.bound) {
         addYearButton.dataset.bound = "true"
-        addYearButton.addEventListener("click", async () => {
+        addYearButton.addEventListener("click", () => {
             closeVentasMenu()
-            const suggestedYear = String(new Date().getFullYear())
-            const year = prompt("Escribe el nuevo año (YYYY)", suggestedYear)?.trim()
-
-            if (!year) {
-                return
-            }
-
-            try {
-                await persistVentasData()
-                await createVentasYear(year)
-                ventasYears = (await loadVentasIndex()).years || []
-                await renderVentasYear(year)
-            } catch (error) {
-                console.error(error)
-                alert("No se pudo crear el año.")
-            }
+            openYearModal({
+                title: "Añadir año",
+                submitLabel: "Crear año",
+                onConfirm: async (year) => {
+                    await persistVentasData()
+                    await createVentasYear(year)
+                    ventasYears = (await loadVentasIndex()).years || []
+                    await renderVentasYear(year)
+                }
+            })
         })
     }
 

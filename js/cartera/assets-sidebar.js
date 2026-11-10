@@ -65,6 +65,7 @@ function _avisoDePausa(motivo, tipos) {
         acciones: "acciones",
         etfs: "ETF",
         comoditis: "comodities",
+        indices: "índices",
         cripto: "cripto"
     }
     const afectados = tipos.map((tipo) => nombres[tipo] || tipo).join(", ")
@@ -602,7 +603,8 @@ function buildAssetTypeLabel(assetType) {
         cripto: "Cripto",
         acciones: "Acciones",
         etfs: "ETFs",
-        comoditis: "Comoditis"
+        comoditis: "Comoditis",
+        indices: "Índices"
     }
 
     return labels[assetType] || assetType

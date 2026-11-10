@@ -205,6 +205,7 @@ def getSettings():
         "precioDecimalesAcciones":  _asInt(gcfg.get("precioDecimalesAcciones"), 2),
         "precioDecimalesEtf":       _asInt(gcfg.get("precioDecimalesEtf"), 2),
         "precioDecimalesComoditis": _asInt(gcfg.get("precioDecimalesComoditis"), 2),
+        "precioDecimalesIndices":   _asInt(gcfg.get("precioDecimalesIndices"), 2),
         "precioDecimalesCripto":    _asInt(gcfg.get("precioDecimalesCripto"), 4),
         "soloHorarioMercado":       bool(gcfg.get("soloHorarioMercado", False)),
         "soloMercadoTipos":         gcfg.get("soloMercadoTipos") or ["acciones", "etfs", "comoditis"],
@@ -238,6 +239,7 @@ def _seguimientoDe(prefs: dict) -> dict:
         seguimiento_prefs.CLAVE_LISTA: seguimiento_prefs.normalizarLista(prefs.get(seguimiento_prefs.CLAVE_LISTA)),
         seguimiento_prefs.CLAVE_OCULTOS: seguimiento_prefs.normalizarOcultos(prefs.get(seguimiento_prefs.CLAVE_OCULTOS)),
         seguimiento_prefs.CLAVE_OVERRIDES: seguimiento_prefs.normalizarOverrides(prefs.get(seguimiento_prefs.CLAVE_OVERRIDES)),
+        seguimiento_prefs.CLAVE_ORDEN: seguimiento_prefs.normalizarOrden(prefs.get(seguimiento_prefs.CLAVE_ORDEN)),
     }
 
 
@@ -591,10 +593,10 @@ def testTelegramSettings():
 # ajuste es añadir una línea y cada regla se lee sola.
 _SIN_CAMBIO = object()
 _DECIMALES_PRECIO = {2, 4, 6, 8}
-_TIPOS_SOLO_MERCADO = {"acciones", "etfs", "comoditis", "cripto"}
+_TIPOS_SOLO_MERCADO = {"acciones", "etfs", "comoditis", "indices", "cripto"}
 _MODULOS = {
     "panelSuperior", "vistaGeneral", "activos", "gastos",
-    "finanzas", "cripto", "planes", "herramientas", "metricas",
+    "finanzas", "cripto", "planes", "herramientas", "metricas", "alertas",
 }
 # El panel superior es una barra de la cabecera: no tiene página que abrir.
 _MODULOS_CON_PAGINAS = _MODULOS - {"panelSuperior"}
@@ -680,17 +682,94 @@ def _porcentaje(valor, defecto):
         return defecto
 
 
-def _configAhorro(valor, _cfg):
-    if not isinstance(valor, dict):
-        return _SIN_CAMBIO
-    crudo = valor.get("presupuesto", {})
-    presupuesto = {}
+# Tope del presupuesto fijo por categoría: evita que un valor absurdo (o
+# Infinity, que float() acepta) llegue al JSON de ajustes.
+_PRESUPUESTO_EUR_MAXIMO = 1_000_000_000.0
+
+
+def _importePresupuesto(valor: object) -> float:
+    """Normaliza un presupuesto mensual fijo en euros.
+
+    Args:
+        valor: Importe recibido del cliente (número o texto numérico).
+
+    Returns:
+        El importe acotado entre 0 y el máximo, redondeado a céntimos; 0.0 si
+        no es un número finito.
+    """
+    try:
+        numero = float(valor)
+    except (ValueError, TypeError, OverflowError):
+        return 0.0
+    if numero != numero:  # NaN no se compara igual a sí mismo
+        return 0.0
+    return round(max(0.0, min(_PRESUPUESTO_EUR_MAXIMO, numero)), 2)
+
+
+def _mapaPorCategoria(crudo: object, normalizar) -> dict:
+    """Limpia un diccionario {categoría: valor} aplicando `normalizar` a cada valor.
+
+    Args:
+        crudo: Lo que llegó del cliente; si no es un diccionario se ignora.
+        normalizar: Función que convierte cada valor en su forma guardada.
+
+    Returns:
+        Diccionario con claves recortadas a 80 caracteres y sin claves vacías.
+    """
+    resultado = {}
     if isinstance(crudo, dict):
         for clave, importe in crudo.items():
             limpia = str(clave)[:80].strip()
             if limpia:
-                presupuesto[limpia] = _porcentaje(importe, 0.0)
-    return {"objetivoAhorro": _porcentaje(valor.get("objetivoAhorro", 30), 30.0), "presupuesto": presupuesto}
+                resultado[limpia] = normalizar(importe)
+    return resultado
+
+
+# Tope de categorías marcadas como inversión: una lista sin fin solo puede ser basura.
+_MAX_CATEGORIAS_INVERSION = 100
+
+
+def _categoriasInversion(crudo: object) -> list:
+    """Categorías de gasto que el usuario marca como inversión.
+
+    Lo que se gasta en ellas cuenta como ahorro (dinero apartado), no como
+    gasto, en Ahorro y en Métricas. Son nombres de categorías que creó el
+    propio usuario: no hay ninguna fija.
+
+    Args:
+        crudo: Lista recibida del cliente.
+
+    Returns:
+        Nombres recortados a 80 caracteres, sin vacíos ni repetidos
+        (sin distinguir mayúsculas), en el orden recibido.
+    """
+    if not isinstance(crudo, list):
+        return []
+    resultado = []
+    vistos = set()
+    for nombre in crudo[:_MAX_CATEGORIAS_INVERSION]:
+        limpio = str(nombre or "")[:80].strip()
+        if limpio and limpio.lower() not in vistos:
+            resultado.append(limpio)
+            vistos.add(limpio.lower())
+    return resultado
+
+
+def _configAhorro(valor, _cfg):
+    if not isinstance(valor, dict):
+        return _SIN_CAMBIO
+    presupuesto = _mapaPorCategoria(valor.get("presupuesto", {}), lambda v: _porcentaje(v, 0.0))
+    presupuestoEur = _mapaPorCategoria(valor.get("presupuestoEur", {}), _importePresupuesto)
+    # Una categoría tiene un solo modo: si trae importe fijo, el porcentaje
+    # sobra y sumaría dos veces al total asignado.
+    for categoria in presupuestoEur:
+        presupuesto.pop(categoria, None)
+    return {
+        "objetivoAhorro": _porcentaje(valor.get("objetivoAhorro", 30), 30.0),
+        "presupuesto": presupuesto,
+        "presupuestoEur": presupuestoEur,
+        "categoriasInversion": _categoriasInversion(valor.get("categoriasInversion")),
+    }
 
 
 def _configCuentaAhorro(valor, _cfg):
@@ -722,6 +801,10 @@ def _seguimientoOverrides(valor, _cfg):
     return seguimiento_prefs.normalizarOverrides(valor) if isinstance(valor, dict) else _SIN_CAMBIO
 
 
+def _seguimientoOrden(valor, _cfg):
+    return seguimiento_prefs.normalizarOrden(valor) if isinstance(valor, list) else _SIN_CAMBIO
+
+
 _NORMALIZADORES_GLOBALES = {
     "autoBackupDays": _acotado(0, 365, 0),
     "backupIncluirClaves": lambda valor, _cfg: valor is True,
@@ -736,6 +819,7 @@ _NORMALIZADORES_GLOBALES = {
     "precioDecimalesAcciones": _enteroDe(_DECIMALES_PRECIO, 2),
     "precioDecimalesEtf": _enteroDe(_DECIMALES_PRECIO, 2),
     "precioDecimalesComoditis": _enteroDe(_DECIMALES_PRECIO, 2),
+    "precioDecimalesIndices": _enteroDe(_DECIMALES_PRECIO, 2),
     "precioDecimalesCripto": _enteroDe(_DECIMALES_PRECIO, 2),
     "soloHorarioMercado": _booleano,
     "soloMercadoTipos": _tiposSoloMercado,
@@ -764,6 +848,7 @@ _NORMALIZADORES_PORTFOLIO = {
     seguimiento_prefs.CLAVE_LISTA: _seguimientoLista,
     seguimiento_prefs.CLAVE_OCULTOS: _seguimientoOcultos,
     seguimiento_prefs.CLAVE_OVERRIDES: _seguimientoOverrides,
+    seguimiento_prefs.CLAVE_ORDEN: _seguimientoOrden,
 }
 
 

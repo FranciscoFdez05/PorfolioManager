@@ -220,6 +220,26 @@ def _omitido(motivo: str):
     return jsonify({"ok": True, "skipped": True, "motivo": motivo})
 
 
+def _preciosSinPosicion() -> list:
+    """Precios de lo que no está en cartera para el punto de la pestaña, o nada si fallan.
+
+    La pestaña manda su punto al empezar el hueco y el hilo del servidor llega
+    unos segundos después, así que con la app abierta casi siempre gana ella: si
+    este punto no los llevara, las baldosas sin posición se quedarían sin
+    minigráfico todo el día. Son un extra: si fallan, el punto se guarda igual.
+
+    Returns:
+        `[{"id", "p"}]` o lista vacía.
+    """
+    from stores.valoracion import preciosSinPosicion
+
+    try:
+        return preciosSinPosicion()
+    except Exception as e:
+        log.warning("[snapshots] No se pudieron cotizar los activos sin posición: %s", e)
+        return []
+
+
 def _coinciden(cliente: float, servidor: float) -> bool:
     return abs(cliente - servidor) <= _TOLERANCIA_SNAPSHOT * max(abs(servidor), 1.0)
 
@@ -277,7 +297,8 @@ def saveSnapshot():
                 totalValue, valoracion["total_value"],
             )
             guardado = guardarSnapshot(
-                valoracion["total_value"], valoracion["total_invested"], valoracion["assets"]
+                valoracion["total_value"], valoracion["total_invested"], valoracion["assets"],
+                precios=_preciosSinPosicion(),
             )
     except BloqueoOcupado:
         return _omitido("importacion_en_curso")

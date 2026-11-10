@@ -37,6 +37,9 @@ let mensualidadesSearch = ""
 // La vista Mensualidades se ve como tabla o como calendario del año. El día
 // seleccionado ("mes-día") es lo que detalla el panel lateral del calendario.
 let mensualidadesTab = "tabla"
+// Abierta desde Mi dinero › Mensualidades la página solo muestra esa vista:
+// cambiar de año no debe devolver a la tabla anual de gastos.
+let gastosSoloMensualidades = false
 let mensCalendarSelection = null
 
 // Cada frecuencia indica cada cuántos meses se repite el cargo.
@@ -328,6 +331,112 @@ function resumeMensualidad(row) {
     }
 
     return { ...row, activa: true, meses }
+}
+
+/**
+ * Mes del primer cargo en otro año, siguiendo la cadencia del último cargo.
+ *
+ * Todas las frecuencias dividen a 12, así que la fase dentro del año se repite
+ * cada año y basta el módulo: una trimestral cobrada en noviembre vuelve en
+ * febrero, sea el año siguiente o tres después.
+ *
+ * Args:
+ *     row: Mensualidad normalizada del año de origen.
+ *
+ * Returns:
+ *     Índice (0-11) del mes en que empieza a cobrarse; 0 si no tenía cargos.
+ */
+function getMensualidadInicioEnOtroAnio(row) {
+    const charged = getMensualidadChargedMonths(row)
+    if (!charged.length) {
+        return 0
+    }
+    const step = getMensualidadFrecuencia(row.frecuencia).meses
+    return (charged[charged.length - 1].index + step) % GASTOS_MONTHS.length
+}
+
+/**
+ * Copia de una mensualidad lista para otro año.
+ *
+ * Se conservan nombre, importe, frecuencia, día, cuenta, nota y estado. Las
+ * excepciones por mes (otro día u otra cuenta en un mes concreto) no pasan:
+ * eran de ese año, no de la suscripción. Una pausada sigue pausada y sin
+ * cargos, para poder reactivarla sin volver a escribirla.
+ *
+ * Args:
+ *     rawRow: Mensualidad tal como viene del año de origen.
+ *
+ * Returns:
+ *     Fila con la forma que guarda el formulario de mensualidades.
+ */
+function copiarMensualidadParaOtroAnio(rawRow) {
+    const row = normalizeMensualidad(rawRow)
+    const importeTexto = row.activa ? getMensualidadImporteTexto(row) : ""
+    return {
+        nombre: row.nombre,
+        importe: row.importe,
+        frecuencia: row.frecuencia,
+        diaCobro: row.diaCobro,
+        diasCobro: {},
+        activa: row.activa,
+        nota: row.nota,
+        cuenta: row.cuenta,
+        cuentasCobro: {},
+        meses: computeMensualidadMeses(importeTexto, row.frecuencia, getMensualidadInicioEnOtroAnio(row))
+    }
+}
+
+/**
+ * Mensualidades de otro año que faltan en las de destino.
+ *
+ * El nombre identifica la mensualidad (es único por año en la base de datos),
+ * así que las que ya existen en destino se saltan en vez de duplicarse.
+ *
+ * Args:
+ *     origen: Mensualidades del año del que se copia.
+ *     destino: Mensualidades que ya tiene el año al que se copia.
+ *
+ * Returns:
+ *     Objeto con `nuevas` (filas a añadir) y `omitidas` (cuántas ya estaban).
+ */
+function getMensualidadesParaCopiar(origen, destino) {
+    const existentes = new Set((destino || []).map((row) => normalizeComparableGastoText(row?.nombre || "")))
+    const nuevas = []
+    let omitidas = 0
+    ;(origen || []).forEach((row) => {
+        const clave = normalizeComparableGastoText(row?.nombre || "")
+        if (!clave) {
+            return
+        }
+        if (existentes.has(clave)) {
+            omitidas += 1
+            return
+        }
+        existentes.add(clave)
+        nuevas.push(copiarMensualidadParaOtroAnio(row))
+    })
+    return { nuevas, omitidas }
+}
+
+/**
+ * Año del que copiar las mensualidades: el anterior más cercano y, si no hay
+ * ninguno anterior, el posterior más cercano.
+ *
+ * Args:
+ *     destino: Año al que se copia.
+ *     years: Años que existen.
+ *
+ * Returns:
+ *     El año de origen como texto, o null si no hay otro año.
+ */
+function getAnioOrigenMensualidades(destino, years) {
+    const destinoNum = Number(destino)
+    const otros = (years || []).map(Number).filter((year) => Number.isInteger(year) && year !== destinoNum)
+    const anteriores = otros.filter((year) => year < destinoNum)
+    if (anteriores.length) {
+        return String(Math.max(...anteriores))
+    }
+    return otros.length ? String(Math.min(...otros)) : null
 }
 
 function formatMensualidadDate(date) {
@@ -984,6 +1093,131 @@ function openGastoDetailModal(rowElement) {
     modal.querySelector("#gastosDetailCloseBtn")?.focus()
 }
 
+/**
+ * Lista de los cargos del año de una mensualidad para su popup de detalle.
+ *
+ * Cada cargo lleva su fecha real (con el día de ese mes, que puede ser una
+ * excepción) y la cuenta con la que se cobra ese mes. Lo ya pasado se apaga y
+ * el próximo se resalta, igual que en la tabla.
+ *
+ * Args:
+ *     row: Mensualidad normalizada.
+ *
+ * Returns:
+ *     HTML del bloque «Cargos de <año>».
+ */
+function buildMensualidadDetailCargosHtml(row) {
+    const cargos = getMensualidadCargos(row)
+    const today = getGastosToday()
+    const nextCargo = cargos.find((cargo) => cargo.date >= today)
+
+    const itemsHtml = cargos
+        .map((cargo) => {
+            const classes = ["movDetailCharge"]
+            if (cargo === nextCargo) {
+                classes.push("movDetailChargeNext")
+            } else if (cargo.date < today) {
+                classes.push("movDetailChargeDone")
+            }
+            const fecha = cargo.sinDia ? cargo.label : formatMensualidadDate(cargo.date)
+            const cuenta = nombreDeCuenta(row.cuentasCobro?.[cargo.key] || row.cuenta)
+            return `
+                <li class="${classes.join(" ")}">
+                    <span class="movDetailChargeDate">${escapeGastosHtml(fecha)}</span>
+                    <span class="movDetailChargeAccount">${escapeGastosHtml(cuenta)}</span>
+                    <span class="movDetailChargeAmount">${formatEuro(cargo.amount)}</span>
+                </li>
+            `
+        })
+        .join("")
+
+    return `
+        <div class="movDetailCharges">
+            <span class="movDetailNoteLabel">Cargos de ${escapeGastosHtml(currentGastosYear)} (${cargos.length})</span>
+            ${
+                cargos.length
+                    ? `<ul class="movDetailChargesList">${itemsHtml}</ul>`
+                    : '<p class="movDetailChargesEmpty">Sin cargos este año.</p>'
+            }
+        </div>
+    `
+}
+
+/**
+ * Abre el popup con el detalle de una mensualidad al pulsar su fila.
+ *
+ * Args:
+ *     index: Posición de la mensualidad en `currentGastosData.mensualidades`.
+ */
+function openMensualidadDetailModal(index) {
+    const rawRow = currentGastosData?.mensualidades?.[index]
+    if (!rawRow) {
+        return
+    }
+
+    closeGastosCreateModal()
+    closeGastoDetailModal()
+
+    const row = normalizeMensualidad(rawRow)
+    const frecuencia = getMensualidadFrecuencia(row.frecuencia)
+    const cargo = getMensualidadCargo(row)
+    const next = getMensualidadNextCharge(row)
+    const nextText = next && !next.isPast
+        ? `${formatMensualidadDate(next.date)} (${next.daysLeft === 0 ? "hoy" : `en ${next.daysLeft} d`})`
+        : "—"
+    const nota = row.nota.trim()
+
+    const overlay = document.createElement("div")
+    overlay.id = "gastosDetailModalOverlay"
+    overlay.className = "modalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal movDetailModal movDetailModalWide"
+    modal.setAttribute("role", "dialog")
+    modal.setAttribute("aria-modal", "true")
+    modal.setAttribute("aria-labelledby", "gastosDetailModalTitle")
+    modal.innerHTML = `
+        <h3 class="assetModalTitle" id="gastosDetailModalTitle">${escapeGastosHtml(row.nombre || "Mensualidad")}</h3>
+        <dl class="movDetailList">
+            <div class="movDetailItem"><dt>Cuenta</dt><dd>${escapeGastosHtml(nombreDeCuenta(row.cuenta))}</dd></div>
+            <div class="movDetailItem"><dt>Importe</dt><dd class="movDetailAmount">${cargo ? formatEuro(cargo) : "—"}</dd></div>
+            <div class="movDetailItem"><dt>Frecuencia</dt><dd>${escapeGastosHtml(frecuencia.short)}</dd></div>
+            <div class="movDetailItem"><dt>Renovación</dt><dd>${row.diaCobro ? `Día ${escapeGastosHtml(row.diaCobro)}` : "—"}</dd></div>
+            <div class="movDetailItem"><dt>Próximo cobro</dt><dd>${escapeGastosHtml(nextText)}</dd></div>
+            <div class="movDetailItem"><dt>Estado</dt><dd>${row.activa ? "Activa" : "Pausada"}</dd></div>
+            <div class="movDetailItem"><dt>Coste mensual</dt><dd>${row.activa ? formatEuro(getMensualidadMonthlyCost(row)) : "—"}</dd></div>
+            <div class="movDetailItem"><dt>Coste ${escapeGastosHtml(currentGastosYear)}</dt><dd>${formatEuro(getMensualidadAnnualCost(row))}</dd></div>
+            <div class="movDetailItem"><dt>Empieza en</dt><dd>${escapeGastosHtml(GASTOS_MONTHS.find((month) => month.key === row.mesInicio)?.label || "—")}</dd></div>
+        </dl>
+        ${buildMensualidadDetailCargosHtml(row)}
+        <div class="movDetailNote${nota ? "" : " movDetailNoteEmpty"}">
+            <span class="movDetailNoteLabel">Nota</span>
+            <p class="movDetailNoteText">${nota ? escapeGastosHtml(nota) : "Sin nota"}</p>
+        </div>
+        <div class="assetModalActions">
+            <button type="button" class="cancelButton" id="gastosDetailCloseBtn">Cerrar</button>
+            <button type="button" class="primaryButton" id="gastosDetailEditBtn">Editar</button>
+        </div>
+    `
+
+    modal.querySelector("#gastosDetailCloseBtn")?.addEventListener("click", closeGastoDetailModal)
+    modal.querySelector("#gastosDetailEditBtn")?.addEventListener("click", () => {
+        closeGastoDetailModal()
+        openMensualidadFormModal(index)
+    })
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+
+    gastosDetailKeyHandler = (event) => {
+        if (event.key === "Escape") {
+            closeGastoDetailModal()
+        }
+    }
+    document.addEventListener("keydown", gastosDetailKeyHandler)
+    modal.querySelector("#gastosDetailCloseBtn")?.focus()
+}
+
 function openGastoMovementModal(rowIndex = -1) {
     const currentRows = currentGastosData?.months?.[currentGastosMonth]?.rows || []
     const isEdit = rowIndex >= 0
@@ -1183,13 +1417,15 @@ async function deleteGastosYearRequest(year) {
     return await Api.del(`/api/gastos/${encodeURIComponent(year)}`)
 }
 
-async function initGastosLogic() {
+async function initGastosLogic({ soloMensualidades = false } = {}) {
+    gastosSoloMensualidades = soloMensualidades
     gastosYears = await loadGastosYears()
     sharedGastosTypes = await loadSharedGastosTypes()
     await cargarCuentasDinero()
     currentGastosYear = gastosYears[0] || "2026"
     currentGastosMonth = "enero"
-    currentGastosView = "year"
+    currentGastosView = getGastosVistaPorDefecto()
+    document.getElementById("gastosMensualidadesTabBtn")?.classList.toggle("hidden", soloMensualidades)
     mensualidadesFilter = "todas"
     mensualidadesSearch = ""
     mensualidadesTab = "tabla"
@@ -1224,6 +1460,123 @@ async function initGastosLogic() {
     if (gastosMovementsTable) bindTableSort(gastosMovementsTable, "gastos")
 }
 
+/**
+ * Vista a la que vuelve la página al abrirse o al cambiar de año.
+ *
+ * Returns:
+ *     "mensualidades" si se abrió desde su entrada del menú; "year" en Gastos.
+ */
+function getGastosVistaPorDefecto() {
+    return gastosSoloMensualidades ? "mensualidades" : "year"
+}
+
+// El año que lo normal es crear: el actual si aún no existe y, si ya está, el
+// siguiente al más reciente.
+function getGastosAnioSugerido() {
+    const actual = String(new Date().getFullYear())
+    if (!gastosYears.includes(actual)) {
+        return actual
+    }
+    return String(Math.max(...gastosYears.map(Number).filter(Number.isInteger)) + 1)
+}
+
+/**
+ * Añade al año abierto las mensualidades de otro año que le falten y guarda.
+ *
+ * Args:
+ *     origen: Año del que se copian.
+ *
+ * Returns:
+ *     Lo que devuelve getMensualidadesParaCopiar: filas añadidas y omitidas.
+ */
+async function copiarMensualidadesAlAnioActual(origen) {
+    const datosOrigen = await loadGastosYear(origen)
+    syncGastosDataFromTables()
+    const resultado = getMensualidadesParaCopiar(datosOrigen?.mensualidades, currentGastosData.mensualidades)
+    if (resultado.nuevas.length) {
+        currentGastosData.mensualidades.push(...resultado.nuevas)
+        renderCurrentGastosView()
+        await persistCurrentGastosData()
+    }
+    return resultado
+}
+
+function avisarMensualidadesCopiadas({ nuevas, omitidas }, origen) {
+    if (!nuevas.length) {
+        showToast(
+            omitidas ? `Las mensualidades de ${origen} ya estaban en este año.` : `${origen} no tiene mensualidades.`,
+            { type: "warning" }
+        )
+        return
+    }
+    const copiadas = nuevas.length === 1 ? "1 mensualidad" : `${nuevas.length} mensualidades`
+    const extra = omitidas ? ` (${omitidas} ya estaban)` : ""
+    showToast(`Copiadas ${copiadas} de ${origen}${extra}.`, { type: "success" })
+}
+
+function openGastosAddYearModal() {
+    const sugerido = getGastosAnioSugerido()
+
+    openGastosCreateModal({
+        title: "Añadir año",
+        submitLabel: "Crear año",
+        bodyHtml: `
+            <label class="assetModalLabel" for="gastosNuevoAnioInput">Año</label>
+            <input id="gastosNuevoAnioInput" class="assetModalInput" type="text" inputmode="numeric" maxlength="4" autocomplete="off" value="${sugerido}">
+        `,
+        onReady: (modal) => {
+            const input = modal.querySelector("#gastosNuevoAnioInput")
+            input?.addEventListener("keydown", (event) => {
+                if (event.key === "Enter") modal.querySelector("#gastosCreateModalSaveBtn")?.click()
+            })
+            input?.select()
+        },
+        onSubmit: async ({ getValue, setFeedback }) => {
+            const year = String(getValue("gastosNuevoAnioInput")).trim()
+            if (!/^\d{4}$/.test(year)) {
+                setFeedback("Escribe un año de 4 cifras, por ejemplo 2027.", true)
+                return false
+            }
+            if (gastosYears.includes(year)) {
+                setFeedback(`${year} ya existe.`, true)
+                return false
+            }
+
+            // Las mensualidades se viven como globales: el año nuevo hereda
+            // siempre las del más cercano (crear 2024 con 2025 ya creado copia
+            // de 2025), sin preguntar.
+            const origen = getAnioOrigenMensualidades(year, gastosYears)
+
+            try {
+                await persistCurrentGastosData()
+                await createGastosYear(year)
+                gastosYears = await loadGastosYears()
+                currentGastosYear = year
+                await renderGastosYear(year)
+            } catch (error) {
+                console.error(error)
+                setFeedback("No se pudo crear el año.", true)
+                return false
+            }
+
+            // El año ya existe aunque falle la copia: se cierra el popup y se
+            // avisa, para no invitar a crearlo otra vez.
+            if (origen) {
+                try {
+                    // Sin nada que copiar no se avisa: la copia ya no la pide el
+                    // usuario y un "no tiene mensualidades" solo despistaría.
+                    const resultado = await copiarMensualidadesAlAnioActual(origen)
+                    if (resultado.nuevas.length) avisarMensualidadesCopiadas(resultado, origen)
+                } catch (error) {
+                    console.error(error)
+                    showToast(`${year} se ha creado, pero no se pudieron copiar las mensualidades.`, { type: "error" })
+                }
+            }
+            return true
+        }
+    })
+}
+
 function bindGastosEvents() {
     const menuTrigger = document.querySelector("#gastosActionsMenu .pageActionsMenuTrigger")
     const menuDropdown = document.getElementById("gastosActionsDropdown")
@@ -1247,25 +1600,7 @@ function bindGastosEvents() {
 
     if (addYearButton && !addYearButton.dataset.bound) {
         addYearButton.dataset.bound = "true"
-        addYearButton.addEventListener("click", async () => {
-            const suggestedYear = String(new Date().getFullYear())
-            const year = prompt("Escribe el nuevo año (YYYY)", suggestedYear)?.trim()
-
-            if (!year) {
-                return
-            }
-
-            try {
-                await persistCurrentGastosData()
-                await createGastosYear(year)
-                gastosYears = await loadGastosYears()
-                currentGastosYear = year
-                await renderGastosYear(year)
-            } catch (error) {
-                console.error(error)
-                alert("No se pudo crear el año.")
-            }
-        })
+        addYearButton.addEventListener("click", openGastosAddYearModal)
     }
 
     if (deleteYearButton && !deleteYearButton.dataset.bound) {
@@ -1283,7 +1618,7 @@ function bindGastosEvents() {
                         ? ordenarAniosRecientesPrimero(response.years)
                         : await loadGastosYears()
                     currentGastosYear = gastosYears[0]
-                    currentGastosView = "year"
+                    currentGastosView = getGastosVistaPorDefecto()
                     currentGastosMonth = "enero"
                     await renderGastosYear(currentGastosYear)
                 }
@@ -1373,7 +1708,7 @@ function renderGastosYearButtons() {
         button.addEventListener("click", async () => {
             await persistCurrentGastosData()
             currentGastosYear = year
-            currentGastosView = "year"
+            currentGastosView = getGastosVistaPorDefecto()
             await renderGastosYear(year)
         })
         list.appendChild(button)
@@ -2041,7 +2376,22 @@ function renderMensualidadesTable() {
         const message = totalRows
             ? "Ninguna mensualidad coincide con el filtro."
             : "Aún no hay mensualidades. Añade la primera para llevar el control de tus suscripciones."
-        body.innerHTML = `<tr class="mensEmptyRow"><td colspan="10">${message}</td></tr>`
+        // Un año recién creado sin copiar: el atajo para traerlas va aquí mismo.
+        const origen = totalRows ? null : getAnioOrigenMensualidades(currentGastosYear, gastosYears)
+        const copiarHtml = origen
+            ? `<div class="mensEmptyActions"><button type="button" class="primaryButton" data-mens-copiar data-no-autohide="true">Copiar las de ${escapeGastosHtml(origen)}</button></div>`
+            : ""
+        body.innerHTML = `<tr class="mensEmptyRow"><td colspan="10">${message}${copiarHtml}</td></tr>`
+        body.querySelector("[data-mens-copiar]")?.addEventListener("click", async (event) => {
+            event.currentTarget.disabled = true
+            try {
+                avisarMensualidadesCopiadas(await copiarMensualidadesAlAnioActual(origen), origen)
+            } catch (error) {
+                console.error(error)
+                showToast("No se pudieron copiar las mensualidades.", { type: "error" })
+                renderMensualidadesTable()
+            }
+        })
         foot.innerHTML = ""
         return
     }
@@ -2077,7 +2427,7 @@ function renderMensualidadesTable() {
                 .join(" · ")
 
             return `
-            <tr class="${row.activa ? "" : "mensRowPaused"}">
+            <tr class="movDetailRow${row.activa ? "" : " mensRowPaused"}" data-mens-index="${index}">
                 <td class="mensColName">
                     <span class="mensNameMain">${escapeGastosHtml(row.nombre)}</span>
                     ${row.nota ? `<span class="mensNameNote" title="${escapeGastosHtml(row.nota)}">${escapeGastosHtml(row.nota)}</span>` : ""}
@@ -2396,6 +2746,14 @@ function handleMensualidadesActionClick(event) {
 
     const deleteBtn = event.target.closest("[data-mens-delete]")
     if (!deleteBtn) {
+        // Pulsar la fila (fuera del menú de acciones) abre su detalle.
+        if (event.target.closest(".rowActionsCell")) {
+            return
+        }
+        const rowElement = event.target.closest("tr[data-mens-index]")
+        if (rowElement) {
+            openMensualidadDetailModal(Number(rowElement.dataset.mensIndex))
+        }
         return
     }
 

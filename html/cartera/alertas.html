@@ -1,0 +1,43 @@
+<div class="alertasPage alertasPage--lateral">
+
+    <div class="activosToolbar">
+        <span class="metricasSectionTitle smPageTitle">Alertas</span>
+    </div>
+    <p class="alertasIntro">
+        Avisos por Telegram de precio, movimientos bruscos, tus posiciones y la cartera, vigilados por el servidor aunque
+        la web esté cerrada. Las de un activo también están en la pestaña «Alertas» de su ficha.
+    </p>
+
+    <div class="alertasLayout">
+        <div id="alertasPaginaPanel"></div>
+
+        <aside class="alertasLateral" aria-label="Estado de los avisos">
+            <section class="alLateralCaja" id="alertasTelegram">
+                <div class="alLateralCabecera">
+                    <span class="alLateralTitulo">Telegram</span>
+                </div>
+                <div class="alLateralCuerpo" id="alertasTelegramCuerpo">
+                    <span class="alLateralTenue">Comprobando…</span>
+                </div>
+            </section>
+
+            <section class="alLateralCaja">
+                <div class="alLateralCabecera">
+                    <span class="alLateralTitulo">Últimos avisos</span>
+                    <button type="button" class="alLateralEnlace" id="alertasVerAvisos">Ver todos</button>
+                </div>
+                <div class="alLateralAvisos" id="alertasUltimosAvisos">
+                    <span class="alLateralTenue">Cargando…</span>
+                </div>
+            </section>
+
+            <section class="alLateralCaja">
+                <div class="alLateralCabecera">
+                    <span class="alLateralTitulo">Qué se puede vigilar</span>
+                </div>
+                <ul class="alLateralGuia" id="alertasGuia"></ul>
+            </section>
+        </aside>
+    </div>
+
+</div>

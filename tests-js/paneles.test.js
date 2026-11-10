@@ -465,6 +465,20 @@ describe("mapa de mercado: la lista de Seguimiento", () => {
         expect(_pnDatos.porId.get("aapl").seguido).toBeUndefined()
     })
 
+    it("sigue el orden en que se arrastraron las tarjetas en Seguimiento", () => {
+        globalThis.segAplicarOrden = (items, orden) => {
+            const posicion = new Map((orden || []).map((segId, indice) => [segId, indice]))
+            return [...items].sort((a, b) => (posicion.get(a._segId) ?? Infinity) - (posicion.get(b._segId) ?? Infinity))
+        }
+        window._seguimientoDatos = { orden: ["custom_1", "seguir_aapl"] }
+        try {
+            expect(pnActivosSeguimiento().map((a) => a.id)).toEqual(["wl:custom_1", "aapl"])
+        } finally {
+            delete globalThis.segAplicarOrden
+            delete window._seguimientoDatos
+        }
+    })
+
     it("sin activos elegidos, el mapa de mercado parte de Seguimiento", () => {
         const items = pnActivosDelWidget({}, { soloPosiciones: false, porDefecto: pnActivosSeguimiento() })
         expect(items.map((a) => a.id)).toEqual(["aapl", "wl:custom_1"])

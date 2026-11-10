@@ -1582,7 +1582,7 @@ function openAssetModal() {
     }
 
     assetNameInput.value = ""
-    assetTypeSelect.value = "cripto"
+    assetTypeSelect.value = ""
     assetTypeSelect.dispatchEvent(new Event("change", { bubbles: true }))
     assetTickerInput.value = ""
     assetTickerInput.dataset.marketProvider = ""

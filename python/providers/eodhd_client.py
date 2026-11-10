@@ -152,6 +152,9 @@ def _scoreResult(item, normalizedQuery, normalizedAssetName="", preferredAssetTy
     elif preferredAssetType == "comoditis":
         if any(token in normalizedName for token in ("gold", "silver", "oil", "brent", "crude", "commodity")):
             score += 280
+    elif preferredAssetType == "indices":
+        if resultType == "index":
+            score += 280
 
     if preferredAssetType in PREFERRED_EXCHANGES_BY_TYPE and exchange in PREFERRED_EXCHANGES_BY_TYPE[preferredAssetType]:
         score += 90
@@ -176,6 +179,8 @@ def searchSymbol(queryText, apiKey, timeout=None, limit=8, assetName="", preferr
         searchType = "etf"
     elif preferredAssetType == "cripto":
         searchType = "crypto"
+    elif preferredAssetType == "indices":
+        searchType = "index"
 
     try:
         payload = _fetchJson(

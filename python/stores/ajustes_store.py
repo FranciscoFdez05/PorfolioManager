@@ -50,6 +50,7 @@ _GLOBAL_DEFAULTS = {
     "precioDecimalesAcciones": 2,
     "precioDecimalesEtf": 2,
     "precioDecimalesComoditis": 2,
+    "precioDecimalesIndices": 2,
     "precioDecimalesCripto": 4,
     "soloHorarioMercado": False,
     "soloMercadoTipos": ["acciones", "etfs", "comoditis"],
@@ -103,6 +104,7 @@ _PORTFOLIO_DEFAULTS = {
     seguimiento_prefs.CLAVE_LISTA: [],
     seguimiento_prefs.CLAVE_OCULTOS: [],
     seguimiento_prefs.CLAVE_OVERRIDES: {},
+    seguimiento_prefs.CLAVE_ORDEN: [],
 }
 
 _GLOBAL_KEYS    = set(_GLOBAL_DEFAULTS)

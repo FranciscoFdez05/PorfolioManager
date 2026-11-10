@@ -458,11 +458,6 @@ html[data-theme="black"] .avCard.avDragging {
     box-shadow: inset 0 0 0 1px var(--av-color, var(--accent));
 }
 
-/* pages/ahorro.css */
-html[data-theme="black"] .ahorroObjetivoTarget {
-    box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.5);
-}
-
 /* pages/ajustes.css */
 html[data-theme="black"] .ajustesSection.ajustesUnlocked {
     box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.15);
@@ -1118,6 +1113,11 @@ html[data-theme="black"] .mActivosFilterBtn[data-atype="etfs"].active {
 html[data-theme="black"] .mActivosFilterBtn[data-atype="comoditis"].active {
     background: #150f00;
     border-color: #e0c068;
+}
+
+html[data-theme="black"] .mActivosFilterBtn[data-atype="indices"].active {
+    background: #17050c;
+    border-color: #e8618c;
 }
 
 html[data-theme="black"] .mActivosFilterBtn[data-atype="bonos"].active {
@@ -2532,4 +2532,21 @@ html[data-theme="black"] .ajustesSectionDesc a {
 /* Blanco sobre ámbar no llega a 2,2:1; el número va en oscuro. */
 html[data-theme="black"] .ajustesAtajoPaso[data-estado="aviso"] .ajustesAtajoPasoNum {
     color: #1c1406;
+}
+
+/* Panel de categorías: los inputs van sin caja hasta hover/foco. La regla
+   genérica de inputs usa !important, de ahí la especificidad extra. */
+html[data-theme="black"] .catList .catRow .catInput {
+    background: transparent !important;
+    border-color: transparent !important;
+    color: var(--text-bright) !important;
+}
+
+html[data-theme="black"] .catList .catRow .catInput:hover {
+    border-color: var(--border-mid) !important;
+}
+
+html[data-theme="black"] .catList .catRow .catInput:focus {
+    background: var(--bg-panel) !important;
+    border-color: var(--accent) !important;
 }

@@ -18,6 +18,9 @@ log = logging.getLogger(__name__)
 CLAVE_LISTA = "seguimientoLista"
 CLAVE_OCULTOS = "seguimientoOcultos"
 CLAVE_OVERRIDES = "seguimientoOverrides"
+# Orden de las tarjetas elegido arrastrándolas: `_segId` de cada una. Nunca vivió
+# en el navegador, así que no tiene clave antigua que migrar ni que fusionar.
+CLAVE_ORDEN = "seguimientoOrden"
 
 MAX_ELEMENTOS = 2000
 _MAX_CLAVE = 40
@@ -74,6 +77,20 @@ def normalizarOcultos(valor) -> list[str]:
         return []
     textos = [t for t in valor if isinstance(t, str) and t.strip() and len(t) <= _MAX_TEXTO]
     return list(dict.fromkeys(textos))[:MAX_ELEMENTOS]
+
+
+def normalizarOrden(valor) -> list[str]:
+    """El orden de las tarjetas: identificadores sin repetidos, en su orden.
+
+    Tiene la misma forma que los ocultos (lista de `_segId`), así que se valida igual.
+
+    Args:
+        valor: Lo recibido; cualquier cosa que no sea una lista da una lista vacía.
+
+    Returns:
+        Los identificadores válidos, con `MAX_ELEMENTOS` como tope.
+    """
+    return normalizarOcultos(valor)
 
 
 def normalizarOverrides(valor) -> dict:

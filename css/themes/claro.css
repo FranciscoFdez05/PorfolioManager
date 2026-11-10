@@ -463,11 +463,6 @@ html[data-theme="light"] .avCard.avDragging {
     box-shadow: inset 0 0 0 1px var(--av-color, var(--accent));
 }
 
-/* pages/ahorro.css */
-html[data-theme="light"] .ahorroObjetivoTarget {
-    box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.5);
-}
-
 /* pages/ajustes.css */
 html[data-theme="light"] .ajustesSection.ajustesUnlocked {
     box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.15);
@@ -1298,6 +1293,12 @@ html[data-theme="light"] .mActivosFilterBtn[data-atype="comoditis"].active {
     color: #713f12;
 }
 
+html[data-theme="light"] .mActivosFilterBtn[data-atype="indices"].active {
+    background: #fdf2f8;
+    border-color: #db2777;
+    color: #9d174d;
+}
+
 html[data-theme="light"] .mActivosFilterBtn[data-atype="bonos"].active {
     background: #f3e8ff;
     border-color: #9b59b6;
@@ -1420,6 +1421,10 @@ html[data-theme="light"] .fnTypeBadge[data-type="cripto"] {
 
 html[data-theme="light"] .fnTypeBadge[data-type="comoditis"] {
     color: #a16207;
+}
+
+html[data-theme="light"] .fnTypeBadge[data-type="indices"] {
+    color: #be185d;
 }
 
 html[data-theme="light"] .fnTypeBadge[data-type="rentafija"],
@@ -1563,6 +1568,11 @@ html[data-theme="light"] .movDetailNote {
 
 html[data-theme="light"] .movDetailNoteEmpty {
     border-left-color: var(--border-mid);
+}
+
+html[data-theme="light"] .movDetailCharges {
+    background: #f8fafc;
+    border-color: var(--border-soft);
 }
 
 html[data-theme="light"] .movDetailItem dt,
@@ -2546,6 +2556,18 @@ html[data-theme="light"] .gastosCategoryRow .gastosSectionToggle {
     color: var(--accent-dark) !important;
 }
 
+/* Pagas extra de los ingresos recurrentes: el ámbar claro de la base no se
+   lee sobre blanco. */
+html[data-theme="light"] .recPagasBadge,
+html[data-theme="light"] .recCalSideItemExtra .mensCalSideName,
+html[data-theme="light"] .recCalSideItemExtra .mensCalSideAmount {
+    color: #b45309;
+}
+
+html[data-theme="light"] .recCalDayExtra {
+    box-shadow: inset 0 -2px 0 #d97706;
+}
+
 /* ── 13. Planes ──────────────────────────────────────────────────────────── */
 /* Planes de ahorro y planes de inversión. */
 
@@ -3371,4 +3393,20 @@ html[data-theme="light"] .ajustesUpdateEtiqueta {
 html[data-theme="light"] .ajustesUpdateEtiqueta.hayNueva,
 html[data-theme="light"] .ajustesAviso {
     color: #b45309;
+}
+
+/* Panel de categorías: los inputs van sin caja hasta hover/foco. La regla
+   genérica de inputs usa !important, de ahí la especificidad extra. */
+html[data-theme="light"] .catList .catRow .catInput {
+    background: transparent !important;
+    border-color: transparent !important;
+}
+
+html[data-theme="light"] .catList .catRow .catInput:hover {
+    border-color: var(--border-mid) !important;
+}
+
+html[data-theme="light"] .catList .catRow .catInput:focus {
+    background: var(--bg-surface) !important;
+    border-color: var(--accent) !important;
 }

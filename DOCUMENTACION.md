@@ -19,7 +19,7 @@ Referencia completa de PorfolioManager: instalación, configuración, operación
 - **Vista General** — resumen del portfolio con tabla de activos y métricas clave
 - **Activos** — ficha por activo: compras/aportes, precio medio, rendimiento y, en los activos en divisa extranjera, el desglose entre **efecto activo** y **efecto divisa**
 - **Planes de inversión** — un plan con nombre agrupa los activos que se piensan comprar y las operaciones con las que se va a hacer, vinculando operaciones spot abiertas o creando nuevas; la tabla dice qué parte de cada activo está ya invertida y la gráfica cuánto del plan está realizado. Los planes se archivan sin borrarse. Aparte, la ficha de cada activo conserva su pestaña de planes de precio (a qué precio entrar, a qué precio recoger el beneficio y con cuánto capital)
-- **Gastos & Ingresos** — gastos por categoría, ingresos recurrentes y puntuales, y **mensualidades** (suscripciones) con día de cobro propio por mes y un calendario del año que dice qué se cobró cada día; un **calendario del dinero** junta gastos, ingresos y mensualidades día a día, con chips para elegir qué se ve
+- **Gastos & Ingresos** — gastos por categoría, ingresos puntuales, **ingresos recurrentes** con pagas extra (añadidos puntuales en un mes, sumados a ese mes) y calendario de cobros, y **mensualidades** (suscripciones) con día de cobro propio por mes y un calendario del año que dice qué se cobró cada día; un **calendario del dinero** junta gastos, ingresos y mensualidades día a día, con chips para elegir qué se ve
 - **Finanzas** — cuenta remunerada, dividendos, renta fija, bonos y ventas
 - **Ventas con FIFO fiscal español** — lotes, regla de los dos meses y escala del ahorro calculados en el servidor, con **informe anual de la Renta** en CSV y en HTML imprimible ([detalle](#ventas-y-fiscalidad-españa))
 - **Cripto** — stablecoins, operaciones, transacciones y conversiones
@@ -630,6 +630,9 @@ Un bot de Telegram (lo creas con [@BotFather](https://t.me/BotFather) y pegas el
 | Copias de seguridad | copia manual o automática creada (nombre, tamaño, cuántas hay), copia o restauración fallida, copia restaurada o eliminada |
 | Enviar el fichero de las copias automáticas y al actualizar | cada copia automática, y la que se hace al pulsar Actualizar, llega como ZIP, con las claves de API si se incluyen en las copias; si supera los 50 MB de Telegram solo llega un aviso (desactivado de fábrica). Las demás copias manuales no se envían |
 | Alertas de precio | un activo llega al precio fijado o se mueve en el día el % pedido; cada alerta salta una vez |
+| Caídas y subidas bruscas | un activo cae o sube el % fijado dentro de la ventana elegida (15 min, 1 h, 4 h o 24 h), medido desde el máximo o el mínimo de la ventana; no repite aviso del mismo activo hasta pasado el enfriamiento |
+| Rentabilidad y precio medio | tu posición gana o pierde el % o los euros fijados, o su precio se aleja de tu precio medio el % pedido; avisa al cruzar el umbral y no repite hasta volver a cruzarlo |
+| Valor y peso de la cartera | el valor total baja o sube del importe fijado, cae el % pedido en una ventana, o un activo supera el % de la cartera fijado |
 | Movimientos en las wallets | movimientos nuevos, saldo fuera de los límites, wallet que despierta o actividad sospechosa de las wallets con su interruptor encendido en Cripto › Seguimiento; monedas de Satoshi gastadas, si está activada esa vigilancia |
 | Seguridad | una IP agota los intentos de login, cambio de contraseña o de usuario, verificación en dos pasos activada, desactivada o usada la frase de recuperación |
 | Estado del servidor | servidor iniciado, base de datos dañada al arrancar (reparada o restaurada), disco casi lleno, más de una hora sin guardar snapshots por falta de precios o tipos de cambio. El aviso de aplicación caída lo manda el vigilante y no depende de este interruptor |
@@ -640,6 +643,20 @@ Un bot de Telegram (lo creas con [@BotFather](https://t.me/BotFather) y pegas el
 **Cómo se distinguen.** Cada aviso llega con una imagen de cabecera que indica su tipo y su gravedad (correcto, información, atención o crítico), y el texto debajo. Si la imagen no se puede enviar, el aviso sale igualmente como texto. Los códigos de verificación, las respuestas a comandos y el fichero de cada copia no llevan cabecera. Las imágenes están en `python/core/datos/avisos/` y se generan con `python tools/generar_imagenes_avisos.py`, que requiere Playwright con Chromium solo para ese paso.
 
 **Alertas de precio.** Pestaña *Alertas* en la ficha de cada activo: precio igual o superior a X, igual o inferior a X, o variación del día de ±N %. El servidor las comprueba cada `[avisos] alertas_intervalo_minutos` aunque la web esté cerrada, pidiendo solo la cotización de los activos que tienen alguna alerta activa. Cada alerta salta **una vez** y queda marcada hasta que la reactives.
+
+**Menú Alertas.** **Alertas › Todas las alertas** reúne todas las alertas de la cartera en una lista filtrable por tipo y por activo, con un formulario que pide solo los campos del tipo elegido; al lado, una columna avisa si el bot de Telegram no está configurado, está silenciado o tiene apagada alguna categoría de alertas en Ajustes › Avisos (con un botón que lleva allí), y enseña los cinco últimos avisos y qué vigila cada familia. La pestaña *Alertas* de la ficha de cada activo usa el mismo formulario con el activo ya fijado y enseña sus alertas junto a las generales que también lo vigilan. **Alertas › Últimos avisos** lista lo que ha saltado. Además de las de precio hay estos tipos, que no se desactivan al saltar:
+
+| Tipo | Avisa cuando | Sobre |
+|---|---|---|
+| Caída / subida brusca | cae (o sube) un X % en menos de 15 min, 1 h, 4 h o 24 h, medido desde el máximo (o el mínimo) de la ventana | un activo, o todos los que tienen posición |
+| Rentabilidad de la posición | la ganancia o la pérdida, con comisiones, llega a X % o a X € | un activo con posición, o todos |
+| Precio frente a tu precio medio | el precio queda un X % por debajo (o por encima) del precio medio de compra, sin comisiones | un activo con posición, o todos |
+| Sin cotización | un activo lleva más de 1, 3, 6, 12 o 24 h sin poder cotizarse | un activo, o todos (categoría «Proveedores» de Telegram) |
+| Valor total de la cartera | el valor en euros baja o sube de X € | la cartera |
+| Caída de la cartera | el valor cae un X % en menos de 1, 4 o 24 h | la cartera |
+| Peso de un activo | un activo supera el X % del valor de la cartera | un activo, o cualquiera |
+
+Las de movimiento (caídas y subidas) vuelven a medir desde el último aviso; las demás avisan al **entrar** en la condición y no repiten hasta que salen de ella y vuelven a entrar. En todas, el enfriamiento (15 min a 24 h) es el tiempo mínimo entre dos avisos de lo mismo. Cada `[avisos] reglas_intervalo_minutos` el servidor pide la cotización de los activos vigilados y guarda una muestra (tabla `muestras_precio`, que se purga sola pasadas 24 h); las reglas de cartera valoran además la cartera entera y guardan su valor en `muestras_cartera`. Una valoración incompleta (sin un tipo de cambio o con mucho valor de reserva) no se usa. Coste: una cotización por activo vigilado en cada pasada, más la valoración de la cartera si hay reglas de cartera; con muchos activos y un proveedor de cuota baja, sube el intervalo. Las ventanas cortas necesitan pasadas frecuentes: con un intervalo de 10 min, una ventana de 15 min solo ve dos precios.
 
 **Comandos.** Escríbeselos al bot (solo contesta al chat guardado en Ajustes; a cualquier otro lo ignora sin responder):
 
@@ -662,6 +679,7 @@ La aplicación no puede avisar de que está caída, así que lo hace un proceso 
 ```ini
 [avisos]
 alertas_intervalo_minutos = 5      ; env AVISOS_ALERTAS_MINUTOS · 0 no las vigila
+reglas_intervalo_minutos = 5       ; env AVISOS_REGLAS_MINUTOS · pasada de las reglas de alerta · 0 no las vigila
 espacio_minimo_mb = 1024           ; env AVISOS_ESPACIO_MINIMO_MB · aviso de disco casi lleno
 
 [vigilante]
@@ -728,6 +746,23 @@ erDiagram
         INTEGER id PK
         TEXT asset_id FK
         TEXT condicion
+    }
+    alertas_reglas {
+        INTEGER id PK
+        TEXT tipo
+        TEXT asset_id FK "NULL = toda la cartera"
+        TEXT valor
+    }
+    alertas_reglas_avisos {
+        INTEGER regla_id PK,FK
+        TEXT clave PK "activo o *cartera*"
+        INTEGER avisada_ts
+        INTEGER dentro
+    }
+    muestras_precio {
+        TEXT asset_id PK,FK
+        INTEGER ts PK
+        TEXT precio
     }
     planes_inversion {
         TEXT id PK
@@ -798,6 +833,9 @@ erDiagram
     activos ||--o{ activo_operation_rows : "órdenes"
     activos ||--o{ activo_conversion_rows : "conversiones"
     activos ||--o{ alertas_precio : "alertas"
+    activos |o--o{ alertas_reglas : "reglas"
+    alertas_reglas ||--o{ alertas_reglas_avisos : "último aviso"
+    activos ||--o{ muestras_precio : "muestras"
     activos ||--o{ planes_inversion : "plan en la ficha"
     activos ||--o{ planes_cartera_activos : "incluido en"
     planes_cartera ||--o{ planes_cartera_activos : "agrupa"
@@ -868,6 +906,7 @@ erDiagram
         TEXT nombre UK
         TEXT cuenta
         TEXT cuentas_cobro "JSON por mes"
+        TEXT pagas_extra "JSON: nombre, mes, importe"
     }
     dividendos {
         INTEGER id PK

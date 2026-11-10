@@ -214,6 +214,9 @@
 .activosFilterBtn[data-type="comoditis"]::before {
     background: #e0c06855;
 }
+.activosFilterBtn[data-type="indices"]::before {
+    background: #e8618c55;
+}
 
 .activosFilterBtn[data-type="all"].active,
 .activosFilterBtn[data-type="all"]:has(input:checked) {
@@ -235,6 +238,10 @@
 .activosFilterBtn[data-type="comoditis"]:has(input:checked) {
     border-color: #e0c06844;
 }
+.activosFilterBtn[data-type="indices"].active,
+.activosFilterBtn[data-type="indices"]:has(input:checked) {
+    border-color: #e8618c44;
+}
 
 .activosFilterBtn[data-type="cripto"].active::before,
 .activosFilterBtn[data-type="cripto"]:has(input:checked)::before {
@@ -251,6 +258,10 @@
 .activosFilterBtn[data-type="comoditis"].active::before,
 .activosFilterBtn[data-type="comoditis"]:has(input:checked)::before {
     background: #e0c068;
+}
+.activosFilterBtn[data-type="indices"].active::before,
+.activosFilterBtn[data-type="indices"]:has(input:checked)::before {
+    background: #e8618c;
 }
 
 .activosFilterBtn[data-source="all"]::before {

@@ -1573,3 +1573,29 @@
         grid-template-columns: minmax(0, 1fr);
     }
 }
+
+/* ── Oro y plata ────────────────────────────────────────────────────────── */
+/* El peso y su unidad van en una sola fila: se leen juntos ("100 gramos") y
+   el bloque peso / importe cabe sin desplazarse en la columna de datos. */
+.hMetSeparador {
+    margin-top: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-mid);
+}
+.hMetPesoFila {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 8.5rem);
+    gap: 8px;
+    align-items: stretch;
+}
+.hMetPesoFila .csWrapper,
+.hMetPesoFila .csTrigger {
+    height: 100%;
+    box-sizing: border-box;
+}
+.hMetEquivale {
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin: -2px 0 -6px;
+}

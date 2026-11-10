@@ -72,6 +72,8 @@ beforeAll(() => {
     cargarModulo("js/cartera/assets.js")
     cargarScript("js/cartera/planes.js")
     cargarScript("js/cartera/alertas-precio.js")
+    cargarScript("js/core/api.js")
+    cargarScript("js/cartera/alertas-panel.js")
 })
 
 beforeEach(async () => {

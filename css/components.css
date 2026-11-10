@@ -1925,6 +1925,9 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 .overviewFilterOption:has(input[value="comoditis"]:checked)::before {
     background: #e0c068;
 }
+.overviewFilterOption:has(input[value="indices"]:checked)::before {
+    background: #e8618c;
+}
 
 /* estado checked: Bonos y Mercado privado usan el mismo encendido que
    Operaciones y Vista general (sin negrita). */
@@ -1951,6 +1954,9 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 }
 .overviewFilterOption:has(input[value="comoditis"]:checked) {
     border-color: #e0c06844;
+}
+.overviewFilterOption:has(input[value="indices"]:checked) {
+    border-color: #e8618c44;
 }
 
 /* Filtros de Planes. Son botones y no casillas —se elige un estado, no varios—,
@@ -3074,6 +3080,15 @@ button.calPopupTitulo:hover,
     white-space: nowrap;
 }
 
+/* En Operaciones y Wallets no se añade nada desde la Watchlist (ver segSyncAddBtn). */
+#seguimientoAddBtn:disabled,
+#seguimientoAddBtn:disabled:hover {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    background: var(--btn-active-bg);
+}
+
 /* Añadir a Seguimiento: primero se elige qué añadir y luego, si es del
    portfolio, se marcan en una lista. */
 .segAddOpciones {
@@ -3590,8 +3605,86 @@ button.calPopupTitulo:hover,
     font-style: italic;
 }
 
+/* Detalle de una mensualidad o un ingreso recurrente: más datos que un
+   movimiento suelto, así que el popup es más ancho y va a tres columnas. */
+.movDetailModalWide {
+    width: min(580px, 100%);
+}
+
+.movDetailModalWide .movDetailList {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.movDetailCharges {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--border-mid);
+    border-radius: 8px;
+    background: var(--bg-panel);
+}
+
+/* Con doce cargos y pagas extra la lista crece; se desplaza dentro del popup
+   para que los botones sigan a la vista. */
+.movDetailChargesList {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-height: calc(30 * var(--vh));
+    overflow-y: auto;
+}
+
+.movDetailCharge {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 12px;
+    align-items: baseline;
+    padding: 6px 0;
+    border-top: 1px solid var(--border-soft);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.movDetailCharge:first-child {
+    border-top: none;
+}
+
+.movDetailChargeAccount {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.movDetailChargeAmount {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    text-align: right;
+}
+
+/* Lo ya cobrado se apaga; el próximo cargo se marca con el acento. */
+.movDetailChargeDone {
+    color: var(--text-dim);
+}
+
+.movDetailChargeNext .movDetailChargeDate {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.movDetailChargesEmpty {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-style: italic;
+}
+
+@media (max-width: 600px) {
+    .movDetailModalWide .movDetailList {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 480px) {
-    .movDetailList {
+    .movDetailList,
+    .movDetailModalWide .movDetailList {
         grid-template-columns: 1fr;
     }
 }
@@ -4310,40 +4403,53 @@ button.calPopupTitulo:hover,
    gestionar por separado desde el menú de fila de cada tabla anual. */
 
 .categoriasModal {
-    width: min(760px, 100%);
+    width: min(780px, 100%);
 }
 
 .catColumns {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 18px;
-    margin-bottom: 14px;
+    gap: 20px;
+    margin-bottom: 16px;
+}
+
+.catColumn {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
 }
 
 .catColumnTitle {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin: 0 0 8px 0;
+    margin: 0 0 10px 0;
     color: var(--text-subtle);
-    font-size: 14px;
+    font-size: 12px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
 }
 
 .catCount {
-    padding: 1px 7px;
+    padding: 1px 8px;
     border-radius: 10px;
-    background: var(--bg-inset);
-    color: var(--text-muted);
-    font-size: 12px;
+    background: var(--accent-tint, var(--accent-glow));
+    color: var(--accent);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0;
 }
 
+/* La lista es una sola caja con filas de inputs sin borde: se lee como una
+   lista editable y no como un formulario de siete campos sueltos. */
 .catList {
     max-height: calc(46 * var(--vh));
     margin: 0;
-    padding: 0;
+    padding: 4px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--bg-inset);
     overflow-y: auto;
     list-style: none;
 }
@@ -4351,13 +4457,20 @@ button.calPopupTitulo:hover,
 .catRow {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 3px 0;
+    gap: 4px;
+    padding: 2px 4px 2px 2px;
+    border-radius: 6px;
+    transition: background-color 0.12s ease;
+}
+
+.catRow:not(.catRowEmpty):hover,
+.catRow:focus-within {
+    background: var(--bg-hover, var(--btn-bg));
 }
 
 .catRowEmpty,
 .catHint {
-    padding: 6px 0;
+    padding: 10px 8px;
     color: var(--text-dim);
     font-size: 13px;
 }
@@ -4374,42 +4487,75 @@ button.calPopupTitulo:hover,
     flex: 1;
     min-width: 0;
     box-sizing: border-box;
-    height: 34px;
+    height: 32px;
     padding: 0 10px;
-    border: 1px solid var(--border-mid);
-    border-radius: 4px;
-    background: var(--bg-inset);
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
     color: var(--text-bright);
     font-size: 14px;
     outline: none;
+    transition: border-color 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.catInput:hover {
+    border-color: var(--border-mid);
 }
 
 .catInput:focus {
     border-color: var(--accent);
+    background: var(--bg-panel);
     box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 /* Número de movimientos que usan la categoría en el año cargado: es lo que
    explica por qué el botón de eliminar está deshabilitado. */
 .catUso {
-    min-width: 22px;
+    flex: none;
+    box-sizing: border-box;
+    min-width: 30px;
+    margin-right: 4px;
+    padding: 1px 6px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-surface);
     color: var(--text-dim);
-    font-size: 12px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.3;
     text-align: center;
+    cursor: help;
+}
+
+/* Sin usos el span queda vacío: se mantiene el hueco para que los botones no
+   bailen entre filas, pero sin la pastilla. */
+.catUso:empty {
+    border-color: transparent;
+    background: transparent;
+    cursor: default;
 }
 
 .catIconBtn {
+    display: inline-flex;
     flex: none;
+    align-items: center;
+    justify-content: center;
     width: 28px;
     height: 28px;
     padding: 0;
-    border: 1px solid var(--btn-border);
-    border-radius: 4px;
-    background: var(--btn-bg);
-    color: var(--text-muted);
-    font-size: 12px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 10px;
     line-height: 1;
     cursor: pointer;
+    transition: border-color 0.12s ease, background-color 0.12s ease, color 0.12s ease;
+}
+
+.catRow:hover .catIconBtn:not(:disabled),
+.catRow:focus-within .catIconBtn:not(:disabled) {
+    color: var(--text-muted);
 }
 
 .catIconBtn:hover:not(:disabled) {
@@ -4418,31 +4564,48 @@ button.calPopupTitulo:hover,
     color: var(--text-bright);
 }
 
+.catIconBtn:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
 .catIconBtn:disabled {
-    opacity: 0.35;
+    opacity: 0.25;
     cursor: not-allowed;
 }
 
 .catIconBtnDanger:hover:not(:disabled) {
     border-color: var(--color-neg);
+    background: transparent;
     color: var(--color-neg-bright);
 }
 
 .catAddBtn {
     width: 100%;
-    margin-top: 8px;
-    padding: 7px 10px;
+    height: 34px;
+    margin-top: 10px;
+    padding: 0 10px;
     border: 1px dashed var(--border-hard);
-    border-radius: 4px;
+    border-radius: 8px;
     background: transparent;
     color: var(--text-muted);
     font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
+    transition: border-color 0.12s ease, background-color 0.12s ease, color 0.12s ease;
 }
 
 .catAddBtn:hover {
     border-color: var(--accent);
+    background: var(--accent-tint, var(--accent-glow));
     color: var(--text-bright);
+}
+
+.catAddBtn:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 /* ── Pestaña "Todos" de la ficha ──

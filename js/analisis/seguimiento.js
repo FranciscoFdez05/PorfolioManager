@@ -2,19 +2,66 @@ const AV_SEG_TYPE_COLORS = {
     cripto: "#f7931a",
     acciones: "#3a7bd5",
     etfs: "#2ecc71",
-    comoditis: "#e0c068"
+    comoditis: "#e0c068",
+    indices: "#e8618c"
 }
 const AV_SEG_TYPE_LABELS = {
     cripto: "Cripto",
     acciones: "Acciones",
     etfs: "ETFs",
-    comoditis: "Comoditis"
+    comoditis: "Comoditis",
+    indices: "Índices"
 }
 
 // Orígenes de la watchlist: se ve uno cada vez, el primero por defecto.
 // «seguimiento» es la lista que elige el usuario (activos del portfolio y nuevos)
 // y «wallets», la cripto de sus wallets.
 const SEG_SOURCES = ["portfolio", "operaciones", "nuevos", "seguimiento", "wallets"]
+
+// «Añadir activo» da de alta lo que lista la pestaña abierta. Operaciones y
+// Wallets salen de otras pantallas: ahí el botón se desactiva y dice dónde ir.
+const SEG_ALTA_POR_FUENTE = { portfolio: "activo", nuevos: "nuevo", seguimiento: "elegir" }
+const SEG_ALTA_EN_OTRA_PANTALLA = {
+    operaciones: "Las operaciones se añaden en Cripto › Operaciones",
+    wallets: "Las wallets se añaden en Cripto › Seguimiento"
+}
+
+/**
+ * Qué abre «Añadir activo» en una pestaña de la Watchlist.
+ *
+ * @param {string} fuente Pestaña (`SEG_SOURCES`).
+ * @returns {{alta: string|null, aviso: string}} `alta` es "activo" (alta en el
+ *     portfolio), "nuevo" (activo nuevo de Seguimiento), "elegir" (el selector)
+ *     o null si en esa pestaña no se añade nada; `aviso`, el porqué.
+ */
+function segAltaDeFuente(fuente) {
+    return { alta: SEG_ALTA_POR_FUENTE[fuente] || null, aviso: SEG_ALTA_EN_OTRA_PANTALLA[fuente] || "" }
+}
+
+/**
+ * Activa o desactiva «Añadir activo» según la pestaña abierta.
+ *
+ * @param {HTMLButtonElement|null} boton El botón de la Watchlist.
+ */
+function segSyncAddBtn(boton) {
+    if (!boton) return
+    const { alta, aviso } = segAltaDeFuente(_segFilterSrc)
+    boton.disabled = !alta
+    boton.title = aviso
+}
+
+// Un activo creado desde la pestaña Portfolio tiene que salir en ella sin recargar.
+window.addEventListener("app:activo-creado", async () => {
+    if (!document.getElementById("seguimientoAddBtn")) return
+    try {
+        const resp = await fetch("/api/activos")
+        if (!resp.ok) return
+        const data = await resp.json()
+        segMergeAndRender(data.assets || data || [])
+    } catch (error) {
+        console.error("Watchlist: no se pudo recargar la lista de activos", error)
+    }
+})
 
 let _segAllItems = []
 let _segFilterType = "all"
@@ -30,7 +77,7 @@ function _segPid() {
 // preferencias del servidor, que es lo que entra en las copias de seguridad, y
 // aquí solo hay una copia en memoria que carga loadGlobalSettings.
 function _segDatos() {
-    if (!window._seguimientoDatos) window._seguimientoDatos = { lista: [], ocultos: [], overrides: {} }
+    if (!window._seguimientoDatos) window._seguimientoDatos = { lista: [], ocultos: [], overrides: {}, orden: [] }
     return window._seguimientoDatos
 }
 
@@ -112,7 +159,8 @@ async function segMigrarAlServidor(pidActivo) {
         window._seguimientoDatos = {
             lista: data.seguimientoLista,
             ocultos: data.seguimientoOcultos,
-            overrides: data.seguimientoOverrides
+            overrides: data.seguimientoOverrides,
+            orden: data.seguimientoOrden ?? []
         }
     } catch (error) {
         console.error("Error al migrar el seguimiento al servidor:", error)
@@ -553,6 +601,7 @@ function segRenderGrid() {
             })
         })
         segWireWalletMenu(card)
+        card.draggable = true
         card.addEventListener("click", (e) => {
             if (e.target.closest(".segRemoveBtn") || e.target.closest(".segEditBtn") || e.target.closest(".rowMenu"))
                 return
@@ -584,6 +633,109 @@ function segRenderGrid() {
     } else {
         filtered.forEach((item) => grid.appendChild(wireCard(segBuildCard(item), item)))
     }
+    segInitDragDrop(grid)
+}
+
+/**
+ * Ordena los elementos según el orden guardado al arrastrar las tarjetas.
+ *
+ * Lo que no está en el orden (activos nuevos, o todo si nunca se ha arrastrado)
+ * va detrás, en el orden de siempre: el sort es estable.
+ *
+ * @param {Array<object>} items Elementos con `_segId`.
+ * @param {Array<string>} orden `_segId` en el orden elegido.
+ * @returns {Array<object>} Copia ordenada.
+ */
+function segAplicarOrden(items, orden) {
+    const posicion = new Map((orden || []).map((segId, indice) => [segId, indice]))
+    const clave = (item) => posicion.get(item._segId) ?? Infinity
+    return [...items].sort((a, b) => clave(a) - clave(b))
+}
+
+/**
+ * Lleva el orden de las tarjetas visibles al orden completo.
+ *
+ * Con un filtro activo solo se ve una parte: las visibles se reparten, en su
+ * nuevo orden, por los huecos que ya ocupaban, y las demás no se mueven.
+ *
+ * @param {Array<string>} ordenCompleto `_segId` de todos los elementos, en el orden actual.
+ * @param {Array<string>} visibles `_segId` de las tarjetas visibles, en el orden del DOM.
+ * @returns {Array<string>} El orden completo nuevo.
+ * @example
+ * segFusionarOrden(["a", "b", "c", "d"], ["d", "b"]) // ["a", "d", "c", "b"]
+ */
+function segFusionarOrden(ordenCompleto, visibles) {
+    const enVista = new Set(visibles)
+    const cola = visibles.filter((segId) => ordenCompleto.includes(segId))
+    return ordenCompleto.map((segId) => (enVista.has(segId) ? cola.shift() : segId))
+}
+
+// Tarjeta delante de la que se suelta la arrastrada (null = al final), como en Activos.
+function segFindDropReference(grid, dragged, pointerX, pointerY) {
+    const cards = [...grid.querySelectorAll(".avCard")].filter((card) => card !== dragged && card.dataset.segId)
+    for (const card of cards) {
+        const rect = card.getBoundingClientRect()
+        if (pointerY > rect.bottom) continue
+        if (pointerY < rect.top || pointerX < rect.left + rect.width / 2) return card
+    }
+    return null
+}
+
+function segGuardarOrdenDesdeDom(grid) {
+    const visibles = [...grid.querySelectorAll(".avCard")].map((card) => card.dataset.segId).filter(Boolean)
+    const orden = segFusionarOrden(
+        _segAllItems.map((item) => item._segId),
+        visibles
+    )
+    _segDatos().orden = orden
+    _segGuardar({ seguimientoOrden: orden })
+    _segAllItems = segAplicarOrden(_segAllItems, orden)
+}
+
+// Arrastrar tarjetas para reordenarlas, con la misma mecánica que la cuadrícula de Activos.
+function segInitDragDrop(grid) {
+    if (grid.dataset.dragBound === "true") return
+    grid.dataset.dragBound = "true"
+
+    let arrastradaId = null
+    let soltada = false
+
+    grid.addEventListener("dragstart", (e) => {
+        const card = e.target.closest(".avCard")
+        if (!card?.dataset.segId) return
+        arrastradaId = card.dataset.segId
+        soltada = false
+        if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = "move"
+            e.dataTransfer.setData("text/plain", arrastradaId)
+        }
+        // El estilo de hueco va después de que el navegador genere la imagen de arrastre.
+        requestAnimationFrame(() => card.classList.add("avDragging"))
+    })
+
+    grid.addEventListener("dragend", () => {
+        grid.querySelector(".avCard.avDragging")?.classList.remove("avDragging")
+        arrastradaId = null
+        // Cancelado: se vuelve al orden real.
+        if (!soltada) segRenderGrid()
+        soltada = false
+    })
+
+    grid.addEventListener("dragover", (e) => {
+        const dragged = grid.querySelector(".avCard.avDragging")
+        if (!arrastradaId || !dragged) return
+        e.preventDefault()
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "move"
+        moveDraggedAssetPreview(grid, dragged, segFindDropReference(grid, dragged, e.clientX, e.clientY))
+    })
+
+    grid.addEventListener("drop", (e) => {
+        if (!arrastradaId || !grid.querySelector(".avCard.avDragging")) return
+        e.preventDefault()
+        soltada = true
+        segGuardarOrdenDesdeDom(grid)
+        segRenderGrid()
+    })
 }
 
 /**
@@ -679,7 +831,10 @@ function segMergeAndRender(portfolioAssets) {
         .map((c) => (c.assetId ? segItemReferencia(c, portfolioAssets, overrides) : propiosPorId.get(c._segId)))
         .filter(Boolean)
 
-    _segAllItems = [...portfolioItems, ...operacionesItems, ...seguidos, ...(window._segWalletItems || [])]
+    _segAllItems = segAplicarOrden(
+        [...portfolioItems, ...operacionesItems, ...seguidos, ...(window._segWalletItems || [])],
+        _segDatos().orden
+    )
     segRenderGrid()
     segUpdateHiddenBtn()
 }
@@ -1155,12 +1310,14 @@ async function initSeguimientoLogic() {
                 marcarSrc()
                 localStorage.setItem(`seguimientoFilterSrc_${_segPid()}`, JSON.stringify(_segFilterSrc))
                 updateSegFilterLabel()
+                segSyncAddBtn(addBtn)
                 segRenderGrid()
             })
         }
     }
 
     updateSegFilterLabel()
+    segSyncAddBtn(addBtn)
 
     // toggle vista cards / tabla
     viewToggle?.addEventListener("click", (e) => {
@@ -1250,7 +1407,10 @@ async function initSeguimientoLogic() {
         if (!el) return
         nombreInput.value = el.dataset.name || ""
         tickerInput.value = el.dataset.ticker || ""
-        if (typeSelect && el.dataset.tipo) typeSelect.value = el.dataset.tipo
+        if (typeSelect && el.dataset.tipo) {
+            typeSelect.value = el.dataset.tipo
+            typeSelect.dispatchEvent(new Event("change", { bubbles: true }))
+        }
         suggestionsBox.classList.add("hidden")
         suggestionsBox.innerHTML = ""
         tickerInput.focus()
@@ -1320,16 +1480,30 @@ async function initSeguimientoLogic() {
         }
     }
 
-    function openModal() {
+    function abrirAlta() {
+        const { alta } = segAltaDeFuente(_segFilterSrc)
+        if (alta === "activo") openAssetModal()
+        else if (alta) openModal(alta)
+    }
+
+    function openModal(paso = "elegir") {
         if (!modalOverlay) return
+        // Abierto desde Nuevos no hay selector al que volver.
+        pasos.nuevo?.querySelector('[data-seg-paso="elegir"]')?.classList.toggle("hidden", paso === "nuevo")
+        const titulo = modalOverlay.querySelector(".assetModalTitle")
+        if (titulo) titulo.textContent = paso === "nuevo" ? "Añadir a Nuevos" : "Añadir a Seguimiento"
         nombreInput.value = ""
         tickerInput.value = ""
+        if (typeSelect) {
+            typeSelect.value = ""
+            typeSelect.dispatchEvent(new Event("change", { bubbles: true }))
+        }
         if (tvTickerInput) tvTickerInput.value = ""
         delete tickerInput?.dataset.marketProvider
         segHideSuggestions()
         segClearSearch()
         modalOverlay.classList.remove("hidden")
-        mostrarPaso("elegir")
+        mostrarPaso(paso)
     }
 
     modalOverlay?.addEventListener("click", (e) => {
@@ -1367,7 +1541,7 @@ async function initSeguimientoLogic() {
         modalOverlay?.classList.add("hidden")
     }
 
-    addBtn?.addEventListener("click", openModal)
+    addBtn?.addEventListener("click", abrirAlta)
     cancelBtn?.addEventListener("click", closeModal)
     tickerInput?.addEventListener("keydown", (e) => {
         if (e.key === "Enter") confirmBtn?.click()
@@ -1383,8 +1557,16 @@ async function initSeguimientoLogic() {
                 .toLowerCase()
         }
         if (nombreInput && !nombreInput.value.trim()) nombreInput.value = result.description || ""
+        autorrellenarTipoActivo(typeSelect, result)
+        const sinTipo = !typeSelect?.value
         if (typeof setAssetSearchFeedback === "function")
-            setAssetSearchFeedback(segSearchFeedback, `Ticker seleccionado (${providerName}): ${result.symbol}`)
+            setAssetSearchFeedback(
+                segSearchFeedback,
+                sinTipo
+                    ? `Ticker seleccionado (${providerName}): ${result.symbol} — no se ha podido detectar el tipo, elígelo en «Tipo»`
+                    : `Ticker seleccionado (${providerName}): ${result.symbol}`,
+                sinTipo
+            )
         if (typeof renderMarketSearchResults === "function") renderMarketSearchResults(segSearchResults, [], () => {})
     }
 
@@ -1459,6 +1641,13 @@ async function initSeguimientoLogic() {
             nombreInput?.focus()
             return
         }
+        // "Detectar automáticamente" sin ticker elegido, o con uno cuyo tipo
+        // no se pudo saber: no se guarda un tipo inventado, se pide.
+        if (!typeSelect?.value) {
+            setAssetSearchFeedback?.(segSearchFeedback, "No se ha podido detectar el tipo: elígelo en «Tipo».", true)
+            typeSelect?.closest(".csWrapper")?.querySelector(".csTrigger")?.focus()
+            return
+        }
         const customs = segLoadCustomItems()
         customs.push({
             _segId: `custom_${Date.now()}`,
@@ -1466,12 +1655,14 @@ async function initSeguimientoLogic() {
             ticker: tickerInput?.value.trim() || "",
             marketProvider: tickerInput?.dataset.marketProvider || "",
             tvSymbol: tvTickerInput?.value.trim() || "",
-            tipo: typeSelect?.value || "acciones",
+            tipo: typeSelect.value,
             notas: ""
         })
         segSaveCustomItems(customs)
         closeModal()
         segMergeAndRender(portfolioAssets)
+        // Sin esto el activo nuevo no tiene precio hasta la próxima carga de la página.
+        segRefreshCustomPrices()
     })
 
     // ── Modal de edición ─────────────────────────────────────────────────────
@@ -1529,7 +1720,10 @@ async function initSeguimientoLogic() {
             }
 
             editNombreInput.value = item.nombre || ""
-            if (editTypeSelect) editTypeSelect.value = item.tipo || "acciones"
+            if (editTypeSelect) {
+                editTypeSelect.value = item.tipo || "acciones"
+                editTypeSelect.dispatchEvent(new Event("change", { bubbles: true }))
+            }
             editTickerInput.value = item.ticker || ""
             delete editTickerInput.dataset.marketProvider
             if (item.marketProvider) editTickerInput.dataset.marketProvider = item.marketProvider
@@ -1571,20 +1765,27 @@ async function initSeguimientoLogic() {
         const customs = segLoadCustomItems()
         const idx = customs.findIndex((c) => c._segId === _editingSegId)
         if (idx < 0) return
+        const anterior = customs[idx]
         customs[idx] = {
-            ...customs[idx],
+            ...anterior,
             nombre,
             ticker: editTickerInput?.value.trim() || "",
-            marketProvider: editTickerInput?.dataset.marketProvider || customs[idx].marketProvider || "",
+            marketProvider: editTickerInput?.dataset.marketProvider || anterior.marketProvider || "",
             tvSymbol: editTVInput?.value.trim() || "",
             tipo: editTypeSelect?.value || "acciones"
         }
+        const cotizacionCambia =
+            customs[idx].ticker !== (anterior.ticker || "") ||
+            customs[idx].marketProvider !== (anterior.marketProvider || "")
+        // El precio guardado era del ticker anterior: si el nuevo no cotiza, mejor "—" que un precio ajeno.
+        if (cotizacionCambia) Object.assign(customs[idx], { price: "", change: "", lastUpdated: null })
         segSaveCustomItems(customs)
 
         _editingSegId = null
         segClearEditSearch()
         editOverlay?.classList.add("hidden")
         segMergeAndRender(portfolioAssets)
+        segRefreshCustomPrices()
     })
 
     const editTickerSelected = (result, providerName) => {

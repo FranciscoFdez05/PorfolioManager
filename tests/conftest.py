@@ -174,6 +174,13 @@ def _tmpDeDatosAislado(tmp_path_factory, monkeypatch):
 
     monkeypatch.setattr(listas_tokens, "_LISTAS", listas_tokens.ListasTokens(urls=lambda: []))
 
+    # Feed de TradingView por WebSocket: los tests del cliente sustituyen solo
+    # `_fetchJson`, y todo ticker que su respuesta falsa no cotice acabaría
+    # abriendo una conexión real. Los tests del feed inyectan su propio socket.
+    from providers import tradingview_feed
+
+    monkeypatch.setattr(tradingview_feed, "fetchQuotes", lambda symbols, timeout=None, **kwargs: {})
+
     # Ritmo entre llamadas a Esplora: con las respuestas falsas de los tests no
     # protege de nada y añadiría un segundo de espera real por llamada. Los
     # tests del ritmo lo fijan ellos mismos.

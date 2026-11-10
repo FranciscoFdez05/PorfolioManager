@@ -1348,6 +1348,37 @@ def testCadaOmisionDiceSuMotivo(snapshotConPosicion, clienteAutenticado):
     assert sinPrecios["motivo"] == "pestana_sin_precios"
 
 
+def testElSnapshotDeLaPestanaGuardaLosPreciosSinPosicion(snapshotConPosicion, monkeypatch):
+    """La pestaña gana el hueco al hilo del servidor: sin esto, lo que no está en
+    cartera se quedaba todo el día sin minigráfico mientras la app estaba abierta."""
+    from core.db import getDb
+    from stores import valoracion
+
+    client, cabeceras = snapshotConPosicion
+    monkeypatch.setattr(valoracion, "preciosSinPosicion", lambda: [{"id": "spacex", "p": 126.76}])
+
+    assert _enviar(client, cabeceras)["skipped"] is False
+
+    fila = getDb().execute("SELECT asset_id, price_eur FROM asset_price_snapshots").fetchone()
+    assert (fila["asset_id"], fila["price_eur"]) == ("spacex", 126.76)
+
+
+def testSiFallanLosPreciosSinPosicionLaPestanaGuardaElPuntoIgual(snapshotConPosicion, monkeypatch):
+    from core.db import getDb
+    from stores import valoracion
+
+    client, cabeceras = snapshotConPosicion
+
+    def fallar():
+        raise RuntimeError("proveedor caído")
+
+    monkeypatch.setattr(valoracion, "preciosSinPosicion", fallar)
+
+    assert _enviar(client, cabeceras)["skipped"] is False
+    assert getDb().execute("SELECT COUNT(*) FROM portfolio_snapshots").fetchone()[0] == 1
+    assert getDb().execute("SELECT COUNT(*) FROM asset_price_snapshots").fetchone()[0] == 0
+
+
 def testSinPosicionesYValoracionIncompletaTienenMotivoPropio(clienteAutenticado, datosAislados, tempDb, monkeypatch):
     from routes.snapshots import snapshotsBp
     from stores import asset_store, valoracion

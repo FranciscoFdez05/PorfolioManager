@@ -270,6 +270,12 @@ def contadorQuickCheck(tempDb, monkeypatch):
 
     realGetDb = salud.db.getDb
     monkeypatch.setattr(salud.db, "getDb", lambda: ConexionEspia(realGetDb()))
+    # Con sesión, /api/health pide el portfolio activo. Sin portfolios.json eso
+    # inicializa los portfolios y cambia la base activa a mitad del test: la
+    # clave de la caché cambia y el quick check se repetía por eso, no por el TTL.
+    from admin import portfolios_manager
+
+    monkeypatch.setattr(portfolios_manager, "getActivePortfolioId", lambda: "prueba")
     yield ejecuciones
     salud._quickCheckVigente = None
 

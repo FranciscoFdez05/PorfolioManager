@@ -100,6 +100,7 @@ function pnPintarMapa(w, cuerpo, ctrls) {
         },
         "Forma"
     )
+    pnBotonPrecarga(w, ctrls)
     // En la rejilla todas las casillas son iguales: el tamaño no aplica.
     if (forma === "treemap") {
         pnChip(
@@ -139,6 +140,56 @@ function pnPintarMapa(w, cuerpo, ctrls) {
     }
     dibujar()
     pnObservarTamano(w, cuerpo, dibujar)
+}
+
+/**
+ * Botón de la cabecera que activa o desactiva la precarga de las vistas previas
+ * y, mientras está activa, enseña cuántas lleva cargadas (`pnProgresoPrecarga`).
+ *
+ * Es un botón suelto y no un desplegable con `_cab`: la misma opción ya está
+ * en los ajustes del widget como casilla, y repetirla allí sería un duplicado.
+ *
+ * @param {object} w Widget del mapa.
+ * @param {HTMLElement} ctrls Contenedor de los controles de la cabecera.
+ */
+function pnBotonPrecarga(w, ctrls) {
+    const activa = pnSi(w.cfg, "precargaTv", false)
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.className = "pnChip pnPrecargaBtn"
+    btn.setAttribute("aria-pressed", String(activa))
+    btn.title = activa
+        ? "Quitar la precarga: el gráfico se cargará al pasar el cursor"
+        : "Cargar ya todos los gráficos de vista previa (más memoria)"
+    btn.innerHTML = `<i class="pnPrecargaBarra"></i><span class="pnPrecargaTexto">Precargar</span>`
+    btn.addEventListener("click", () => {
+        if (activa) delete w.cfg.precargaTv
+        else w.cfg.precargaTv = true
+        pnGuardar()
+        pnPintarWidget(w)
+    })
+    ctrls.appendChild(btn)
+}
+
+/**
+ * Pinta en el botón de precarga del widget cuántas vistas previas van listas.
+ * Se busca el botón cada vez porque la cabecera se repinta por su cuenta.
+ *
+ * @param {object} w Widget del mapa.
+ * @param {number} hechos Vistas previas ya cargadas.
+ * @param {number} total Vistas previas que hay que cargar.
+ */
+function pnProgresoPrecarga(w, hechos, total) {
+    const btn = pnWidgetEl(w)?.querySelector(".pnPrecargaBtn")
+    if (!btn) return
+    const acabada = hechos >= total
+    btn.classList.toggle("pnPrecargando", !acabada)
+    btn.querySelector(".pnPrecargaBarra").style.width = total ? `${(hechos / total) * 100}%` : "0"
+    btn.querySelector(".pnPrecargaTexto").textContent = !total
+        ? "Precargar"
+        : acabada
+          ? `Precargados ${total}`
+          : `Precargando ${hechos}/${total}`
 }
 
 function pnFormaMapa(cfg) {
@@ -220,18 +271,35 @@ function pnDibujarMapa(w, cuerpo) {
 
     lienzo.innerHTML = ""
     lienzo.classList.toggle("pnMapaRejilla", rejilla)
-    mapaDiaPrecalentarTv(enriquecidos.find((a) => a.tv)?.tv)
+    // Con la precarga, todas las vistas previas se cargan en segundo plano; sin
+    // ella se cancela la que hubiera en curso y el tope de iframes vuelve al normal.
+    if (pnSi(cfg, "precargaTv", false)) {
+        mapaDiaPrecargarTv(
+            enriquecidos.map((a) => a.tv),
+            (hechos, total) => pnProgresoPrecarga(w, hechos, total)
+        )
+    } else {
+        mapaDiaPrecargarTv([])
+        mapaDiaPrecalentarTv(enriquecidos.find((a) => a.tv)?.tv)
+    }
 
+    // «Desde la compra» no es una ventana de tiempo común a todos: sin línea.
+    const periodoLinea = periodo === "todo" ? null : periodo
     if (rejilla) {
         pnRejilla(lienzo, enriquecidos, cfg, periodo, escala, def, agrupar)
-        mapaDiaActivar(lienzo, periodo === "dia", pnRejillaExtremos)
+        mapaDiaActivar(lienzo, periodoLinea, (celda, puntos, ventana) => {
+            pnRejillaExtremos(celda, puntos)
+            pnRejillaEje(celda, ventana)
+            const cerrado = celda.querySelector(".pnRjCerrado")
+            if (cerrado) cerrado.textContent = ventana?.cerrado ? "Cerrado" : ""
+        })
         return
     }
     lienzo.removeAttribute("style")
 
     if (agrupar === "no") {
         pnBaldosas(lienzo, enriquecidos, { x: 0, y: 0, w: W, h: H }, cfg, periodo, escala, def)
-        mapaDiaActivar(lienzo, periodo === "dia")
+        mapaDiaActivar(lienzo, periodoLinea)
         return
     }
 
@@ -268,7 +336,7 @@ function pnDibujarMapa(w, cuerpo) {
         }
         pnBaldosas(lienzo, g.miembros, { x: g.x, y: g.y + franja, w: g.w, h: g.h - franja }, cfg, periodo, escala, def)
     })
-    mapaDiaActivar(lienzo, periodo === "dia")
+    mapaDiaActivar(lienzo, periodoLinea)
 }
 
 /** Reparte un rectángulo entre activos y pinta sus baldosas. */
@@ -370,10 +438,13 @@ function pnRejilla(lienzo, items, cfg, periodo, escala, def, agrupar) {
     const porNombre = pnRotuloPorNombre(cfg)
     const verPct = pnSi(cfg, "pct")
     const verEur = pnSi(cfg, "eur", def.eur ?? true)
+    // Fuera de «Hoy» los rótulos son fechas y los pone pnRejillaEje al llegar la serie.
     const eje =
         periodo === "dia"
             ? `<div class="pnRjEje" aria-hidden="true"><span style="left:25%">06:00</span><span style="left:50%">12:00</span><span style="left:75%">18:00</span></div>`
-            : ""
+            : periodo !== "todo"
+              ? `<div class="pnRjEje" aria-hidden="true"></div>`
+              : ""
 
     lienzo.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`
     lienzo.style.gridAutoRows = `${altoFila}px`
@@ -397,7 +468,7 @@ function pnRejilla(lienzo, items, cfg, periodo, escala, def, agrupar) {
                     <span class="pnRjPrecio" style="font-size:${cuerpoPrecio}px">${escapeHtml(pnPrecio(r))}</span>
                     ${mov}
                 </div>
-                <div class="pnRjDer">${pct}<span class="pnRjExt" data-ext="max"></span><span class="pnRjExt" data-ext="min"></span></div>
+                <div class="pnRjDer">${pct}<span class="pnRjCerrado"></span><span class="pnRjExt" data-ext="max"></span><span class="pnRjExt" data-ext="min"></span></div>
             </div>${eje}`
         lienzo.appendChild(cel)
     })
@@ -434,6 +505,22 @@ function pnRejillaExtremos(celda, puntos) {
         h.textContent = `${h.dataset.ext === "max" ? "H" : "L"} ${hmFormatPrice(valor, d.currency)}`
         h.classList.toggle("pnRjCerca", Math.abs(d.precio - valor) / d.precio <= PN_REJILLA_CERCA_EXTREMO)
     })
+}
+
+/**
+ * Rótulos horarios del eje de una casilla de la rejilla para la ventana de su
+ * línea: el día entero o, con horario de mercado, solo la sesión.
+ *
+ * @param {HTMLElement} celda Casilla de la rejilla.
+ * @param {{inicio: number, fin: number}|undefined} ventana Ventana de `mapaDiaSesion`.
+ */
+function pnRejillaEje(celda, ventana) {
+    const eje = celda.querySelector(".pnRjEje")
+    if (!eje || !ventana) return
+    const marcas = ventana.dias ? mapaDiaMarcasFecha : mapaDiaMarcasEje
+    eje.innerHTML = marcas(ventana.inicio, ventana.fin)
+        .map((m) => `<span style="left:${m.pos.toFixed(2)}%">${escapeHtml(m.texto)}</span>`)
+        .join("")
 }
 
 function pnColorMapa(pct, escala) {

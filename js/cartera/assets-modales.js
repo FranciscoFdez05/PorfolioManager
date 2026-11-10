@@ -119,6 +119,103 @@ function showAlert(message, title = "Aviso") {
     })
 }
 
+// ── Pedir un año ─────────────────────────────────────────────────────────────
+//
+// Sustituye al `prompt()` del navegador en los «Añadir año»: aquel cuadro sale
+// con el aspecto del sistema, encima de la cabecera y sin tema. El año se valida
+// aquí y los errores del guardado se enseñan dentro del propio popup, que sigue
+// abierto para corregir sin volver a empezar.
+
+/**
+ * Abre un popup para introducir un año de 4 cifras.
+ *
+ * Args:
+ *   title: Título del popup.
+ *   defaultValue: Año que aparece escrito y seleccionado al abrir.
+ *   submitLabel: Texto del botón de confirmar.
+ *   onConfirm: Recibe el año (string). Puede ser async; si lanza, el popup no
+ *     se cierra y muestra `errorMessage`.
+ *   errorMessage: Texto que se enseña si `onConfirm` falla.
+ */
+function openYearModal({
+    title = "Añadir año",
+    defaultValue = String(new Date().getFullYear()),
+    submitLabel = "Crear año",
+    onConfirm,
+    errorMessage = "No se pudo crear el año."
+}) {
+    document.getElementById("yearModalOverlay")?.remove()
+
+    const overlay = document.createElement("div")
+    overlay.id = "yearModalOverlay"
+    overlay.className = "modalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal interesesCreateModal"
+    modal.setAttribute("role", "dialog")
+    modal.setAttribute("aria-modal", "true")
+    modal.innerHTML = `
+        <h3 class="assetModalTitle"></h3>
+        <label class="assetModalLabel" for="yearModalInput">Año</label>
+        <input id="yearModalInput" class="assetModalInput" type="text" inputmode="numeric" maxlength="4" autocomplete="off">
+        <p class="gastosCreateModalFeedback error hidden" id="yearModalFeedback"></p>
+        <div class="assetModalActions interesesModalActions">
+            <button type="button" class="cancelButton" id="yearModalCancelBtn">Cancelar</button>
+            <button type="button" class="primaryButton" id="yearModalConfirmBtn" data-no-autohide="true"></button>
+        </div>
+    `
+    modal.querySelector(".assetModalTitle").textContent = title
+    modal.querySelector("#yearModalConfirmBtn").textContent = submitLabel
+
+    const input = modal.querySelector("#yearModalInput")
+    const feedback = modal.querySelector("#yearModalFeedback")
+    const confirmButton = modal.querySelector("#yearModalConfirmBtn")
+    input.value = defaultValue
+
+    const setFeedback = (message) => {
+        feedback.textContent = message
+        feedback.classList.toggle("hidden", !message)
+    }
+    const close = () => overlay.remove()
+
+    let enviando = false
+    const doConfirm = async () => {
+        // Un doble clic o Enter repetido mientras se guarda crearía el año dos veces.
+        if (enviando) return
+        const year = input.value.trim()
+        if (!/^\d{4}$/.test(year)) {
+            setFeedback("Escribe un año de 4 cifras, por ejemplo 2027.")
+            input.focus()
+            return
+        }
+        enviando = true
+        confirmButton.disabled = true
+        try {
+            await onConfirm?.(year)
+            close()
+        } catch (error) {
+            console.error(error)
+            setFeedback(errorMessage)
+        } finally {
+            enviando = false
+            confirmButton.disabled = false
+        }
+    }
+
+    modal.querySelector("#yearModalCancelBtn").addEventListener("click", close)
+    confirmButton.addEventListener("click", doConfirm)
+    input.addEventListener("input", () => setFeedback(""))
+    input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") doConfirm()
+        if (event.key === "Escape") close()
+    })
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+    input.focus()
+    input.select()
+}
+
 function initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton) {
     const campoConfirmacion = document.getElementById("confirmModalTypeInput")
 
@@ -195,7 +292,11 @@ async function enviarAssetModal() {
     }
 
     if (!type) {
-        setAssetSearchFeedback(assetSearchFeedback, "Selecciona el tipo de activo.", true)
+        setAssetSearchFeedback(
+            assetSearchFeedback,
+            "No se ha podido detectar el tipo de activo: elígelo en «Tipo del activo».",
+            true
+        )
         assetTypeSelect.focus()
         return
     }
@@ -227,6 +328,8 @@ async function enviarAssetModal() {
         closeAssetModal()
         currentAssetId = createdAsset.id
         await refreshAssetsSidebar(createdAsset.id, true)
+        // Para las pantallas que listan activos sin ser la de Activos (la Watchlist).
+        window.dispatchEvent(new CustomEvent("app:activo-creado", { detail: { id: createdAsset.id } }))
     } catch (error) {
         console.error(error)
         const detail = error?.serverMessage ? ` ${error.serverMessage}.` : ""
@@ -557,13 +660,20 @@ function initAssetModal(
         if (assetNameInput && !assetNameInput.value.trim()) {
             assetNameInput.value = result.description
         }
+        // Antes de proponer la red: las wallets solo aparecen si el tipo es Cripto.
+        autorrellenarTipoActivo(assetTypeSelect, result)
         proponerRedWallets()
 
         const sinCotizacion = String(result.price || "").trim() === ""
-        const mensaje = sinCotizacion
-            ? `Ticker seleccionado (${providerName}): ${result.symbol} — sin cotización disponible, el precio no se actualizará solo`
-            : `Ticker seleccionado (${providerName}): ${result.symbol}`
-        setAssetSearchFeedback(assetSearchFeedback, mensaje, sinCotizacion)
+        const sinTipo = !assetTypeSelect?.value
+        const mensaje = [
+            `Ticker seleccionado (${providerName}): ${result.symbol}`,
+            sinCotizacion ? "sin cotización disponible, el precio no se actualizará solo" : "",
+            sinTipo ? "no se ha podido detectar el tipo, elígelo en «Tipo del activo»" : ""
+        ]
+            .filter(Boolean)
+            .join(" — ")
+        setAssetSearchFeedback(assetSearchFeedback, mensaje, sinCotizacion || sinTipo)
         renderMarketSearchResults(assetSearchResults, [], () => {})
     }
 

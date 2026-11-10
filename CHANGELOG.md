@@ -22,6 +22,152 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.3.0] — 2026-11-10
+
+**Esquema de base de datos:** lo sube al **31** (tablas nuevas `alertas_reglas`,
+`alertas_reglas_avisos`, `muestras_precio` y `muestras_cartera`; columna nueva
+`ingresos_recurrentes.pagas_extra`, vacía en las filas que ya existen; ninguna
+fila de las tablas existentes tocada). La migración se aplica sola al arrancar
+y antes guarda la copia `data/backups/auto/<portfolio>_pre-esquema-28-a-31_*.db`.
+
+### Añadido
+
+- **Minigráficos del mapa de Paneles en Semana, Mes, Año y YTD**: hasta ahora
+  solo «Hoy» llevaba línea. Cada casilla pinta la misma serie que el gráfico de
+  la ficha del activo en ese rango (7D, 30D, 1A, YTD), con el máximo y el mínimo
+  del periodo y fechas en el eje. `GET /api/activos-serie-dia` admite
+  `?periodo=semana|mes|anyo|ytd`; sin él sigue siendo la serie de hoy.
+- **Mi dinero › Ingresos recurrentes**: entrada propia en el menú, como
+  Mensualidades, que abre Ingresos directamente en la vista de recurrentes con
+  su selector de año. La vista gana un resumen con el ingreso de un mes normal,
+  el del año y el de las pagas extra, una columna «Pagas extra» y un
+  **calendario de cobros** del año (tabla o calendario, con el detalle del día
+  al lado y las pagas extra marcadas).
+- **Detalle de mensualidades e ingresos recurrentes**: pulsar una fila de la
+  tabla (fuera del menú «···») abre un popup con cuenta, importe, frecuencia,
+  día, próximo cobro, estado, coste o ingreso mensual y del año, la nota y la
+  lista de cargos o cobros del año con su fecha, la cuenta de ese mes y las
+  pagas extra marcadas. Desde ahí, «Editar» abre el formulario.
+- **Pagas extra** en cada ingreso recurrente: añadidos puntuales con nombre
+  (por defecto «Extra»), mes e importe, por ejemplo 1.000 € en junio sobre una
+  nómina de 1.500 €. Se suman al importe de ese mes, así que cuentas, saldos y
+  métricas los cuentan sin cambios; el ingreso mensual no los incluye y el anual
+  sí. Se guardan en `ingresos_recurrentes.pagas_extra`.
+- **Los ingresos recurrentes pasan de un año a otro**: al crear un año se copian
+  los del año más cercano, con su ritmo de cobro y sus pagas extra (las pausadas
+  siguen pausadas y sin cobros), y en el menú «···» hay «Copiar recurrentes de
+  otro año». Un año sin recurrentes ofrece copiarlas desde la propia tabla.
+- **Añadir año en Ingresos** usa un popup propio en vez del cuadro del
+  navegador, con validación del año y propuesta del siguiente si el actual ya
+  existe.
+- **Herramientas › Mercado › Oro y plata**: valor de una cantidad de oro o
+  plata en gramos, kilos u onzas troy (31,1035 g) según su pureza, elegida de
+  una lista por metal (oro de 24, 22, 18, 14 o 9 k; plata fina, de ley 925, 900
+  u 800), con onzas y gramos de metal puro y precio por gramo y por kilo. Funciona
+  en los dos sentidos: se escribe el peso y sale el importe, o se escribe el
+  importe y sale cuánto metal compra; todo se recalcula al escribir. El precio
+  de la onza se carga en vivo de TradingView (`TVC:GOLD` / `TVC:SILVER`) al abrir
+  la herramienta y al cambiar de metal, convertido a la moneda base, y se puede
+  corregir a mano.
+- **Mi dinero › Ahorro rediseñada.** Ahorro del periodo con su variación frente
+  al mes anterior y a la media de 12 meses (enero se compara con diciembre del
+  año anterior), medidor de la tasa frente al objetivo, gráfico de evolución
+  mensual (un clic en un mes lo abre), resumen del año con mejor y peor mes,
+  meses en objetivo y previsión a diciembre, vista «Año» comparada con el mismo
+  tramo del año anterior, tabla de presupuesto con disponible, estado y
+  variación por categoría (filtros «Con presupuesto» y «Excedidas») y
+  observaciones automáticas. El presupuesto de cada categoría puede ser un % de
+  los ingresos o un **importe fijo mensual** (`ahorroConfig.presupuestoEur`);
+  la configuración anterior sigue valiendo tal cual.
+- **Categorías de inversión en Ahorro**: en la ventana «Presupuesto» se ve la
+  elegida y, con «Cambiar…», una segunda ventana permite marcar las categorías
+  de Gastos en las que se aparta dinero para invertir
+  (`ahorroConfig.categoriasInversion`). Lo apuntado en ellas, también en
+  mensualidades de esas categorías, cuenta como ahorro y no como gasto en
+  Ahorro y en la tasa de ahorro y el resumen anual de Métricas. Son categorías
+  del propio usuario: no hay ninguna fija, no se toca ningún dato de Gastos y
+  desmarcar una categoría deja todo como estaba.
+- **Menú «Alertas»** entre Planes y Herramientas. **Todas las alertas** reúne
+  todas las alertas de la cartera con filtros por tipo y activo, y a su lado
+  una columna con el estado del bot de Telegram (sin configurar, silenciado o
+  con avisos de alertas apagados), los cinco últimos avisos y qué vigila cada
+  familia; **Últimos avisos** lista lo que ha saltado.
+- Tipos de alerta nuevos, vigilados por el servidor aunque la web esté cerrada:
+  caída y subida brusca en 15 min / 1 h / 4 h / 24 h, rentabilidad de la
+  posición (% o €), precio frente al precio medio, sin cotización, valor total
+  de la cartera, caída de la cartera y peso de un activo. Los de un activo
+  admiten «todos los activos en cartera». No se desactivan al saltar: tienen
+  enfriamiento, y los de nivel no repiten hasta volver a cruzar el umbral.
+  Se evalúan cada `[avisos] reglas_intervalo_minutos` (5 por defecto, env
+  `AVISOS_REGLAS_MINUTOS`).
+- La pestaña «Alertas» de la ficha de cada activo permite crear todos los tipos
+  por activo y enseña también las reglas generales que lo vigilan.
+- Categorías nuevas en Ajustes › Telegram: «Caídas y subidas bruscas»,
+  «Rentabilidad y precio medio» y «Valor y peso de la cartera». «Sin
+  cotización» avisa con la de proveedores.
+- El módulo «Alertas» se puede ocultar desde Ajustes › Módulos.
+- **Mi dinero › Mensualidades**, entre Ingresos y Calendario: abre directamente
+  la vista de mensualidades de Gastos, sin pasar por la tabla anual. Cambiar de
+  año desde ahí se queda en las mensualidades.
+- **Añadir año** en Gastos es un popup propio (antes, el cuadro del navegador)
+  que sugiere el año siguiente y copia siempre, sin preguntar, las mensualidades
+  del año más cercano: mismo importe, frecuencia, día y cuenta, con los cobros
+  siguiendo el ritmo del año de origen (una trimestral de noviembre vuelve en
+  febrero) y las pausadas, pausadas.
+- Botón «Copiar las de AAAA» cuando un año no tiene ninguna mensualidad. Solo
+  añade las que faltan: las que ya existen con el mismo nombre no se tocan.
+- **Tipo de activo «Índices»** (S&P 500, IBEX 35…) en toda la aplicación:
+  alta de activos y de Seguimiento, filtros de Activos, Vista general,
+  Seguimiento, Métricas, Heatmap y Fundamentales, gráficos por tipo, informes,
+  Paneles y Ajustes (decimales de precio y pausa fuera de horario de mercado).
+  Los buscadores de TradingView, Yahoo, Finnhub y EODHD dan prioridad a los
+  índices cuando se elige este tipo. El petróleo y el resto de materias primas
+  siguen en Comoditis.
+- **«Detectar automáticamente»** como opción por defecto del tipo al añadir un
+  activo o un activo nuevo a Seguimiento: al elegir un ticker de la búsqueda se
+  rellena el tipo según lo que dice la API (acción, ETF o fondo, cripto,
+  materia prima o futuro, índice). Si no se puede saber (divisas, bonos,
+  perpetuos…) se avisa y no se deja confirmar hasta elegirlo a mano.
+- **Cotización de índices y CFD de brókers en TradingView**: el scanner que se
+  usaba no incluye índices (`TVC:SPX`) ni la mayoría de CFD de brókers
+  (`VANTAGE:SP500`, `CAPITALCOM:US500`), que salían «Sin cotización disponible»
+  en la búsqueda y sin precio en el activo. Lo que el scanner no tiene se pide
+  ahora al feed en tiempo real de los gráficos de TradingView (WebSocket, sin
+  cuenta ni clave y sin dependencias nuevas), en una sola conexión para todos
+  los resultados. El cruce calculado (`OANDA:XAUEUR`) queda como último recurso.
+  En Seguimiento, un activo nuevo o editado se cotiza al guardarlo (antes no
+  tenía precio hasta recargar la página) y, si cambia de ticker, deja de
+  enseñar el precio del ticker anterior.
+- **Reordenar las tarjetas de Seguimiento arrastrándolas**, como en Activos.
+  El orden se guarda por portfolio en `prefs_<id>.json` (`seguimientoOrden`,
+  lista de identificadores) y viaja en copias y exportaciones. Con un filtro
+  activo solo se mueven las tarjetas visibles; lo añadido después va al final.
+
+### Cambiado
+
+- El minigráfico del día del mapa de Paneles se ciñe a la sesión de cada
+  activo: lo que tiene horario de mercado ya no dibuja horas de línea recta
+  antes de abrir y después de cerrar, y el eje rotula las horas de su sesión.
+  El horario se deduce de la propia serie (un tramo plano de 90 min o más en un
+  extremo es mercado cerrado; el rato con el servidor parado no cuenta), sin
+  tabla por bolsa; la cripto conserva el día entero. Lo que tiene el mercado
+  cerrado lleva la marca «Cerrado», y si no se ha movido en todo el día no
+  dibuja línea.
+- El desplegable de tipo de Seguimiento (añadir y editar) usa el mismo
+  desplegable de la app que el resto de formularios, en lugar de la lista
+  nativa del navegador.
+
+### Corregido
+
+- Los activos sin posición (Watchlist, Seguimiento) se quedaban sin minigráfico
+  del día en el mapa de Paneles mientras la app estaba abierta. La pestaña guarda
+  el punto al empezar cada hueco, antes que el hilo del servidor, y su ruta
+  (`POST /api/portfolio/snapshot`) no guardaba sus precios; ahora sí.
+- En Windows, el `TZ=Europe/Madrid` de `.env` ponía el proceso en UTC (la
+  librería de C no entiende los nombres IANA): «hoy» empezaba a la 01:00 y los
+  minigráficos del día perdían sus primeros puntos. Ahora en Windows se ignora
+  ese `TZ` y se usa la zona del sistema; en Docker (Linux) no cambia nada.
+
 ## [5.2.0] — 2026-11-09
 
 **Esquema de base de datos:** lo sube al **28** (columna `etiquetas` en `cuentas`). La

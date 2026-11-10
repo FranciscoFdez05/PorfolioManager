@@ -66,6 +66,8 @@ beforeAll(() => {
     cargarScript("js/cripto/operaciones.js")
     cargarScript("js/cartera/planes.js")
     cargarScript("js/cartera/alertas-precio.js")
+    cargarScript("js/core/api.js")
+    cargarScript("js/cartera/alertas-panel.js")
 })
 
 /** Monta la ficha del activo y espera a que lleguen los planes. */

@@ -95,6 +95,9 @@ async function initHerramientasLogic() {
     // ── Capitalización objetivo ────────────────────────────────────
     hCapIniciar()
 
+    // ── Oro y plata ────────────────────────────────────────────────
+    hMetIniciar()
+
     // ── Comparador de divisas ──────────────────────────────────────
     hFxIniciar()
 
@@ -177,6 +180,8 @@ function hAbrirHerramienta(btn) {
     }
 
     if (btn.dataset.tool === "divisas") hFxAlAbrir()
+
+    if (btn.dataset.tool === "metales") hMetAlAbrir()
 
     if (btn.dataset.tool === "ratioOroBtc") {
         const mb = window._monedaBase || "EUR"

@@ -15,6 +15,7 @@
                 <label class="activosFilterBtn" data-type="acciones"><input type="checkbox" checked><span>Acciones</span></label>
                 <label class="activosFilterBtn" data-type="etfs"><input type="checkbox" checked><span>ETFs</span></label>
                 <label class="activosFilterBtn" data-type="comoditis"><input type="checkbox" checked><span>Comoditis</span></label>
+                <label class="activosFilterBtn" data-type="indices"><input type="checkbox" checked><span>Índices</span></label>
             </div>
             <div class="filtersDivider"></div>
             <div class="activosFilters" id="seguimientoSourceFilters">
@@ -101,11 +102,13 @@
             </div>
 
             <label class="assetModalLabel" for="seguimientoTypeSelect">Tipo</label>
-            <select id="seguimientoTypeSelect" class="assetModalSelect" data-no-custom="true">
+            <select id="seguimientoTypeSelect" class="assetModalSelect">
+                <option value="">Detectar automáticamente</option>
                 <option value="acciones">Acciones</option>
                 <option value="cripto">Cripto</option>
                 <option value="etfs">ETFs</option>
                 <option value="comoditis">Comoditis</option>
+                <option value="indices">Índices</option>
             </select>
 
             <label class="assetModalLabel" for="seguimientoTickerInput">Ticker mercado <span class="assetModalLabelHint">(opcional)</span></label>
@@ -161,11 +164,12 @@
                 <input id="segEditNombreInput" class="assetModalInput" type="text" placeholder="Ej: Apple, Bitcoin...">
 
                 <label class="assetModalLabel" for="segEditTypeSelect">Tipo</label>
-                <select id="segEditTypeSelect" class="assetModalSelect" data-no-custom="true">
+                <select id="segEditTypeSelect" class="assetModalSelect">
                     <option value="acciones">Acciones</option>
                     <option value="cripto">Cripto</option>
                     <option value="etfs">ETFs</option>
                     <option value="comoditis">Comoditis</option>
+                    <option value="indices">Índices</option>
                 </select>
 
                 <label class="assetModalLabel" for="segEditTickerInput">Ticker mercado <span class="assetModalLabelHint">(opcional)</span></label>

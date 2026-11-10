@@ -41,7 +41,7 @@ const OPERATION_SCOPES = {
         quantityDecimals: OPERATION_QUANTITY_DECIMALS
     },
     bolsa: {
-        assetTypes: ["acciones", "etfs", "comoditis"],
+        assetTypes: ["acciones", "etfs", "comoditis", "indices"],
         useStablecoins: false,
         quantityDecimals: 4
     }

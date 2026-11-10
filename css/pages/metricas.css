@@ -826,6 +826,9 @@
 .mActivosFilterBtn[data-atype="comoditis"]::before {
     background: #e0c068;
 }
+.mActivosFilterBtn[data-atype="indices"]::before {
+    background: #e8618c;
+}
 .mActivosFilterBtn[data-atype="bonos"]::before {
     background: #9b59b6;
 }
@@ -855,6 +858,10 @@
 .mActivosFilterBtn[data-atype="comoditis"].active,
 .mActivosFilterBtn[data-atype="comoditis"]:has(input:checked) {
     border-color: #e0c06844;
+}
+.mActivosFilterBtn[data-atype="indices"].active,
+.mActivosFilterBtn[data-atype="indices"]:has(input:checked) {
+    border-color: #e8618c44;
 }
 .mActivosFilterBtn[data-atype="bonos"].active,
 .mActivosFilterBtn[data-atype="bonos"]:has(input:checked) {

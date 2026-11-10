@@ -396,6 +396,7 @@ CREATE TABLE IF NOT EXISTS ingresos_recurrentes (
     nota        TEXT NOT NULL DEFAULT '',
     cuenta      TEXT NOT NULL DEFAULT '',
     cuentas_cobro TEXT NOT NULL DEFAULT '',
+    pagas_extra TEXT NOT NULL DEFAULT '',
     UNIQUE(year, nombre)
 );
 
@@ -668,6 +669,59 @@ CREATE TABLE IF NOT EXISTS alertas_precio (
 );
 CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id, activa);
 
+-- Reglas de alerta que vigila el servidor (ver stores/reglas_alerta_store.py):
+-- caída o subida brusca, rentabilidad de la posición, precio frente al precio
+-- medio, sin cotización, valor y caída de la cartera y peso de un activo.
+-- `asset_id` NULL en un tipo por activo vale para todos los activos con
+-- posición viva; en un tipo de cartera siempre es NULL. `valor` es TEXT como
+-- el resto de importes (ver core.dinero). A diferencia de alertas_precio no se
+-- desactivan al saltar: `enfriamiento_min` es lo que tarda en poder avisar
+-- otra vez de lo mismo.
+CREATE TABLE IF NOT EXISTS alertas_reglas (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo             TEXT NOT NULL,
+    asset_id         TEXT REFERENCES activos(id) ON DELETE CASCADE,
+    sentido          TEXT NOT NULL DEFAULT '',
+    unidad           TEXT NOT NULL DEFAULT '',
+    valor            TEXT NOT NULL DEFAULT '',
+    ventana_min      INTEGER NOT NULL DEFAULT 0,
+    enfriamiento_min INTEGER NOT NULL,
+    nota             TEXT NOT NULL DEFAULT '',
+    activa           INTEGER NOT NULL DEFAULT 1,
+    creada_ts        INTEGER NOT NULL DEFAULT 0
+);
+
+-- Último aviso de cada regla para cada activo (`clave` = id del activo, o
+-- '*cartera*' en las de cartera). Es lo que cuenta el enfriamiento, lo que se
+-- reclama para que dos workers no avisen dos veces y, con `dentro`, lo que
+-- impide repetir una alerta de nivel mientras la condición siga cumpliéndose.
+CREATE TABLE IF NOT EXISTS alertas_reglas_avisos (
+    regla_id   INTEGER NOT NULL REFERENCES alertas_reglas(id) ON DELETE CASCADE,
+    clave      TEXT NOT NULL,
+    avisada_ts INTEGER NOT NULL DEFAULT 0,
+    dentro     INTEGER NOT NULL DEFAULT 0,
+    valor      TEXT NOT NULL DEFAULT '',
+    detalle    TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (regla_id, clave)
+);
+
+-- Precios muestreados por el hilo de avisos para medir caídas y subidas en una
+-- ventana. Solo se guardan mientras hay alguna regla activa y se purgan al
+-- salir de la ventana más larga permitida.
+CREATE TABLE IF NOT EXISTS muestras_precio (
+    asset_id TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
+    ts       INTEGER NOT NULL,
+    precio   TEXT NOT NULL,
+    PRIMARY KEY (asset_id, ts)
+) WITHOUT ROWID;
+
+-- Valor total de la cartera en euros, muestreado igual que muestras_precio,
+-- para las reglas de caída de la cartera.
+CREATE TABLE IF NOT EXISTS muestras_cartera (
+    ts    INTEGER PRIMARY KEY,
+    valor TEXT NOT NULL
+);
+
 """
 
 
@@ -689,7 +743,7 @@ CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id,
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 28
+ESQUEMA_VERSION = 31
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1766,6 +1820,114 @@ def _esquema28(conn):
     columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(cuentas)")}
     if "etiquetas" not in columnas:
         conn.execute("ALTER TABLE cuentas ADD COLUMN etiquetas TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(29)
+def _esquema29(conn):
+    """Alertas de caída brusca y las muestras de precio con las que se miden.
+
+    Tres tablas nuevas y ninguna fila tocada, con IF NOT EXISTS. Las dos de
+    caídas las sustituye el paso 30 por `alertas_reglas`; `muestras_precio`
+    sigue en `_SCHEMA`.
+    """
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS alertas_caida (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            asset_id         TEXT REFERENCES activos(id) ON DELETE CASCADE,
+            caida            TEXT NOT NULL,
+            ventana_min      INTEGER NOT NULL,
+            enfriamiento_min INTEGER NOT NULL,
+            nota             TEXT NOT NULL DEFAULT '',
+            activa           INTEGER NOT NULL DEFAULT 1,
+            creada_ts        INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS alertas_caida_avisos (
+            alerta_id  INTEGER NOT NULL REFERENCES alertas_caida(id) ON DELETE CASCADE,
+            asset_id   TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
+            avisada_ts INTEGER NOT NULL,
+            caida      TEXT NOT NULL DEFAULT '',
+            precio_max TEXT NOT NULL DEFAULT '',
+            precio     TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (alerta_id, asset_id)
+        );
+        CREATE TABLE IF NOT EXISTS muestras_precio (
+            asset_id TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
+            ts       INTEGER NOT NULL,
+            precio   TEXT NOT NULL,
+            PRIMARY KEY (asset_id, ts)
+        ) WITHOUT ROWID;
+    """)
+
+
+@_migracion(30)
+def _esquema30(conn):
+    """Reglas de alerta de varios tipos en lugar de solo caídas.
+
+    `alertas_caida` pasa a ser el tipo «caida» de `alertas_reglas`, con los
+    mismos ids, y sus avisos pasan a `alertas_reglas_avisos`: el enfriamiento
+    de cada regla sigue contando desde su último aviso. Las tablas viejas se
+    borran porque `_SCHEMA` ya no las crea. Volver atrás es restaurar la copia
+    previa a la migración.
+    """
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS alertas_reglas (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            tipo             TEXT NOT NULL,
+            asset_id         TEXT REFERENCES activos(id) ON DELETE CASCADE,
+            sentido          TEXT NOT NULL DEFAULT '',
+            unidad           TEXT NOT NULL DEFAULT '',
+            valor            TEXT NOT NULL DEFAULT '',
+            ventana_min      INTEGER NOT NULL DEFAULT 0,
+            enfriamiento_min INTEGER NOT NULL,
+            nota             TEXT NOT NULL DEFAULT '',
+            activa           INTEGER NOT NULL DEFAULT 1,
+            creada_ts        INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS alertas_reglas_avisos (
+            regla_id   INTEGER NOT NULL REFERENCES alertas_reglas(id) ON DELETE CASCADE,
+            clave      TEXT NOT NULL,
+            avisada_ts INTEGER NOT NULL DEFAULT 0,
+            dentro     INTEGER NOT NULL DEFAULT 0,
+            valor      TEXT NOT NULL DEFAULT '',
+            detalle    TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (regla_id, clave)
+        );
+        CREATE TABLE IF NOT EXISTS muestras_cartera (
+            ts    INTEGER PRIMARY KEY,
+            valor TEXT NOT NULL
+        );
+    """)
+    tablas = {fila[0] for fila in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "alertas_caida" in tablas:
+        conn.execute(
+            "INSERT OR IGNORE INTO alertas_reglas (id, tipo, asset_id, unidad, valor, ventana_min, "
+            "enfriamiento_min, nota, activa, creada_ts) "
+            "SELECT id, 'caida', asset_id, '%', caida, ventana_min, enfriamiento_min, nota, activa, creada_ts "
+            "FROM alertas_caida"
+        )
+    if "alertas_caida_avisos" in tablas:
+        conn.execute(
+            "INSERT OR IGNORE INTO alertas_reglas_avisos (regla_id, clave, avisada_ts, valor) "
+            "SELECT alerta_id, asset_id, avisada_ts, caida FROM alertas_caida_avisos"
+        )
+    conn.execute("DROP TABLE IF EXISTS alertas_caida_avisos")
+    conn.execute("DROP TABLE IF EXISTS alertas_caida")
+
+
+@_migracion(31)
+def _esquema31(conn):
+    """Pagas extra de los ingresos recurrentes.
+
+    `ingresos_recurrentes.pagas_extra`: un JSON con la lista de pagas extra
+    (`[{"nombre": "Extra", "mes": "junio", "importe": "1.000,00 €"}]`). Los
+    importes ya van sumados a la columna del mes, así que saldos, histórico y
+    métricas no tienen que leer esta columna: solo sirve para saber qué parte
+    del mes es paga extra. Vacío = sin pagas extra, que es lo que quedan las
+    recurrentes que ya existen.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(ingresos_recurrentes)")}
+    if "pagas_extra" not in columnas:
+        conn.execute("ALTER TABLE ingresos_recurrentes ADD COLUMN pagas_extra TEXT NOT NULL DEFAULT ''")
 
 
 class _CerrarAlTerminarElHilo:

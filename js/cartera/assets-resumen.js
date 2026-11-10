@@ -493,7 +493,7 @@ function initSidebarFilterBar() {
 
 function getSelectedOverviewTypes() {
     const todosInput = document.querySelector('#overviewFilters input[value="todos"]')
-    if (todosInput?.checked) return ["cripto", "acciones", "etfs", "comoditis"]
+    if (todosInput?.checked) return ["cripto", "acciones", "etfs", "comoditis", "indices"]
     return [...document.querySelectorAll('#overviewFilters input[type="checkbox"]:checked')]
         .map((input) => input.value)
         .filter((v) => v !== "todos")
@@ -1278,7 +1278,13 @@ function renderOverviewRows(rows) {
         emptyState.classList.add("hidden")
     }
 
-    const OV_TYPE_COLORS = { cripto: "#f7931a", acciones: "#3a7bd5", etfs: "#2ecc71", comoditis: "#e0c068" }
+    const OV_TYPE_COLORS = {
+        cripto: "#f7931a",
+        acciones: "#3a7bd5",
+        etfs: "#2ecc71",
+        comoditis: "#e0c068",
+        indices: "#e8618c"
+    }
     const consulta = _ovSearch.trim().toLowerCase()
     const visibles = consulta
         ? rows.filter((r) =>

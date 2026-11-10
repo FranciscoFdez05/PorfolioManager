@@ -1015,6 +1015,16 @@
     white-space: normal;
 }
 
+.mensEmptyActions {
+    margin-top: 14px;
+}
+
+/* La casilla de copiar mensualidades al crear un año se oculta cuando no hay
+   otro año del que copiar; su display:flex taparía el atributo hidden. */
+.gastosCreateModal [hidden] {
+    display: none !important;
+}
+
 .mensNextHint,
 .recNextHint {
     margin-left: 6px;

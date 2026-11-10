@@ -165,6 +165,7 @@ function hResetPanel(panelId) {
     panel.querySelectorAll(".herramientaResults").forEach((el) => el.classList.add("hidden"))
 
     if (panelId === "toolCapitalizacion") hCapReiniciar()
+    if (panelId === "toolMetales") hMetReiniciar()
     if (panelId === "toolInteres" && _herramientasChart) {
         _herramientasChart.destroy()
         _herramientasChart = null

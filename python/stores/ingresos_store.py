@@ -1,3 +1,5 @@
+import json
+
 from core.db import getDb, transactional
 from core.validation import normalizeYear
 from stores import revisiones
@@ -43,6 +45,57 @@ def normalizeDiaCobro(value):
         return ""
     day = int(text)
     return str(day) if 1 <= day <= 31 else ""
+
+
+# Una nómina normal tiene dos o tres pagas extra; el tope solo evita que un
+# cliente roto meta miles de filas en una columna de texto.
+_MAX_PAGAS_EXTRA = 24
+_NOMBRE_PAGA_EXTRA = "Extra"
+
+
+def normalizePagasExtra(value):
+    """Pagas extra de un ingreso recurrente, limpias y listas para usar.
+
+    Entra una lista (o su JSON) de `{"nombre", "mes", "importe"}`. Se descartan
+    las que no tienen un mes reconocible o vienen sin importe, en vez de
+    rechazar el guardado entero; un nombre vacío pasa a «Extra».
+
+    Args:
+        value: Lista de pagas extra o el texto JSON guardado en la columna.
+
+    Returns:
+        Lista de dicts con `nombre`, `mes` e `importe` como texto.
+
+    Example:
+        >>> normalizePagasExtra('[{"mes": "junio", "importe": "1.000,00"}]')
+        [{'nombre': 'Extra', 'mes': 'junio', 'importe': '1.000,00'}]
+    """
+    if isinstance(value, str):
+        try:
+            value = json.loads(value) if value.strip() else []
+        except ValueError:
+            return []
+
+    if not isinstance(value, list):
+        return []
+
+    pagas = []
+    for paga in value[:_MAX_PAGAS_EXTRA]:
+        if not isinstance(paga, dict):
+            continue
+        mes = str(paga.get("mes") or "").strip().lower()
+        importe = str(paga.get("importe") or "")[:_MAX_SHORT].strip()
+        if mes not in MONTH_KEYS or not importe:
+            continue
+        nombre = str(paga.get("nombre") or "")[:_MAX_LABEL].strip() or _NOMBRE_PAGA_EXTRA
+        pagas.append({"nombre": nombre, "mes": mes, "importe": importe})
+    return pagas
+
+
+def serializePagasExtra(value):
+    """Las pagas extra, listas para la columna. Sin ninguna se guarda ''."""
+    pagas = normalizePagasExtra(value)
+    return json.dumps(pagas, ensure_ascii=False) if pagas else ""
 
 
 def buildEmptyMonthSummary():
@@ -120,6 +173,7 @@ def sanitizeRecurrentesRows(rows):
             "nota": str(row.get("nota", ""))[:_MAX_NOTA].strip(),
             "cuenta": str(row.get("cuenta", ""))[:_MAX_SHORT * 2].strip(),
             "cuentasCobro": normalizeCuentasCobro(row.get("cuentasCobro")),
+            "pagasExtra": normalizePagasExtra(row.get("pagasExtra")),
             "meses": {
                 month: str(_dict(row.get("meses")).get(month, ""))[:_MAX_SHORT].strip()
                 for month in MONTH_KEYS
@@ -229,12 +283,14 @@ def readIngresosYear(year):
             "nota": r["nota"],
             "cuenta": r["cuenta"],
             "cuentasCobro": normalizeCuentasCobro(r["cuentas_cobro"]),
+            "pagasExtra": normalizePagasExtra(r["pagas_extra"]),
             "meses": {month: r[month] for month in MONTH_KEYS},
         }
         for r in conn.execute(
             "SELECT nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
             "septiembre, octubre, noviembre, diciembre, "
-            "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta, cuentas_cobro "
+            "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta, cuentas_cobro, "
+            "pagas_extra "
             "FROM ingresos_recurrentes WHERE year = ? ORDER BY id",
             (normalized,)
         ).fetchall()
@@ -286,8 +342,9 @@ def writeIngresosYear(year, data, revisionEsperada=None):
         "INSERT INTO ingresos_recurrentes "
         "(year, nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
         "septiembre, octubre, noviembre, diciembre, "
-        "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta, cuentas_cobro) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta, cuentas_cobro, "
+        "pagas_extra) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (normalized, m.get("nombre", ""),
              m.get("meses", {}).get("enero", ""), m.get("meses", {}).get("febrero", ""),
@@ -303,7 +360,8 @@ def writeIngresosYear(year, data, revisionEsperada=None):
              1 if m.get("activa", True) else 0,
              m.get("nota", ""),
              normalizarCuentaDeFila(m.get("cuenta"), validas),
-             serializeCuentasCobro(m.get("cuentasCobro"), validas | {ID_BANCO}))
+             serializeCuentasCobro(m.get("cuentasCobro"), validas | {ID_BANCO}),
+             serializePagasExtra(m.get("pagasExtra")))
             for m in data.get("recurrentes", [])
         ]
     )

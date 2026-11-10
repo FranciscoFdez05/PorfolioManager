@@ -1,0 +1,706 @@
+/* ── Alertas: páginas del menú y panel compartido con la ficha ─────────────
+   El panel (js/cartera/alertas-panel.js) se usa en «Alertas > Todas las
+   alertas» y en la pestaña «Alertas» de la ficha de cada activo. Reutiliza el
+   interruptor de Ajustes (.ajustesSwitch), los segmentos de Métricas
+   (.mToggleGroup) y los iconos Lucide; todo sigue las variables de cada tema.
+   Los colores de familia son tonos medios que se leen sobre fondo claro y
+   oscuro, los mismos que las cabeceras de los avisos de Telegram. */
+
+.alertasPage {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 1080px;
+}
+
+/* El título reutiliza el de Métricas, que lleva la flecha de plegar; aquí no
+   hay nada que plegar (igual que en Sentimiento). */
+.alertasPage .metricasSectionTitle::after {
+    content: none;
+}
+
+.alertasIntro {
+    margin: 0 0 12px;
+    max-width: 760px;
+    font-size: 0.84rem;
+    line-height: 1.5;
+    color: var(--text-dim);
+}
+
+/* ── «Todas las alertas»: panel + columna lateral ──
+   Con el tope de 1080px el panel dejaba un tercio de la pantalla vacío a la
+   derecha; ahora ese espacio lo ocupa el lateral (Telegram, últimos avisos y
+   guía de tipos). Por debajo de 1100px el lateral pasa debajo del panel. */
+
+.alertasPage--lateral {
+    max-width: 1500px;
+}
+
+.alertasLayout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+    gap: 20px;
+}
+
+/* El hueco al pie lo pone ya el gap de la rejilla (se nota al apilar). */
+.alertasLayout .alPanel {
+    padding-bottom: 0;
+}
+
+.alertasLateral {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.alLateralCaja {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+}
+
+.alLateralCabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.alLateralTitulo {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+
+.alLateralEnlace {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--accent);
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.alLateralEnlace:hover {
+    text-decoration: underline;
+}
+
+.alLateralCuerpo {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.alLateralTenue {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.alLateralTexto {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.alLateralEstado {
+    --al-estado: var(--text-dim);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.alLateralEstado--ok {
+    --al-estado: var(--color-pos-bright);
+}
+
+.alLateralEstado--aviso {
+    --al-estado: var(--color-warn, #d9a441);
+}
+
+.alLateralEstado--error {
+    --al-estado: var(--color-neg-bright);
+}
+
+.alLateralPunto {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--al-estado);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--al-estado) 22%, transparent);
+}
+
+.alLateralBoton {
+    height: 32px;
+    padding: 0 14px;
+    font-size: 0.8rem;
+}
+
+.alLateralAvisos {
+    display: flex;
+    flex-direction: column;
+}
+
+.alLateralAviso {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 10px;
+    padding: 8px 0;
+}
+
+.alLateralAviso + .alLateralAviso {
+    border-top: 1px solid var(--border-soft);
+}
+
+.alLateralAvisoSujeto {
+    overflow: hidden;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.alLateralAvisoDetalle {
+    overflow: hidden;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.alLateralAvisoHora {
+    margin-top: 1px;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+}
+
+.alLateralGuia {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.alLateralGuiaItem {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--text-muted);
+}
+
+.alLateralGuiaItem strong {
+    display: block;
+    font-size: 0.82rem;
+    color: var(--text-primary);
+}
+
+@media (max-width: 1100px) {
+    .alertasLayout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .alertasLateral {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        align-items: start;
+    }
+}
+
+/* ── Panel ── */
+
+/* El lateral de «Todas las alertas» pinta los mismos iconos de familia. */
+.alPanel,
+.alertasLateral {
+    --al-precio: #0ea5e9;
+    --al-movimiento: #f43f5e;
+    --al-posicion: #22c55e;
+    --al-cotizacion: #8b9bb0;
+    --al-cartera: #f59e0b;
+}
+
+.alPanel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-bottom: 24px;
+}
+
+.alPanel--ficha {
+    padding: 18px 22px 22px;
+}
+
+/* Los campos que no usa el tipo elegido se ocultan con [hidden]; sin esta
+   regla, el display de .alCampo los volvía a enseñar. */
+.alPanel [hidden] {
+    display: none !important;
+}
+
+.alPanelBarra {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.alPanelFiltros {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.alPanelCuenta {
+    margin-left: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+}
+
+.alPanelFiltroActivo {
+    display: block;
+    min-width: 190px;
+}
+
+.alPanelBarra .csWrapper {
+    width: 100%;
+}
+
+.alPanelBarra .csTrigger {
+    height: 36px;
+    padding: 0 12px;
+    background: var(--bg-inset);
+    border-color: var(--border-soft);
+    font-size: 0.84rem;
+    color: var(--text-primary);
+}
+
+.alPanelNueva {
+    height: 36px;
+    margin-left: auto;
+    padding: 0 16px;
+}
+
+/* ── Formulario ── */
+
+.alPanelForm {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px 20px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+}
+
+.alPanelFormCabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.alPanelFormTitulo {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.alPanelCerrar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.alPanelCerrar:hover {
+    background: var(--btn-bg-hover);
+    color: var(--text-primary);
+}
+
+.alPanelTipos {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.alPanelTiposGrupo {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    align-items: center;
+    gap: 12px;
+}
+
+.alPanelTiposNombre {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+
+.alPanelTiposBotones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.alPanelTipo {
+    height: 32px;
+    padding: 0 13px;
+    border: 1px solid var(--border-soft);
+    border-radius: 999px;
+    background: var(--bg-inset);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+        border-color 0.15s,
+        color 0.15s,
+        background 0.15s;
+}
+
+.alPanelTipo:hover {
+    border-color: var(--border-hard);
+    color: var(--text-primary);
+}
+
+.alPanelTipo[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+}
+
+.alPanelAyuda {
+    margin: 0;
+    padding: 9px 12px;
+    border-radius: 8px;
+    background: var(--bg-inset);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.alPanelCampos {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px 14px;
+}
+
+.alCampo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.alCampoAncho {
+    grid-column: span 2;
+}
+
+.alCampoEtiqueta {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+
+/* .ajustesInput trae `flex: 1` y alto propios: en una columna flex aplastaban el campo. */
+.alCampo .alCampoControl {
+    width: 100%;
+    height: 38px;
+    flex: none;
+    box-sizing: border-box;
+}
+
+.alCampo .csWrapper {
+    width: 100%;
+}
+
+.alCampo .csTrigger {
+    height: 38px;
+    padding: 0 12px;
+    background: var(--bg-inset);
+    border-color: var(--border-soft);
+    font-size: 0.88rem;
+    color: var(--text-primary);
+}
+
+.alPanelFormPie {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* ── Lista ── */
+
+.alPanelLista {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    background: var(--bg-surface);
+    overflow: hidden;
+}
+
+.alPanelLista:has(> .alPanelVacio:only-child) {
+    border: none;
+    background: transparent;
+}
+
+.alFila {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto auto auto;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    transition: background 0.15s;
+}
+
+.alFila + .alFila {
+    border-top: 1px solid var(--border-soft);
+}
+
+.alFila:hover {
+    background: var(--bg-elevated);
+}
+
+.alFila--aviso {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+}
+
+.alFila--pausada .alFilaTitulo,
+.alFila--saltada .alFilaTitulo {
+    color: var(--text-muted);
+}
+
+.alFila--pausada .alFilaIcono {
+    opacity: 0.45;
+}
+
+.alFilaIcono {
+    --al-color: var(--al-cartera);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    color: var(--al-color);
+    background: color-mix(in srgb, var(--al-color) 14%, transparent);
+    font-size: 1rem;
+}
+
+.alFilaIcono--0 {
+    --al-color: var(--al-precio);
+}
+
+.alFilaIcono--1 {
+    --al-color: var(--al-movimiento);
+}
+
+.alFilaIcono--2 {
+    --al-color: var(--al-posicion);
+}
+
+.alFilaIcono--3 {
+    --al-color: var(--al-cotizacion);
+}
+
+.alFilaTexto {
+    min-width: 0;
+}
+
+.alFilaTitulo {
+    overflow: hidden;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.alFilaAmbito {
+    font-weight: 700;
+}
+
+.alFilaSeparador {
+    margin: 0 7px;
+    color: var(--text-dim);
+}
+
+.alFilaMeta {
+    margin-top: 2px;
+    overflow: hidden;
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.alFilaMeta em {
+    color: var(--text-muted);
+}
+
+.alFilaEstado {
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--text-dim);
+}
+
+.alFilaEstado--activa {
+    color: var(--color-pos-bright);
+}
+
+.alFilaEstado--saltada {
+    color: var(--color-warn, #d9a441);
+}
+
+.alFilaHora {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.alFilaBorrar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition:
+        color 0.15s,
+        background 0.15s;
+}
+
+.alFilaBorrar:hover {
+    color: var(--color-neg-bright);
+    background: rgba(231, 76, 60, 0.1);
+}
+
+/* ── Vacío y sugerencias ── */
+
+.alPanelVacio {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 34px 20px;
+    text-align: center;
+    border: 1px dashed var(--border-mid);
+    border-radius: 12px;
+    color: var(--text-dim);
+    font-size: 0.84rem;
+}
+
+.alPanelVacio strong {
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.alPanelVacio--filtro {
+    border: none;
+    padding: 22px;
+}
+
+.alPanelSugerencias {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.alPanelSugerencia {
+    height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 999px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.alPanelSugerencia:hover {
+    border-color: var(--accent);
+}
+
+@media (max-width: 760px) {
+    .alPanel--ficha {
+        padding: 14px 4px 18px;
+    }
+
+    .alPanelNueva {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .alPanelFiltroActivo,
+    .alPanelBarra .csWrapper {
+        width: 100%;
+    }
+
+    .alPanelTiposGrupo {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .alPanelCampos {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .alFila {
+        grid-template-columns: 34px minmax(0, 1fr) auto auto;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .alFilaEstado {
+        display: none;
+    }
+
+    .alFilaTitulo,
+    .alFilaMeta {
+        white-space: normal;
+    }
+}

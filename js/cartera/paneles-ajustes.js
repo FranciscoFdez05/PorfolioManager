@@ -167,7 +167,14 @@ const PN_AJUSTES = {
                 { clave: "pct", tipo: "check", etiqueta: "Variación en %", defecto: true },
                 { clave: "eur", tipo: "check", etiqueta: "Movimiento en €", defecto: true },
                 { clave: "precio", tipo: "check", etiqueta: "Precio", defecto: false },
-                { clave: "leyenda", tipo: "check", etiqueta: "Leyenda de colores", defecto: false }
+                { clave: "leyenda", tipo: "check", etiqueta: "Leyenda de colores", defecto: false },
+                {
+                    clave: "precargaTv",
+                    tipo: "check",
+                    etiqueta: "Precargar los gráficos de vista previa",
+                    ayuda: "Carga en segundo plano el gráfico de TradingView de todos los activos para que aparezca al instante al pasar el cursor. Ocupa más memoria.",
+                    defecto: false
+                }
             ]
         }
     ],

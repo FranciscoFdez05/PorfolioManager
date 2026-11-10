@@ -221,7 +221,7 @@ function mRenderAll(payload) {
         gastosYearData || null,
         payload.ahorroConfig || { objetivoAhorro: 30, presupuesto: {} }
     )
-    mRenderAnual(payload.anualData || [])
+    mRenderAnual(payload.anualData || [], payload.ahorroConfig)
 
     const gastosEmpty = !gastosYearsList?.length || !gastosYearData
     const ingresosEmpty = !ingresosYearsList?.length || !ingresosYearData
@@ -572,7 +572,7 @@ async function initMetricasLogic() {
     _metricasSortDir = getChartPref("metricasSortDir", "desc")
     const _divYearToggle = document.getElementById("mDivYearToggle")
     if (_divYearToggle) _divYearToggle.dataset.bound = ""
-    const _allActivosTypes = ["cripto", "acciones", "etfs", "comoditis", "rentaFija", "privateMarket"]
+    const _allActivosTypes = ["cripto", "acciones", "etfs", "comoditis", "indices", "rentaFija", "privateMarket"]
     const _savedHidden = window._metricasActivosHidden || []
     _metricasActivosFilter = new Set(_allActivosTypes.filter((t) => !_savedHidden.includes(t)))
     _metricasGastosTipoFilter = new Set()
@@ -595,7 +595,7 @@ async function initMetricasLogic() {
         mInitEvolucion()
         mInitEvolucionTipos()
 
-        const _allTypes = ["cripto", "acciones", "etfs", "comoditis", "rentaFija", "privateMarket"]
+        const _allTypes = ["cripto", "acciones", "etfs", "comoditis", "indices", "rentaFija", "privateMarket"]
         const _todosBtn = document.querySelector(".mActivosFilterBtn[data-atype='todos']")
         const _specificBtns = [...document.querySelectorAll(".mActivosFilterBtn[data-atype]:not([data-atype='todos'])")]
 

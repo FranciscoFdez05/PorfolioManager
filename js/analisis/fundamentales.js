@@ -52,6 +52,7 @@ const FN_TYPE_LABELS = {
     etfs: "ETFs",
     cripto: "Cripto",
     comoditis: "Comoditis",
+    indices: "Índices",
     rentaFija: "Renta fija"
 }
 

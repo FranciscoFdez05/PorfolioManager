@@ -630,6 +630,66 @@ def testUnObjetivoDeAhorroQueNoEsNumeroCaeAlDefecto(cliente):
     assert client.get("/api/settings").get_json()["ahorroConfig"]["objetivoAhorro"] == 30.0
 
 
+def testElPresupuestoFijoEnEurosSeGuardaRedondeadoYAcotado(cliente):
+    client, cabeceras, _rutas = cliente
+    _guardar(client, cabeceras, ahorroConfig={
+        "objetivoAhorro": 20,
+        "presupuestoEur": {"Casa": "650.456", "Ocio": -10, "Viajes": "nada", "Lujo": 1e300},
+    })
+
+    guardado = client.get("/api/settings").get_json()["ahorroConfig"]["presupuestoEur"]
+    assert guardado == {"Casa": 650.46, "Ocio": 0.0, "Viajes": 0.0, "Lujo": 1_000_000_000.0}
+
+
+@pytest.mark.parametrize("raro", ["nan", "inf", "-inf"])
+def testUnPresupuestoFijoNoFinitoQuedaEnCeroOAcotado(cliente, raro):
+    client, cabeceras, _rutas = cliente
+    _guardar(client, cabeceras, ahorroConfig={"presupuestoEur": {"Casa": raro}})
+
+    importe = client.get("/api/settings").get_json()["ahorroConfig"]["presupuestoEur"]["Casa"]
+    assert importe in (0.0, 1_000_000_000.0)
+
+
+def testUnaCategoriaConImporteFijoPierdeElPorcentaje(cliente):
+    client, cabeceras, _rutas = cliente
+    _guardar(client, cabeceras, ahorroConfig={
+        "presupuesto": {"Casa": 25, "Ocio": 10},
+        "presupuestoEur": {"Casa": 700},
+    })
+
+    guardado = client.get("/api/settings").get_json()["ahorroConfig"]
+    assert guardado["presupuesto"] == {"Ocio": 10.0}
+    assert guardado["presupuestoEur"] == {"Casa": 700.0}
+
+
+def testUnaConfigAntiguaSinPresupuestoFijoSigueValiendo(cliente):
+    client, cabeceras, _rutas = cliente
+    _guardar(client, cabeceras, ahorroConfig={"objetivoAhorro": 25, "presupuesto": {"Casa": 30}})
+
+    guardado = client.get("/api/settings").get_json()["ahorroConfig"]
+    assert guardado["presupuesto"] == {"Casa": 30.0}
+    assert guardado["presupuestoEur"] == {}
+    assert guardado["categoriasInversion"] == []
+
+
+def testLasCategoriasDeInversionSeLimpianYNoSeRepiten(cliente):
+    client, cabeceras, _rutas = cliente
+    _guardar(client, cabeceras, ahorroConfig={
+        "categoriasInversion": [" Inversion ", "inversion", "", None, "Fondos " + "x" * 100, 7],
+    })
+
+    guardado = client.get("/api/settings").get_json()["ahorroConfig"]["categoriasInversion"]
+    assert guardado == ["Inversion", ("Fondos " + "x" * 100)[:80], "7"]
+
+
+@pytest.mark.parametrize("valor", ["Inversion", {"Inversion": True}, 5])
+def testCategoriasDeInversionQueNoSonListaQuedanVacias(cliente, valor):
+    client, cabeceras, _rutas = cliente
+    _guardar(client, cabeceras, ahorroConfig={"categoriasInversion": valor})
+
+    assert client.get("/api/settings").get_json()["ahorroConfig"]["categoriasInversion"] == []
+
+
 def testLasDivisasFiatExigenCodigoYNombre(cliente):
     client, cabeceras, _rutas = cliente
     _guardar(client, cabeceras, fiatCurrencies=[

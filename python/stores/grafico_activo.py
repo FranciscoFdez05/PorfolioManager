@@ -522,7 +522,7 @@ def seriesDelDia(ahora: float | None = None) -> dict:
         ahora: Instante de referencia; por defecto, el actual.
 
     Returns:
-        `{"inicio", "fin", "segundosHueco", "series": {asset_id: [[ts, valor], ...]}}`.
+        `{"periodo": "dia", "inicio", "fin", "segundosHueco", "series": {asset_id: [[ts, valor], ...]}}`.
         Solo aparecen los activos con al menos dos puntos.
     """
     ahora = datetime.now().timestamp() if ahora is None else ahora
@@ -531,8 +531,52 @@ def seriesDelDia(ahora: float | None = None) -> dict:
     # Por fecha y no sumando 86400: los días de cambio de hora duran 23 o 25 horas.
     fin = int(datetime.combine(date.fromordinal(hoy.toordinal() + 1), time.min).timestamp())
 
-    conn = getDb()
-    snapshots = _leerSnapshotsDesde(conn, inicio, fin, _CUBETA_DIA)
+    series = _seriesEntre(getDb(), inicio, fin, _CUBETA_DIA)
+    return {"periodo": "dia", "inicio": inicio, "fin": fin, "segundosHueco": _HUECO_DIA, "series": series}
+
+
+# Periodos del mapa de Paneles y el rango del gráfico de la ficha que les
+# corresponde: misma ventana, resolución y cortes, así que la línea de la casilla
+# es la misma que se ve al abrir el activo.
+PERIODOS_MAPA = {"semana": "7D", "mes": "30D", "anyo": "1A", "ytd": "YTD"}
+
+
+def seriesDelPeriodo(periodo: str, ahora: float | None = None) -> dict:
+    """Evolución de todos los activos en un periodo, para los minigráficos de los mapas.
+
+    Args:
+        periodo: "dia" o una de las claves de `PERIODOS_MAPA`.
+        ahora: Instante de referencia; por defecto, el actual.
+
+    Returns:
+        Lo mismo que `seriesDelDia`. Fuera de «dia» el eje acaba en `ahora`, porque
+        el periodo es «los últimos N días» y no uno natural que se vaya completando.
+
+    Raises:
+        RangoInvalido: Si `periodo` no existe.
+    """
+    if periodo == "dia":
+        return seriesDelDia(ahora)
+    rango = PERIODOS_MAPA.get(periodo)
+    if rango is None:
+        raise RangoInvalido(f"Periodo no admitido: {periodo or 'vacío'}")
+
+    ajustes = RANGOS[rango]
+    ahora = datetime.now().timestamp() if ahora is None else ahora
+    inicio = _inicioDelRango(rango, ajustes, ahora)
+    fin = int(ahora)
+    # `_seriesEntre` excluye el final: +1 para que entre el snapshot de este mismo segundo.
+    series = _seriesEntre(getDb(), inicio, fin + 1, ajustes["cubeta"])
+    return {"periodo": periodo, "inicio": inicio, "fin": fin, "segundosHueco": ajustes["hueco"], "series": series}
+
+
+def _seriesEntre(conn, inicio: int, fin: int, cubeta: int) -> dict[str, list]:
+    """Líneas de todos los activos entre `inicio` (incluido) y `fin` (excluido).
+
+    Returns:
+        `{asset_id: [[ts, valor], ...]}`, solo con los que tienen dos puntos.
+    """
+    snapshots = _leerSnapshotsDesde(conn, inicio, fin, cubeta)
     series: dict[str, list] = {}
     if snapshots:
         activos = {
@@ -558,10 +602,10 @@ def seriesDelDia(ahora: float | None = None) -> dict:
             if linea:
                 series[assetId] = linea
 
-    for assetId, linea in _seriesDePrecios(conn, inicio, fin, _CUBETA_DIA).items():
+    for assetId, linea in _seriesDePrecios(conn, inicio, fin, cubeta).items():
         series.setdefault(assetId, linea)
 
-    return {"inicio": inicio, "fin": fin, "segundosHueco": _HUECO_DIA, "series": series}
+    return series
 
 
 def _seriesDePrecios(conn, desdeTs: int, hastaTs: int, cubeta: int) -> dict[str, list]:

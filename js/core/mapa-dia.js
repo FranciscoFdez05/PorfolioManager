@@ -7,6 +7,9 @@
 // en cada baldosa la línea de hoy. El eje va siempre de las 00:00 a las 24:00,
 // así que la línea llega hasta la hora actual y se va completando a lo largo
 // del día. Los minigráficos se refrescan solos mientras haya un mapa a la vista.
+// Con horario de mercado, el eje se ciñe a la sesión del activo (mapaDiaSesion).
+// En Semana, Mes, Año y YTD la línea es la del gráfico de la ficha del activo
+// en ese rango y el eje va del inicio del periodo hasta ahora.
 
 // La serie sale de los snapshots, que se guardan cada pocos minutos: pedirla
 // más a menudo no traería puntos nuevos.
@@ -17,6 +20,19 @@ const MAPA_DIA_ANCHO_MIN = 70
 const MAPA_DIA_ALTO_MIN = 64
 // Lo mínimo que tiene que abarcar la serie de hoy para pintarla (ver mapaDiaSerieUtil).
 const MAPA_DIA_COBERTURA_MIN = 3600
+// Un tramo plano al principio o al final del día que dure al menos esto es el
+// mercado cerrado: se recorta del eje (ver mapaDiaSesion). Más corto puede ser
+// un activo poco negociado o una cotización que tardó en refrescarse (con una
+// hora, un valor de EE. UU. con 80 min sin cambio en plena sesión se tomaba por
+// cerrado). Tiene que quedarse por debajo de las 2 h que hay entre el cierre de
+// EE. UU. (22:00) y la medianoche, o ese cierre no se detectaría nunca.
+const MAPA_DIA_CIERRE_MIN = 90 * 60
+// Hueco por defecto si la respuesta no trae `segundosHueco` (el del servidor).
+const MAPA_DIA_HUECO = 7200
+// Como mucho tantas marcas horarias en el eje, y ninguna pegada a los bordes
+// (en % del ancho), donde el texto se cortaría.
+const MAPA_DIA_EJE_MAX_MARCAS = 4
+const MAPA_DIA_EJE_MARGEN = 8
 // Retardo antes de abrir la vista previa: al cruzar el mapa con el ratón no se
 // carga un iframe por cada baldosa que se toca de pasada.
 const MAPA_DIA_RETARDO_TV = 200
@@ -27,41 +43,53 @@ const MAPA_DIA_TV_ALTO = 280
 // aunque su código ya esté en la caché del navegador, porque arranca la
 // aplicación de gráficos entera; cada uno vivo ocupa memoria, de ahí el tope.
 const MAPA_DIA_TV_MAX_MARCOS = 6
+// Lo más que espera la precarga a que un iframe termine de cargar antes de
+// pasar al siguiente: si TradingView no responde, no se queda atascada.
+const MAPA_DIA_TV_ESPERA_CARGA = 8000
 
-let _mapaDiaCache = null // { datos, ts }
-let _mapaDiaPeticion = null
+let _mapaDiaCache = {} // periodo -> { datos, ts }
+let _mapaDiaPeticion = {} // periodo -> Promise en curso
 let _mapaDiaRefresco = null
 let _mapaDiaTvTimer = null
 let _mapaDiaTvSimbolo = ""
 // URL → iframe. Map conserva el orden de inserción: el primero es el que hace
 // más tiempo que no se usa y el que sale al pasar del tope.
 const _mapaDiaTvMarcos = new Map()
+// Tope de vistas previas vivas: el de siempre o, con la precarga activa, tantas
+// como símbolos tenga el mapa que la pidió.
+let _mapaDiaTvTope = MAPA_DIA_TV_MAX_MARCOS
+// Turno de la precarga en curso: cada llamada nueva deja sin efecto la anterior.
+let _mapaDiaTvPrecarga = 0
 
 /**
- * Serie de hoy de todos los activos, cacheada un minuto y compartida entre los
- * mapas: dos mapas en pantalla hacen una sola petición.
+ * Serie de todos los activos en un periodo, cacheada un minuto y compartida
+ * entre los mapas: dos mapas en pantalla con el mismo periodo hacen una sola
+ * petición.
  *
- * @returns {Promise<object|null>} `{inicio, fin, segundosHueco, series}` o null si falla.
+ * @param {string} [periodo] "dia" (por defecto), "semana", "mes", "anyo" o "ytd".
+ * @returns {Promise<object|null>} `{periodo, inicio, fin, segundosHueco, series}` o null si falla.
  */
-function mapaDiaCargar() {
-    if (_mapaDiaCache && Date.now() - _mapaDiaCache.ts < MAPA_DIA_TTL) return Promise.resolve(_mapaDiaCache.datos)
-    if (!_mapaDiaPeticion) {
-        _mapaDiaPeticion = fetch("/api/activos-serie-dia")
+function mapaDiaCargar(periodo = "dia") {
+    const guardado = _mapaDiaCache[periodo]
+    if (guardado && Date.now() - guardado.ts < MAPA_DIA_TTL) return Promise.resolve(guardado.datos)
+    if (!_mapaDiaPeticion[periodo]) {
+        const url = periodo === "dia" ? "/api/activos-serie-dia" : `/api/activos-serie-dia?periodo=${encodeURIComponent(periodo)}`
+        _mapaDiaPeticion[periodo] = fetch(url)
             .then((res) => (res.ok ? res.json() : null))
             .then((json) => {
                 if (!json?.ok) return null
-                _mapaDiaCache = { datos: json, ts: Date.now() }
+                _mapaDiaCache[periodo] = { datos: json, ts: Date.now() }
                 return json
             })
             .catch((error) => {
-                console.error("Mapa: no se pudo cargar la serie del día", error)
+                console.error(`Mapa: no se pudo cargar la serie (${periodo})`, error)
                 return null
             })
             .finally(() => {
-                _mapaDiaPeticion = null
+                delete _mapaDiaPeticion[periodo]
             })
     }
-    return _mapaDiaPeticion
+    return _mapaDiaPeticion[periodo]
 }
 
 /**
@@ -104,11 +132,12 @@ function mapaDiaTrazado(puntos, inicio, fin, hueco) {
  *
  * @param {Array<[number, number]>|undefined} puntos Serie del activo.
  * @param {object} datos Respuesta de `mapaDiaCargar`.
+ * @param {{inicio: number, fin: number}} [ventana] Eje X; por defecto, el día entero.
  * @returns {string} El SVG, o cadena vacía si no hay dos puntos que unir.
  */
-function mapaDiaSvg(puntos, datos) {
+function mapaDiaSvg(puntos, datos, ventana = datos) {
     if (!Array.isArray(puntos) || puntos.length < 2) return ""
-    const { linea, area } = mapaDiaTrazado(puntos, datos.inicio, datos.fin, datos.segundosHueco || 7200)
+    const { linea, area } = mapaDiaTrazado(puntos, ventana.inicio, ventana.fin, datos.segundosHueco || MAPA_DIA_HUECO)
     return `<svg class="mapaDiaLinea" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
         <path class="mapaDiaArea" d="${area}"/>
         <path class="mapaDiaTrazo" d="${linea}" vector-effect="non-scaling-stroke"/>
@@ -130,18 +159,132 @@ function mapaDiaSerieUtil(puntos) {
 }
 
 /**
+ * Ventana del eje X para una serie: el día entero, o solo la sesión si el
+ * activo tiene horario de mercado.
+ *
+ * El horario no se sabe de antemano (no hay tabla por bolsa): se deduce de la
+ * propia serie. Antes de abrir y después de cerrar, los snapshots repiten el
+ * mismo precio, y eso dibujaba horas de línea recta. Un tramo plano de al menos
+ * `MAPA_DIA_CIERRE_MIN` en un extremo se recorta: la ventana empieza en el
+ * último punto antes del primer cambio (el cierre anterior, de donde parte la
+ * sesión) y acaba en el primer punto del tramo plano final (el cierre). Con
+ * uno de los dos extremos recortado el activo tiene horario, y el otro se
+ * ciñe a los datos: con la sesión abierta la ventana acaba en el último punto,
+ * y si el servidor arrancó ya abierta la sesión empieza en el primero, en vez
+ * de dejar medio eje vacío. Lo que cotiza todo el día, como la cripto, no tiene
+ * esos tramos y conserva el día entero; una serie plana entera (fin de semana)
+ * también.
+ *
+ * Los tramos planos solo cuentan con datos seguidos: entre dos puntos separados
+ * más de `hueco` no hubo snapshots (servidor parado) y no se sabe si el precio
+ * se movió. Sin esto, el precio de antes de parar el servidor y el de después,
+ * si coincidían, pasaban por horas de mercado cerrado.
+ *
+ * `cerrado` dice si el mercado del activo está cerrado ahora: lleva al menos
+ * `MAPA_DIA_CIERRE_MIN` sin moverse al final de la serie. `plano`, si no se ha
+ * movido en todo el día (aún no ha abierto, o es fin de semana).
+ *
+ * @param {Array<[number, number]>|undefined} puntos Serie del activo, ordenada.
+ * @param {number} inicio Inicio del día (ts).
+ * @param {number} fin Fin del día (ts).
+ * @param {number} [hueco] Segundos sin datos a partir de los que la serie se corta.
+ * @returns {{inicio: number, fin: number, cerrado: boolean, plano: boolean}} La ventana.
+ */
+function mapaDiaSesion(puntos, inicio, fin, hueco = MAPA_DIA_HUECO) {
+    const diaEntero = { inicio, fin, cerrado: false, plano: false }
+    if (!Array.isArray(puntos) || puntos.length < 2) return diaEntero
+    const ultimo = puntos.length - 1
+    const plano = (desde, hasta) => mapaDiaDuracionConDatos(puntos, desde, hasta, hueco) >= MAPA_DIA_CIERRE_MIN
+    const primerCambio = puntos.findIndex((p) => p[1] !== puntos[0][1])
+    if (primerCambio < 0) return { ...diaEntero, cerrado: plano(0, ultimo), plano: true }
+
+    const ultimoCambio = puntos.findLastIndex((p) => p[1] !== puntos[ultimo][1])
+    const antesDeAbrir = plano(0, primerCambio - 1)
+    const trasCerrar = plano(ultimoCambio + 1, ultimo)
+    if (!antesDeAbrir && !trasCerrar) return diaEntero
+
+    return {
+        inicio: antesDeAbrir ? puntos[primerCambio - 1][0] : puntos[0][0],
+        fin: trasCerrar ? puntos[ultimoCambio + 1][0] : puntos[ultimo][0],
+        cerrado: trasCerrar,
+        plano: false
+    }
+}
+
+/**
+ * Tiempo cubierto por datos entre dos puntos de una serie: la suma de los
+ * intervalos entre puntos seguidos, sin los que pasan de `hueco`.
+ *
+ * @param {Array<[number, number]>} puntos Serie ordenada.
+ * @param {number} desde Índice del primer punto.
+ * @param {number} hasta Índice del último punto.
+ * @param {number} hueco Intervalo máximo que cuenta.
+ * @returns {number} Segundos.
+ */
+function mapaDiaDuracionConDatos(puntos, desde, hasta, hueco) {
+    let total = 0
+    for (let i = desde; i < hasta; i++) {
+        const paso = puntos[i + 1][0] - puntos[i][0]
+        if (paso <= hueco) total += paso
+    }
+    return total
+}
+
+/**
+ * Marcas horarias del eje X para una ventana: horas en punto, con el paso más
+ * corto que no pase de `MAPA_DIA_EJE_MAX_MARCAS`, y ninguna pegada a un borde.
+ * El día entero da las 06:00, 12:00 y 18:00 de siempre.
+ *
+ * @param {number} inicio Inicio de la ventana (ts).
+ * @param {number} fin Fin de la ventana (ts).
+ * @returns {Array<{pos: number, texto: string}>} Posición en % del ancho y rótulo.
+ */
+function mapaDiaMarcasEje(inicio, fin) {
+    const duracion = fin - inicio
+    if (!(duracion > 0)) return []
+    const paso = [1, 2, 3, 4, 6].find((p) => duracion / 3600 / p <= MAPA_DIA_EJE_MAX_MARCAS) || 6
+    const marcas = []
+    // Hora a hora con setHours y no sumando 3600: así las marcas caen en la
+    // hora en punto local también el día del cambio de hora.
+    const hora = new Date(inicio * 1000)
+    hora.setMinutes(0, 0, 0)
+    while (hora.getTime() / 1000 <= fin) {
+        const pos = ((hora.getTime() / 1000 - inicio) / duracion) * 100
+        if (hora.getHours() % paso === 0 && pos >= MAPA_DIA_EJE_MARGEN && pos <= 100 - MAPA_DIA_EJE_MARGEN) {
+            marcas.push({ pos, texto: `${String(hora.getHours()).padStart(2, "0")}:00` })
+        }
+        hora.setHours(hora.getHours() + 1)
+    }
+    return marcas
+}
+
+/**
  * Mete o actualiza el minigráfico en las baldosas de un lienzo.
  *
  * @param {HTMLElement} lienzo Contenedor con baldosas `[data-serie-id]`.
  * @param {object} datos Respuesta de `mapaDiaCargar`.
  */
 function mapaDiaPintarEn(lienzo, datos) {
+    // Fuera de «Hoy» la serie abarca varios días: ni hay sesión que recortar
+    // (las noches y los fines de semana son parte del periodo) ni cobertura mínima
+    // que exigir, que es cosa de un servidor recién arrancado a media mañana.
+    const esDia = (datos.periodo || "dia") === "dia"
     lienzo.querySelectorAll("[data-serie-id]").forEach((celda) => {
         celda.querySelector(".mapaDiaLinea")?.remove()
-        const puntos = mapaDiaSerieUtil(datos.series?.[celda.dataset.serieId])
-        lienzo._mapaDiaAlPintar?.(celda, puntos)
+        const bruta = datos.series?.[celda.dataset.serieId]
+        const serie = esDia ? mapaDiaSerieUtil(bruta) : Array.isArray(bruta) && bruta.length >= 2 ? bruta : undefined
+        const ventana = esDia
+            ? mapaDiaSesion(serie, datos.inicio, datos.fin, datos.segundosHueco || MAPA_DIA_HUECO)
+            : { inicio: datos.inicio, fin: datos.fin, cerrado: false, plano: false, dias: true }
+        // Fuera de la sesión solo quedan los puntos planos recortados. Con el
+        // mercado cerrado todo el día no hay nada que dibujar: sería una recta.
+        const puntos =
+            ventana.plano && ventana.cerrado
+                ? undefined
+                : serie?.filter((p) => p[0] >= ventana.inicio && p[0] <= ventana.fin)
+        lienzo._mapaDiaAlPintar?.(celda, puntos, ventana)
         if (celda.offsetWidth < MAPA_DIA_ANCHO_MIN || celda.offsetHeight < MAPA_DIA_ALTO_MIN) return
-        const svg = mapaDiaSvg(puntos, datos)
+        const svg = mapaDiaSvg(puntos, datos, ventana)
         if (svg) celda.insertAdjacentHTML("afterbegin", svg)
     })
 }
@@ -150,25 +293,56 @@ function mapaDiaPintarEn(lienzo, datos) {
  * Activa los minigráficos del día en un mapa recién pintado.
  *
  * @param {HTMLElement} lienzo Contenedor de las baldosas.
- * @param {boolean} activo Si el mapa está en el periodo «Hoy»; si no, se
- *     desmarca el lienzo para que el refresco lo ignore.
+ * @param {string|null} periodo Periodo del mapa ("dia", "semana", "mes",
+ *     "anyo" o "ytd"); null si no tiene línea (p. ej. «Desde la compra»), y
+ *     entonces se desmarca el lienzo para que el refresco lo ignore.
  * @param {Function} [alPintar] `(celda, puntos)` por cada baldosa al llegar la
  *     serie, también en cada refresco: lo que la baldosa saca de la línea (el
- *     máximo y el mínimo del día en la rejilla de Paneles). `puntos` puede
- *     faltar si el activo no tiene serie.
+ *     máximo y el mínimo del periodo en la rejilla de Paneles). `puntos` puede
+ *     faltar si el activo no tiene serie o si su mercado lleva cerrado todo
+ *     el día. Recibe además la ventana del eje (`mapaDiaSesion`), con
+ *     `cerrado`, como tercer argumento; fuera de «Hoy» lleva `dias: true`.
  */
-function mapaDiaActivar(lienzo, activo, alPintar = null) {
+function mapaDiaActivar(lienzo, periodo, alPintar = null) {
     if (!lienzo) return
     lienzo._mapaDiaAlPintar = alPintar
-    if (!activo) {
+    if (!periodo) {
         delete lienzo.dataset.mapaDia
         return
     }
-    lienzo.dataset.mapaDia = "true"
-    mapaDiaCargar().then((datos) => {
-        if (datos && lienzo.isConnected && lienzo.dataset.mapaDia) mapaDiaPintarEn(lienzo, datos)
+    lienzo.dataset.mapaDia = periodo
+    mapaDiaCargar(periodo).then((datos) => {
+        // El periodo pudo cambiar mientras llegaba la respuesta.
+        if (datos && lienzo.isConnected && lienzo.dataset.mapaDia === periodo) mapaDiaPintarEn(lienzo, datos)
     })
     mapaDiaProgramarRefresco()
+}
+
+/**
+ * Marcas de fecha del eje X para una ventana de varios días: tres, repartidas,
+ * cada una en la medianoche más cercana para que el rótulo diga el día justo.
+ *
+ * @param {number} inicio Inicio de la ventana (ts).
+ * @param {number} fin Fin de la ventana (ts).
+ * @returns {Array<{pos: number, texto: string}>} Posición en % del ancho y rótulo.
+ */
+function mapaDiaMarcasFecha(inicio, fin) {
+    const duracion = fin - inicio
+    if (!(duracion > 0)) return []
+    const marcas = []
+    for (const fraccion of [0.25, 0.5, 0.75]) {
+        const dia = new Date((inicio + duracion * fraccion) * 1000)
+        // Redondeo a la medianoche local más cercana, con setHours para que el
+        // cambio de hora no la desplace.
+        if (dia.getHours() >= 12) dia.setDate(dia.getDate() + 1)
+        dia.setHours(0, 0, 0, 0)
+        const pos = ((dia.getTime() / 1000 - inicio) / duracion) * 100
+        const texto = dia.toLocaleDateString("es-ES", { day: "numeric", month: "short" }).replace(".", "")
+        if (pos >= MAPA_DIA_EJE_MARGEN && pos <= 100 - MAPA_DIA_EJE_MARGEN && !marcas.some((m) => m.texto === texto)) {
+            marcas.push({ pos, texto })
+        }
+    }
+    return marcas
 }
 
 /**
@@ -186,9 +360,15 @@ function mapaDiaProgramarRefresco() {
         }
         // Con la pestaña oculta no se pide nada; al volver, el siguiente ciclo lo pone al día.
         if (document.hidden) return
-        _mapaDiaCache = null
-        mapaDiaCargar().then((datos) => {
-            if (datos) lienzos.filter((l) => l.isConnected).forEach((l) => mapaDiaPintarEn(l, datos))
+        _mapaDiaCache = {}
+        // Una petición por periodo, no por mapa.
+        new Set(lienzos.map((l) => l.dataset.mapaDia)).forEach((periodo) => {
+            mapaDiaCargar(periodo).then((datos) => {
+                if (!datos) return
+                lienzos
+                    .filter((l) => l.isConnected && l.dataset.mapaDia === periodo)
+                    .forEach((l) => mapaDiaPintarEn(l, datos))
+            })
         })
     }, MAPA_DIA_REFRESCO)
 }
@@ -284,12 +464,85 @@ function mapaDiaMarcoTv(caja, simbolo) {
         caja.appendChild(marco)
     }
     _mapaDiaTvMarcos.set(url, marco)
-    while (_mapaDiaTvMarcos.size > MAPA_DIA_TV_MAX_MARCOS) {
+    mapaDiaRecortarMarcos()
+    return marco
+}
+
+/** Quita las vistas previas que llevan más tiempo sin usarse hasta quedar en el tope. */
+function mapaDiaRecortarMarcos() {
+    while (_mapaDiaTvMarcos.size > _mapaDiaTvTope) {
         const [masAntigua, viejo] = _mapaDiaTvMarcos.entries().next().value
         viejo.remove()
         _mapaDiaTvMarcos.delete(masAntigua)
     }
-    return marco
+}
+
+/** Promesa que se cumple cuando el navegador está libre (o a los 3 s como mucho). */
+function mapaDiaEsperarOcio() {
+    return new Promise((resolver) => {
+        if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(resolver, { timeout: 3000 })
+        else setTimeout(resolver, 200)
+    })
+}
+
+/**
+ * Promesa que se cumple cuando el iframe termina de cargar, o pasado
+ * `MAPA_DIA_TV_ESPERA_CARGA` si no lo hace.
+ *
+ * @param {HTMLIFrameElement} marco Iframe recién creado.
+ * @returns {Promise<void>}
+ */
+function mapaDiaEsperarCarga(marco) {
+    return new Promise((resolver) => {
+        const temporizador = setTimeout(resolver, MAPA_DIA_TV_ESPERA_CARGA)
+        marco.addEventListener(
+            "load",
+            () => {
+                clearTimeout(temporizador)
+                resolver()
+            },
+            { once: true }
+        )
+    })
+}
+
+/**
+ * Carga de antemano las vistas previas de todos los símbolos de un mapa, para
+ * que ninguna tenga la espera de ~1 s al pasar el ratón por primera vez.
+ *
+ * Van una detrás de otra y con el navegador libre, no todas a la vez: cada
+ * iframe arranca la aplicación de gráficos de TradingView entera y en paralelo
+ * dejarían la página sin responder. El tope de iframes vivos sube hasta que
+ * quepan todos; cada uno ocupa memoria, por eso la precarga es opcional.
+ *
+ * Llamarla con una lista vacía cancela la precarga en curso y devuelve el tope
+ * al de siempre.
+ *
+ * @param {string[]} simbolos Símbolos de TradingView del mapa.
+ * @param {(hechos: number, total: number) => void} [alProgresar] Se llama al
+ *     empezar y tras cada vista previa lista, solo mientras esta precarga siga
+ *     siendo la vigente (una cancelada no pisa el progreso de la nueva).
+ * @returns {Promise<void>} Se cumple al acabar o al quedar cancelada.
+ */
+async function mapaDiaPrecargarTv(simbolos, alProgresar) {
+    const turno = ++_mapaDiaTvPrecarga
+    const unicos = [...new Set(simbolos.filter(Boolean))]
+    _mapaDiaTvTope = Math.max(MAPA_DIA_TV_MAX_MARCOS, unicos.length)
+    mapaDiaRecortarMarcos()
+    const avisar = (hechos) => {
+        if (alProgresar && turno === _mapaDiaTvPrecarga) alProgresar(hechos, unicos.length)
+    }
+    avisar(0)
+    for (const [i, simbolo] of unicos.entries()) {
+        await mapaDiaEsperarOcio()
+        if (turno !== _mapaDiaTvPrecarga) return
+        // También se pasa por las que ya estaban cargadas: así suben al final
+        // de la cola y no las echa el recorte al meter las que faltan.
+        const yaEstaba = _mapaDiaTvMarcos.get(mapaDiaUrlTv(simbolo))?.isConnected
+        const marco = mapaDiaMarcoTv(mapaDiaCajaTv(), simbolo)
+        if (!yaEstaba) await mapaDiaEsperarCarga(marco)
+        avisar(i + 1)
+    }
 }
 
 /**

@@ -19,10 +19,12 @@ from core import atajo_acceso, csp, estaticos, paths, seguridad_app, settings, t
 from core.errors import registerErrorHandlers
 from core.paths import API_DIR, BASE_DIR, INDEX_FILE
 from core.version import __version__, insertarVersion
+from core.zona_horaria import descartarTzIanaEnWindows
 from routes.activos import activosBp
 from routes.actualizacion import actualizacionBp
 from routes.ajustes import ajustesBp
 from routes.alertas import alertasBp
+from routes.alertas_reglas import alertasReglasBp
 from routes.atajo import atajoBp
 from routes.auth import authBp, prepararAltaInicial
 from routes.backup import backupBp
@@ -54,6 +56,7 @@ from stores.app_data import ensureDataFile
 # esas variables se definen aquí. Cargarlo después haría que los overrides de
 # .env no se vieran.
 load_dotenv()
+descartarTzIanaEnWindows()
 
 # Configurar logging ANTES de initPortfolios(): esa llamada verifica la
 # integridad de la BD, puede repararla o restaurarla desde un backup, y todos
@@ -155,6 +158,7 @@ app.register_blueprint(atajoBp)
 app.register_blueprint(actualizacionBp)
 app.register_blueprint(ajustesBp)
 app.register_blueprint(alertasBp)
+app.register_blueprint(alertasReglasBp)
 app.register_blueprint(backupBp)
 app.register_blueprint(categoriasBp)
 app.register_blueprint(cuentaAhorroBp)

@@ -345,6 +345,11 @@ CATALOGO: tuple[Ajuste, ...] = (
            minimo=0, maximo=1440,
            descripcion="Cada cuántos minutos se comprueban las alertas de precio de los activos. "
                        "0 las deja de vigilar (siguen saltando al refrescar un precio a mano)."),
+    Ajuste("avisos", "reglas_intervalo_minutos", ENTERO, 5, env="AVISOS_REGLAS_MINUTOS",
+           minimo=0, maximo=60,
+           descripcion="Cada cuántos minutos se evalúan las reglas de alerta (caídas, subidas, "
+                       "rentabilidad, cartera…), muestreando el precio de los activos vigilados. "
+                       "0 las deja de vigilar."),
     Ajuste("avisos", "espacio_minimo_mb", ENTERO, 1024, env="AVISOS_ESPACIO_MINIMO_MB",
            minimo=0, maximo=10_000_000,
            descripcion="Aviso por Telegram cuando el disco de datos baja de estos MB libres. 0 lo apaga."),
@@ -736,6 +741,11 @@ def proveedorUserAgent() -> str:
 
 def alertasIntervaloSegundos() -> int:
     return obtener("avisos.alertas_intervalo_minutos") * 60
+
+
+def reglasIntervaloSegundos() -> int:
+    """Segundos entre pasadas de las reglas de alerta (0 = apagadas)."""
+    return obtener("avisos.reglas_intervalo_minutos") * 60
 
 
 def espacioMinimoBytes() -> int:

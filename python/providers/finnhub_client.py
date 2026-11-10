@@ -113,6 +113,7 @@ _PUNTOS_POR_TIPO = {
     "etfs": ((("etf", "etp", "fund"), 320), (("common stock",), 60), (("crypto", "forex"), -320)),
     "cripto": ((("crypto",), 220), (("common stock", "forex"), -160)),
     "comoditis": ((("forex",), 260), (("common stock",), -180)),
+    "indices": ((("index",), 260), (("crypto", "forex"), -160)),
 }
 _PALABRAS_COMODITIS = ("gold", "silver", "oil", "brent", "crude")
 _PALABRAS_FONDO = ("etf", "fund", "ucits", "ishares", "vanguard", "invesco", "spdr", "xtrackers", "amundi")

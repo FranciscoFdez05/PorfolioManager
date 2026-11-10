@@ -12,7 +12,7 @@ import pytest
 
 CLAVES_ENTERAS = [
     "autoBackupDays", "staleHours", "autoRefreshMinutes", "snapshotMinutes",
-    "precioDecimalesAcciones", "precioDecimalesEtf", "precioDecimalesComoditis",
+    "precioDecimalesAcciones", "precioDecimalesEtf", "precioDecimalesComoditis", "precioDecimalesIndices",
     "precioDecimalesCripto", "bloqueoInactividad", "maxBackups",
 ]
 VALORES = ["Infinity", "-Infinity", "1e999", "1" + "0" * 400]

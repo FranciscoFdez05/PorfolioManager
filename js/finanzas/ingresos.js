@@ -29,6 +29,15 @@ let ingresosModalKeyHandler = null
 let ingresosDetailKeyHandler = null
 let recurrentesFilter = "todas"
 let recurrentesSearch = ""
+// Como en Mensualidades: la vista de recurrentes se ve como tabla o como
+// calendario del año, y el día elegido ("mes-día") es lo que detalla el lateral.
+let recurrentesTab = "tabla"
+let recCalendarSelection = null
+// Abierta desde Mi dinero › Ingresos recurrentes la página solo muestra esa
+// vista: cambiar de año no debe devolver a la tabla anual de ingresos.
+let ingresosSoloRecurrentes = false
+// Nombre que toma una paga extra si no se le pone otro.
+const PAGA_EXTRA_NOMBRE = "Extra"
 
 // Cada frecuencia indica cada cuántos meses se repite el cobro.
 const RECURRENTE_FRECUENCIAS = [
@@ -68,36 +77,226 @@ function normalizeRecurrente(row = {}) {
         cuenta: String(row.cuenta || ""),
         // Meses que entran en otra cuenta que la habitual: {marzo: "tarjeta"}.
         cuentasCobro: normalizeMensualidadCuentas(row.cuentasCobro),
+        pagasExtra: normalizePagasExtra(row.pagasExtra),
         meses
     }
+}
+
+/**
+ * Pagas extra de un ingreso recurrente, limpias.
+ *
+ * Una paga extra es un añadido puntual a un mes (la extra de junio de una
+ * nómina). Se descartan las que no tienen un mes reconocible o importe.
+ *
+ * Args:
+ *     value: Lista de `{nombre, mes, importe}` tal como llega.
+ *
+ * Returns:
+ *     Lista de pagas con `nombre` (por defecto «Extra»), `mes` e `importe`.
+ */
+function normalizePagasExtra(value) {
+    if (!Array.isArray(value)) {
+        return []
+    }
+    return value
+        .filter((paga) => paga && typeof paga === "object")
+        .map((paga) => ({
+            nombre: String(paga.nombre || "").trim() || PAGA_EXTRA_NOMBRE,
+            mes: String(paga.mes || "").trim().toLowerCase(),
+            importe: String(paga.importe || "").trim()
+        }))
+        .filter((paga) => INGRESOS_MONTHS.some((month) => month.key === paga.mes) && parseEuroNumber(paga.importe) !== 0)
+}
+
+/**
+ * Total de pagas extra por mes.
+ *
+ * Args:
+ *     pagasExtra: Pagas extra normalizadas.
+ *
+ * Returns:
+ *     Objeto `{mes: importe}` con solo los meses que tienen alguna paga.
+ */
+function getPagasExtraPorMes(pagasExtra) {
+    const porMes = {}
+    ;(pagasExtra || []).forEach((paga) => {
+        porMes[paga.mes] = (porMes[paga.mes] || 0) + parseEuroNumber(paga.importe)
+    })
+    return porMes
+}
+
+/**
+ * Parte de cada mes que es cobro normal y parte que es paga extra.
+ *
+ * Las pagas extra van sumadas en `meses` (es lo que leen cuentas, histórico y
+ * métricas), así que aquí se separan. La parte extra nunca pasa del total del
+ * mes: si el mes se dejó a cero o se bajó a mano, la paga no aparece de la nada.
+ *
+ * Args:
+ *     row: Recurrente normalizada.
+ *
+ * Returns:
+ *     Objeto `{mes: {base, extra}}` con los doce meses.
+ */
+function getRecurrenteDesglose(row) {
+    const extrasPorMes = getPagasExtraPorMes(row.pagasExtra)
+    return Object.fromEntries(
+        INGRESOS_MONTHS.map((month) => {
+            const total = parseEuroNumber(row.meses?.[month.key] || "")
+            const extra = total > 0 ? Math.min(extrasPorMes[month.key] || 0, total) : 0
+            return [month.key, { base: total - extra, extra }]
+        })
+    )
+}
+
+/**
+ * Meses de cobro normal más las pagas extra, con el formato de las celdas.
+ *
+ * Args:
+ *     baseMeses: Objeto `{mes: texto}` con el cobro normal de cada mes.
+ *     pagasExtra: Pagas extra normalizadas.
+ *
+ * Returns:
+ *     Objeto `{mes: texto}` listo para guardar en `meses`.
+ */
+function sumarPagasExtraAMeses(baseMeses, pagasExtra) {
+    const extrasPorMes = getPagasExtraPorMes(pagasExtra)
+    return Object.fromEntries(
+        INGRESOS_MONTHS.map((month) => {
+            // Redondeo a céntimos: sumar decimales en coma flotante deja colas.
+            const total =
+                Math.round((parseEuroNumber(baseMeses?.[month.key] || "") + (extrasPorMes[month.key] || 0)) * 100) / 100
+            return [month.key, total !== 0 ? formatEuro(total) : ""]
+        })
+    )
+}
+
+function getRecurrenteExtraAnual(row) {
+    return Object.values(getRecurrenteDesglose(row)).reduce((sum, mes) => sum + mes.extra, 0)
 }
 
 function getRecurrentes() {
     return (currentIngresosData?.recurrentes || []).map(normalizeRecurrente)
 }
 
-// Reparte el importe por los meses del año según la frecuencia (desde enero).
-function computeRecurrenteMeses(importeRaw, frecuenciaKey) {
+// Reparte el importe por los meses del año según la frecuencia, desde el mes
+// `startIndex` (enero por defecto).
+function computeRecurrenteMeses(importeRaw, frecuenciaKey, startIndex = 0) {
     const step = getRecurrenteFrecuencia(frecuenciaKey).meses
     const value = String(importeRaw || "").trim() ? formatCellEuroValue(importeRaw) : ""
 
     return Object.fromEntries(
         INGRESOS_MONTHS.map((month, index) => {
-            const isCharged = value && index % step === 0
+            const isCharged = value && index >= startIndex && (index - startIndex) % step === 0
             return [month.key, isCharged ? value : ""]
         })
     )
 }
 
+/**
+ * Mes del año siguiente en que vuelve a cobrarse una recurrente.
+ *
+ * Sigue el ritmo del año de origen: una trimestral cobrada por última vez en
+ * noviembre vuelve en febrero. Solo cuentan los meses con cobro normal; una
+ * paga extra suelta no marca el ritmo.
+ *
+ * Args:
+ *     row: Recurrente normalizada del año de origen.
+ *
+ * Returns:
+ *     Índice (0-11) del primer mes con cobro; 0 si no tenía cobros.
+ */
+function getRecurrenteInicioEnOtroAnio(row) {
+    const desglose = getRecurrenteDesglose(row)
+    const cobrados = INGRESOS_MONTHS.map((month, index) => ({ index, base: desglose[month.key].base })).filter(
+        (month) => month.base > 0
+    )
+    if (!cobrados.length) {
+        return 0
+    }
+    const step = getRecurrenteFrecuencia(row.frecuencia).meses
+    return (cobrados[cobrados.length - 1].index + step) % INGRESOS_MONTHS.length
+}
+
+/**
+ * Copia de una recurrente lista para otro año.
+ *
+ * Pasan concepto, categoría, importe, frecuencia, día, cuenta, nota, estado y
+ * pagas extra (una nómina repite sus extras cada año). Las cuentas por mes no
+ * pasan: eran de ese año. Una pausada sigue pausada y sin cobros.
+ *
+ * Args:
+ *     rawRow: Recurrente tal como viene del año de origen.
+ *
+ * Returns:
+ *     Fila con la forma que guarda el formulario de recurrentes.
+ */
+function copiarRecurrenteParaOtroAnio(rawRow) {
+    const row = normalizeRecurrente(rawRow)
+    const cobro = getRecurrenteCobro(row)
+    const importe = row.importe || (cobro ? formatEuro(cobro) : "")
+    const baseMeses = row.activa
+        ? computeRecurrenteMeses(importe, row.frecuencia, getRecurrenteInicioEnOtroAnio(row))
+        : {}
+    return {
+        nombre: row.nombre,
+        categoria: row.categoria,
+        importe: row.importe,
+        frecuencia: row.frecuencia,
+        diaCobro: row.diaCobro,
+        mesInicio: row.mesInicio,
+        activa: row.activa,
+        nota: row.nota,
+        cuenta: row.cuenta,
+        cuentasCobro: {},
+        pagasExtra: row.pagasExtra,
+        meses: row.activa ? sumarPagasExtraAMeses(baseMeses, row.pagasExtra) : sumarPagasExtraAMeses({}, [])
+    }
+}
+
+/**
+ * Recurrentes de otro año que faltan en las de destino.
+ *
+ * El concepto es único por año en la base de datos: las que ya existen en
+ * destino se saltan en vez de duplicarse.
+ *
+ * Args:
+ *     origen: Recurrentes del año del que se copia.
+ *     destino: Recurrentes que ya tiene el año al que se copia.
+ *
+ * Returns:
+ *     Objeto con `nuevas` (filas a añadir) y `omitidas` (cuántas ya estaban).
+ */
+function getRecurrentesParaCopiar(origen, destino) {
+    const existentes = new Set((destino || []).map((row) => normalizeComparableIngresoText(row?.nombre || "")))
+    const nuevas = []
+    let omitidas = 0
+    ;(origen || []).forEach((row) => {
+        const clave = normalizeComparableIngresoText(row?.nombre || "")
+        if (!clave) {
+            return
+        }
+        if (existentes.has(clave)) {
+            omitidas += 1
+            return
+        }
+        existentes.add(clave)
+        nuevas.push(copiarRecurrenteParaOtroAnio(row))
+    })
+    return { nuevas, omitidas }
+}
+
 // Importe de un cobro. Si no está guardado, se usa el del último mes cobrado,
-// que es el que refleja el importe actual cuando la ganancia sube o baja.
+// que es el que refleja el importe actual cuando la ganancia sube o baja. Las
+// pagas extra no cuentan: una extra en diciembre no es el cobro habitual.
 function getRecurrenteCobro(row) {
     if (String(row.importe || "").trim()) {
         return parseEuroNumber(row.importe)
     }
 
-    const charged = getRecurrenteChargedMonths(row)
-    return charged.length ? charged[charged.length - 1].amount : 0
+    const desglose = getRecurrenteDesglose(row)
+    const bases = INGRESOS_MONTHS.map((month) => desglose[month.key].base).filter((base) => base !== 0)
+    return bases.length ? bases[bases.length - 1] : 0
 }
 
 // Ingreso mensual equivalente: el importe del cobro repartido entre los meses
@@ -145,6 +344,62 @@ function getRecurrenteNextCharge(row, year = currentIngresosYear) {
     const daysLeft = Math.round((date - today) / 86400000)
 
     return { date, daysLeft, isPast: !upcoming }
+}
+
+/**
+ * Cobros del año de una recurrente, con fecha e importe.
+ *
+ * El cobro normal y cada paga extra van por separado, para que el calendario
+ * y el lateral digan cuál es cuál. Sin día de cobro se toma el día 1 y se marca
+ * `sinDia`, que el calendario lista aparte en vez de clavarlo en un día.
+ *
+ * Args:
+ *     row: Recurrente normalizada.
+ *     year: Año de los cobros.
+ *
+ * Returns:
+ *     Lista de `{monthIndex, monthKey, date, sinDia, amount, esExtra, nombre}`.
+ */
+function getRecurrenteCobros(row, year = currentIngresosYear) {
+    const yearNumber = Number(year)
+    if (!Number.isInteger(yearNumber)) {
+        return []
+    }
+
+    const desglose = getRecurrenteDesglose(row)
+    const sinDia = !row.diaCobro
+    const day = Number(row.diaCobro || 1)
+    const cobros = []
+
+    INGRESOS_MONTHS.forEach((month, monthIndex) => {
+        const { base, extra } = desglose[month.key]
+        const lastDay = new Date(yearNumber, monthIndex + 1, 0).getDate()
+        const date = new Date(yearNumber, monthIndex, Math.min(day, lastDay))
+        const comun = { monthIndex, monthKey: month.key, date, sinDia }
+
+        if (base !== 0) {
+            cobros.push({ ...comun, amount: base, esExtra: false, nombre: row.nombre })
+        }
+        if (extra === 0) {
+            return
+        }
+
+        // La parte extra del mes ya está acotada por el desglose; se reparte
+        // entre las pagas de ese mes en su orden, sin pasarse de lo que hay.
+        let restante = extra
+        row.pagasExtra
+            .filter((paga) => paga.mes === month.key)
+            .forEach((paga) => {
+                const amount = Math.min(parseEuroNumber(paga.importe), restante)
+                if (amount <= 0) {
+                    return
+                }
+                restante -= amount
+                cobros.push({ ...comun, amount, esExtra: true, nombre: `${row.nombre} · ${paga.nombre}` })
+            })
+    })
+
+    return cobros
 }
 
 function formatRecurrenteDate(date) {
@@ -292,6 +547,68 @@ function openIngresoTypeModal() {
     })
 }
 
+function openIngresosAddYearModal() {
+    const suggestedYear = getIngresosAnioSugerido()
+
+    openIngresosCreateModal({
+        title: "Añadir año",
+        submitLabel: "Crear año",
+        bodyHtml: `
+            <label class="assetModalLabel" for="ingresosNuevoAnioInput">Año</label>
+            <input id="ingresosNuevoAnioInput" class="assetModalInput" type="text" inputmode="numeric" maxlength="4" autocomplete="off" value="${suggestedYear}">
+        `,
+        onReady: (modal) => {
+            const input = modal.querySelector("#ingresosNuevoAnioInput")
+            input?.addEventListener("keydown", (event) => {
+                if (event.key === "Enter") modal.querySelector("#ingresosCreateModalSaveBtn")?.click()
+            })
+            input?.select()
+        },
+        onSubmit: async ({ getValue, setFeedback }) => {
+            const year = String(getValue("ingresosNuevoAnioInput")).trim()
+            if (!/^\d{4}$/.test(year)) {
+                setFeedback("Escribe un año de 4 cifras, por ejemplo 2027.", true)
+                return false
+            }
+            if (ingresosYears.map(String).includes(year)) {
+                setFeedback(`${year} ya existe.`, true)
+                return false
+            }
+
+            // Las recurrentes se viven como globales, igual que las
+            // mensualidades: el año nuevo hereda las del más cercano.
+            const origen = getAnioOrigenMensualidades(year, ingresosYears)
+
+            try {
+                await persistCurrentIngresosData()
+                await createIngresosYear(year)
+                ingresosYears = await loadIngresosYears()
+                currentIngresosYear = year
+                await renderIngresosYear(year)
+            } catch (error) {
+                console.error(error)
+                setFeedback("No se pudo crear el año.", true)
+                return false
+            }
+
+            // El año ya existe aunque falle la copia: se cierra el popup y se
+            // avisa, para no invitar a crearlo otra vez.
+            if (origen) {
+                try {
+                    const resultado = await copiarRecurrentesAlAnioActual(origen)
+                    if (resultado.nuevas.length) avisarRecurrentesCopiadas(resultado, origen)
+                } catch (error) {
+                    console.error(error)
+                    showToast(`${year} se ha creado, pero no se pudieron copiar los ingresos recurrentes.`, {
+                        type: "error"
+                    })
+                }
+            }
+            return true
+        }
+    })
+}
+
 function openRecurrenteModal() {
     openRecurrenteFormModal(-1)
 }
@@ -309,12 +626,15 @@ function buildRecurrenteFormHtml(row) {
         .map((type) => `<option value="${escapeIngresosHtml(type)}"></option>`)
         .join("")
 
+    // Los meses del formulario son el cobro normal: las pagas extra se editan
+    // en su sección y se vuelven a sumar al guardar.
+    const desglose = getRecurrenteDesglose(row)
     const monthsHtml = INGRESOS_MONTHS.map(
         (month) => `
         <div class="recMonthField">
             <label class="recMonthLabel" for="ingresosRecurrente-${month.key}">${month.label}</label>
             <input id="ingresosRecurrente-${month.key}" class="assetModalInput recMonthInput" data-rec-month="${month.key}"
-                   type="text" inputmode="decimal" value="${escapeIngresosHtml(row.meses?.[month.key] || "")}" placeholder="—">
+                   type="text" inputmode="decimal" value="${desglose[month.key].base ? escapeIngresosHtml(formatEuro(desglose[month.key].base)) : ""}" placeholder="—">
             ${buildMensualidadMesCuentaSelect(month, row.cuentasCobro?.[month.key] || "", row.cuenta || "")}
         </div>
     `
@@ -377,7 +697,71 @@ function buildRecurrenteFormHtml(row) {
             <p class="recFormMonthsHint">Se rellenan solos con el importe y la frecuencia. Edita un mes para ajustarlo a mano. El selector de debajo es la cuenta en la que entra ese mes (por defecto, la cuenta base).</p>
             <div class="recMonthsGrid mensMonthsGridDays">${monthsHtml}</div>
         </div>
+
+        <div class="recFormMonths recPagasExtra">
+            <div class="recFormMonthsHead">
+                <span class="recFormMonthsTitle">Pagas extra</span>
+                <button type="button" class="recGhostBtn" id="ingresosRecurrenteAddPagaBtn">+ Añadir paga extra</button>
+            </div>
+            <p class="recFormMonthsHint">Un añadido puntual en un mes, como la extra de verano o de Navidad. Se suma al cobro de ese mes.</p>
+            <div class="recPagasList" id="ingresosRecurrentePagas">${row.pagasExtra.map(buildPagaExtraRowHtml).join("")}</div>
+        </div>
     `
+}
+
+/**
+ * Fila editable de una paga extra en el formulario.
+ *
+ * Args:
+ *     paga: Paga extra (`nombre`, `mes`, `importe`); vacía para una nueva.
+ *
+ * Returns:
+ *     HTML de la fila.
+ */
+function buildPagaExtraRowHtml(paga = {}) {
+    const mesOptions = INGRESOS_MONTHS.map(
+        (month) => `<option value="${month.key}"${month.key === paga.mes ? " selected" : ""}>${month.label}</option>`
+    ).join("")
+
+    return `
+        <div class="recPagaRow" data-paga-row>
+            <input class="assetModalInput recPagaNombre" data-paga-nombre type="text" aria-label="Nombre de la paga extra"
+                   value="${escapeIngresosHtml(paga.nombre || PAGA_EXTRA_NOMBRE)}" placeholder="${PAGA_EXTRA_NOMBRE}">
+            <select class="assetModalSelect recPagaMes" data-paga-mes aria-label="Mes de la paga extra">${mesOptions}</select>
+            <input class="assetModalInput recPagaImporte" data-paga-importe type="text" inputmode="decimal" aria-label="Importe de la paga extra"
+                   value="${escapeIngresosHtml(paga.importe || "")}" placeholder="0,00 €">
+            <button type="button" class="recPagaQuitar" data-paga-quitar aria-label="Quitar paga extra" title="Quitar">×</button>
+        </div>
+    `
+}
+
+/**
+ * Mes que se propone para una paga extra nueva: junio la primera, diciembre la
+ * segunda (lo habitual en una nómina de 14 pagas) y, después, el primer mes que
+ * aún no tenga ninguna.
+ *
+ * Args:
+ *     usados: Meses que ya tienen paga extra en el formulario.
+ *
+ * Returns:
+ *     Clave del mes.
+ */
+function getMesSugeridoPagaExtra(usados) {
+    const preferidos = ["junio", "diciembre", ...INGRESOS_MONTHS.map((month) => month.key)]
+    return preferidos.find((mes) => !usados.includes(mes)) || "junio"
+}
+
+function readPagasExtraDelFormulario(modal) {
+    return normalizePagasExtra(
+        [...modal.querySelectorAll("[data-paga-row]")].map((fila) => {
+            const importe = String(fila.querySelector("[data-paga-importe]")?.value || "").trim()
+            return {
+                nombre: fila.querySelector("[data-paga-nombre]")?.value,
+                mes: fila.querySelector("[data-paga-mes]")?.value,
+                importe: importe ? formatCellEuroValue(importe) : ""
+            }
+        })
+    )
 }
 
 function bindRecurrenteFormModal(modal, { autoFill }) {
@@ -399,18 +783,55 @@ function bindRecurrenteFormModal(modal, { autoFill }) {
 
     const updatePreview = () => {
         const meses = readMeses()
-        const total = INGRESOS_MONTHS.reduce((sum, month) => sum + parseEuroNumber(meses[month.key] || ""), 0)
+        const pagas = readPagasExtraDelFormulario(modal)
+        const totalExtra = pagas.reduce((sum, paga) => sum + parseEuroNumber(paga.importe), 0)
+        const total =
+            INGRESOS_MONTHS.reduce((sum, month) => sum + parseEuroNumber(meses[month.key] || ""), 0) + totalExtra
         const cobros = INGRESOS_MONTHS.filter((month) => parseEuroNumber(meses[month.key] || "") !== 0).length
 
-        if (!cobros) {
+        if (!cobros && !pagas.length) {
             preview.textContent = "Sin cobros configurados este año."
             return
         }
 
         const dia = normalizeRecurrenteDia(diaSelect.value)
         const diaText = dia ? ` · se cobra el día ${dia}` : ""
-        preview.textContent = `${cobros} ${cobros === 1 ? "cobro" : "cobros"} en ${currentIngresosYear} · ${formatEuro(total)} al año · ${formatEuro(total / 12)} al mes de media${diaText}`
+        const extraText = pagas.length
+            ? ` (${pagas.length} ${pagas.length === 1 ? "paga extra" : "pagas extra"}: ${formatEuro(totalExtra)})`
+            : ""
+        preview.textContent = `${cobros} ${cobros === 1 ? "cobro" : "cobros"} en ${currentIngresosYear} · ${formatEuro(total)} al año${extraText} · ${formatEuro(total / 12)} al mes de media${diaText}`
     }
+
+    const pagasList = modal.querySelector("#ingresosRecurrentePagas")
+    modal.querySelector("#ingresosRecurrenteAddPagaBtn")?.addEventListener("click", () => {
+        const usados = readPagasExtraDelFormulario(modal).map((paga) => paga.mes)
+        // Lo normal es que la extra sea una paga más: se propone el importe del cobro.
+        const importe = importeInput.value.trim() ? formatCellEuroValue(importeInput.value) : ""
+        pagasList.insertAdjacentHTML(
+            "beforeend",
+            buildPagaExtraRowHtml({ nombre: PAGA_EXTRA_NOMBRE, mes: getMesSugeridoPagaExtra(usados), importe })
+        )
+        pagasList.lastElementChild?.querySelector("[data-paga-importe]")?.focus()
+        updatePreview()
+    })
+    pagasList?.addEventListener("click", (event) => {
+        const quitar = event.target.closest("[data-paga-quitar]")
+        if (!quitar) return
+        quitar.closest("[data-paga-row]")?.remove()
+        updatePreview()
+    })
+    pagasList?.addEventListener("input", updatePreview)
+    pagasList?.addEventListener("change", updatePreview)
+    pagasList?.addEventListener(
+        "blur",
+        (event) => {
+            const input = event.target.closest("[data-paga-importe]")
+            if (!input) return
+            input.value = input.value.trim() ? formatCellEuroValue(input.value) : ""
+            updatePreview()
+        },
+        true
+    )
 
     const refillMonths = ({ force = false } = {}) => {
         const computed = computeRecurrenteMeses(importeInput.value, frecuenciaSelect.value)
@@ -468,12 +889,20 @@ function openRecurrenteFormModal(rowIndex = -1) {
         onReady: (modal) => bindRecurrenteFormModal(modal, { autoFill: !isEdit }),
         onSubmit: async ({ getValue, setFeedback, modal }) => {
             const nombre = sanitizeIngresoTypeLabel(getValue("ingresosRecurrenteNombre"))
-            const meses = Object.fromEntries(
+            const baseMeses = Object.fromEntries(
                 [...modal.querySelectorAll("[data-rec-month]")].map((input) => {
                     const rawValue = String(input.value).trim()
                     return [input.dataset.recMonth, rawValue ? formatCellEuroValue(rawValue) : ""]
                 })
             )
+            const filasPaga = modal.querySelectorAll("[data-paga-row]").length
+            const pagasExtra = readPagasExtraDelFormulario(modal)
+            // Una fila de paga sin importe no se guarda: mejor avisar que perderla.
+            if (pagasExtra.length !== filasPaga) {
+                setFeedback("Pon un importe en cada paga extra o quita las que sobren.", true)
+                return false
+            }
+            const meses = sumarPagasExtraAMeses(baseMeses, pagasExtra)
             const hasAnyAmount = INGRESOS_MONTHS.some((month) => parseEuroNumber(meses[month.key]) !== 0)
 
             if (!nombre) {
@@ -526,6 +955,7 @@ function openRecurrenteFormModal(rowIndex = -1) {
                 // La cuenta bancaria es el vacío; las demás, su identificador.
                 cuenta: cuentaBase,
                 cuentasCobro,
+                pagasExtra,
                 meses
             }
 
@@ -595,6 +1025,131 @@ function openIngresoDetailModal(rowElement) {
     modal.querySelector("#ingresosDetailEditBtn")?.addEventListener("click", () => {
         closeIngresoDetailModal()
         openIngresoMovementModal(rowIndex)
+    })
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+
+    ingresosDetailKeyHandler = (event) => {
+        if (event.key === "Escape") closeIngresoDetailModal()
+    }
+    document.addEventListener("keydown", ingresosDetailKeyHandler)
+    modal.querySelector("#ingresosDetailCloseBtn")?.focus()
+}
+
+/**
+ * Lista de los cobros del año de una recurrente para su popup de detalle.
+ *
+ * El cobro normal y cada paga extra van en líneas separadas, con la cuenta en
+ * la que entra ese mes. Lo ya cobrado se apaga y el próximo se resalta.
+ *
+ * Args:
+ *     row: Recurrente normalizada.
+ *
+ * Returns:
+ *     HTML del bloque «Cobros de <año>».
+ */
+function buildRecurrenteDetailCobrosHtml(row) {
+    const cobros = getRecurrenteCobros(row)
+    const today = getIngresosToday()
+    const nextCobro = cobros.find((cobro) => cobro.date >= today)
+
+    const itemsHtml = cobros
+        .map((cobro) => {
+            const classes = ["movDetailCharge"]
+            if (cobro === nextCobro) {
+                classes.push("movDetailChargeNext")
+            } else if (cobro.date < today) {
+                classes.push("movDetailChargeDone")
+            }
+            const fecha = cobro.sinDia ? INGRESOS_MONTHS[cobro.monthIndex].label : formatRecurrenteDate(cobro.date)
+            const cuenta = nombreDeCuenta(row.cuentasCobro?.[cobro.monthKey] || row.cuenta)
+            const extraHtml = cobro.esExtra
+                ? ` <span class="recPagasBadge recPagasBadgeMini">${escapeIngresosHtml(cobro.nombre.slice(row.nombre.length + 3) || PAGA_EXTRA_NOMBRE)}</span>`
+                : ""
+            return `
+                <li class="${classes.join(" ")}">
+                    <span class="movDetailChargeDate">${escapeIngresosHtml(fecha)}${extraHtml}</span>
+                    <span class="movDetailChargeAccount">${escapeIngresosHtml(cuenta)}</span>
+                    <span class="movDetailChargeAmount">${formatEuro(cobro.amount)}</span>
+                </li>
+            `
+        })
+        .join("")
+
+    return `
+        <div class="movDetailCharges">
+            <span class="movDetailNoteLabel">Cobros de ${escapeIngresosHtml(currentIngresosYear)} (${cobros.length})</span>
+            ${
+                cobros.length
+                    ? `<ul class="movDetailChargesList">${itemsHtml}</ul>`
+                    : '<p class="movDetailChargesEmpty">Sin cobros este año.</p>'
+            }
+        </div>
+    `
+}
+
+/**
+ * Abre el popup con el detalle de una ganancia recurrente al pulsar su fila.
+ *
+ * Args:
+ *     index: Posición de la recurrente en `currentIngresosData.recurrentes`.
+ */
+function openRecurrenteDetailModal(index) {
+    const rawRow = currentIngresosData?.recurrentes?.[index]
+    if (!rawRow) return
+
+    closeIngresosCreateModal()
+    closeIngresoDetailModal()
+
+    const row = normalizeRecurrente(rawRow)
+    const frecuencia = getRecurrenteFrecuencia(row.frecuencia)
+    const cobro = getRecurrenteCobro(row)
+    const extraAnual = getRecurrenteExtraAnual(row)
+    const next = getRecurrenteNextCharge(row)
+    const nextText = next && !next.isPast
+        ? `${formatRecurrenteDate(next.date)} (${next.daysLeft === 0 ? "hoy" : `en ${next.daysLeft} d`})`
+        : "—"
+    const nota = row.nota.trim()
+
+    const overlay = document.createElement("div")
+    overlay.id = "ingresosDetailModalOverlay"
+    overlay.className = "modalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal movDetailModal movDetailModalWide"
+    modal.setAttribute("role", "dialog")
+    modal.setAttribute("aria-modal", "true")
+    modal.setAttribute("aria-labelledby", "ingresosDetailModalTitle")
+    modal.innerHTML = `
+        <h3 class="assetModalTitle" id="ingresosDetailModalTitle">${escapeIngresosHtml(row.nombre || "Ganancia recurrente")}</h3>
+        <dl class="movDetailList">
+            <div class="movDetailItem"><dt>Categoría</dt><dd>${escapeIngresosHtml(row.categoria || "—")}</dd></div>
+            <div class="movDetailItem"><dt>Cuenta</dt><dd>${escapeIngresosHtml(nombreDeCuenta(row.cuenta))}</dd></div>
+            <div class="movDetailItem"><dt>Importe</dt><dd class="movDetailAmount movDetailAmountPos">${cobro ? formatEuro(cobro) : "—"}</dd></div>
+            <div class="movDetailItem"><dt>Frecuencia</dt><dd>${escapeIngresosHtml(frecuencia.short)}</dd></div>
+            <div class="movDetailItem"><dt>Día de cobro</dt><dd>${row.diaCobro ? `Día ${escapeIngresosHtml(row.diaCobro)}` : "—"}</dd></div>
+            <div class="movDetailItem"><dt>Próximo cobro</dt><dd>${escapeIngresosHtml(nextText)}</dd></div>
+            <div class="movDetailItem"><dt>Estado</dt><dd>${row.activa ? "Activa" : "Pausada"}</dd></div>
+            <div class="movDetailItem"><dt>Ingreso mensual</dt><dd>${formatEuro(getRecurrenteMonthlyAmount(row))}</dd></div>
+            <div class="movDetailItem"><dt>Total ${escapeIngresosHtml(currentIngresosYear)}</dt><dd>${formatEuro(getRecurrenteAnnualAmount(row))}</dd></div>
+            ${extraAnual ? `<div class="movDetailItem"><dt>Pagas extra</dt><dd>${row.pagasExtra.length} · ${formatEuro(extraAnual)}</dd></div>` : ""}
+        </dl>
+        ${buildRecurrenteDetailCobrosHtml(row)}
+        <div class="movDetailNote${nota ? "" : " movDetailNoteEmpty"}">
+            <span class="movDetailNoteLabel">Nota</span>
+            <p class="movDetailNoteText">${nota ? escapeIngresosHtml(nota) : "Sin nota"}</p>
+        </div>
+        <div class="assetModalActions">
+            <button type="button" class="cancelButton" id="ingresosDetailCloseBtn">Cerrar</button>
+            <button type="button" class="primaryButton" id="ingresosDetailEditBtn">Editar</button>
+        </div>
+    `
+
+    modal.querySelector("#ingresosDetailCloseBtn")?.addEventListener("click", closeIngresoDetailModal)
+    modal.querySelector("#ingresosDetailEditBtn")?.addEventListener("click", () => {
+        closeIngresoDetailModal()
+        openRecurrenteFormModal(index)
     })
 
     overlay.appendChild(modal)
@@ -813,16 +1368,37 @@ async function deleteIngresosYearRequest(year) {
     return await response.json()
 }
 
-async function initIngresosLogic() {
+/**
+ * Arranca la página de Ingresos.
+ *
+ * Args:
+ *     options.soloRecurrentes: true al abrirla desde Mi dinero › Ingresos
+ *         recurrentes; la página se queda en esa vista.
+ */
+async function initIngresosLogic({ soloRecurrentes = false } = {}) {
+    ingresosSoloRecurrentes = soloRecurrentes
     ingresosYears = await loadIngresosYears()
     sharedIngresosTypes = await loadSharedIngresosTypes()
     // Para el selector «Cobrado en» del popup y la columna «Cuenta».
     await cargarCuentasDinero()
     currentIngresosYear = ingresosYears[0] || "2026"
     currentIngresosMonth = "enero"
-    currentIngresosView = "year"
+    currentIngresosView = getIngresosVistaPorDefecto()
+    document.getElementById("ingresosRecurrentesTabBtn")?.classList.toggle("hidden", soloRecurrentes)
     recurrentesFilter = "todas"
     recurrentesSearch = ""
+    recurrentesTab = "tabla"
+    recCalendarSelection = null
+    // Ingresos e Ingresos recurrentes comparten fragmento: los chips y el
+    // buscador pueden venir con el estado de la otra entrada.
+    document.querySelectorAll("[data-rec-filter]").forEach((chip) => {
+        chip.classList.toggle("active", chip.dataset.recFilter === recurrentesFilter)
+    })
+    document.querySelectorAll("[data-rec-view]").forEach((chip) => {
+        chip.classList.toggle("active", chip.dataset.recView === recurrentesTab)
+    })
+    const recSearchInput = document.getElementById("recSearchInput")
+    if (recSearchInput) recSearchInput.value = ""
     bindIngresosPersistenceGuards()
     window.flushPendingPageChanges = flushIngresosPendingChanges
     await renderIngresosYear(currentIngresosYear)
@@ -849,6 +1425,97 @@ async function initIngresosLogic() {
     if (ingresosMovementsTable) bindTableSort(ingresosMovementsTable, "ingresos")
 }
 
+/**
+ * Vista a la que vuelve la página al abrirse o al cambiar de año.
+ *
+ * Returns:
+ *     "recurrentes" si se abrió desde su entrada del menú; "year" en Ingresos.
+ */
+function getIngresosVistaPorDefecto() {
+    return ingresosSoloRecurrentes ? "recurrentes" : "year"
+}
+
+// El año que lo normal es crear: el actual si aún no existe y, si ya está, el
+// siguiente al más reciente.
+function getIngresosAnioSugerido() {
+    const actual = String(new Date().getFullYear())
+    const years = ingresosYears.map(String)
+    if (!years.includes(actual)) {
+        return actual
+    }
+    return String(Math.max(...years.map(Number).filter(Number.isInteger)) + 1)
+}
+
+/**
+ * Añade al año abierto las recurrentes de otro año que le falten y guarda.
+ *
+ * Args:
+ *     origen: Año del que se copian.
+ *
+ * Returns:
+ *     Lo que devuelve getRecurrentesParaCopiar: filas añadidas y omitidas.
+ */
+async function copiarRecurrentesAlAnioActual(origen) {
+    const datosOrigen = await loadIngresosYear(origen)
+    syncIngresosDataFromTables()
+    const resultado = getRecurrentesParaCopiar(datosOrigen?.recurrentes, currentIngresosData.recurrentes)
+    if (resultado.nuevas.length) {
+        currentIngresosData.recurrentes.push(...resultado.nuevas)
+        renderCurrentIngresosView()
+        await persistCurrentIngresosData()
+        // Un año de ingresos solo existe en el servidor cuando tiene algo
+        // guardado: recién creado no salía en la lista hasta recargar.
+        if (!ingresosYears.map(String).includes(String(currentIngresosYear))) {
+            ingresosYears = await loadIngresosYears()
+            renderIngresosYearButtons()
+        }
+    }
+    return resultado
+}
+
+function avisarRecurrentesCopiadas({ nuevas, omitidas }, origen) {
+    if (!nuevas.length) {
+        showToast(
+            omitidas ? `Las recurrentes de ${origen} ya estaban en este año.` : `${origen} no tiene ingresos recurrentes.`,
+            { type: "warning" }
+        )
+        return
+    }
+    const copiadas = nuevas.length === 1 ? "1 ingreso recurrente" : `${nuevas.length} ingresos recurrentes`
+    const yaEstaban = omitidas ? ` (${omitidas} ya estaban)` : ""
+    showToast(`Copiados ${copiadas} de ${origen}${yaEstaban}.`, { type: "success" })
+}
+
+function openCopiarRecurrentesModal() {
+    const otros = ingresosYears.map(String).filter((year) => year !== String(currentIngresosYear))
+    if (!otros.length) {
+        showToast("No hay otro año del que copiar ingresos recurrentes.", { type: "warning" })
+        return
+    }
+    const origen = getAnioOrigenMensualidades(currentIngresosYear, ingresosYears)
+    const opciones = otros
+        .map(
+            (year) =>
+                `<option value="${escapeIngresosHtml(year)}"${year === origen ? " selected" : ""}>${escapeIngresosHtml(year)}</option>`
+        )
+        .join("")
+
+    openIngresosCreateModal({
+        title: `Copiar recurrentes a ${currentIngresosYear}`,
+        submitLabel: "Copiar",
+        bodyHtml: `
+            <label class="assetModalLabel" for="ingresosCopiarOrigen">Desde el año</label>
+            <select id="ingresosCopiarOrigen" class="assetModalSelect">${opciones}</select>
+            <p class="cuentasHint">Se añaden las que falten en ${escapeIngresosHtml(currentIngresosYear)}, con sus pagas extra; las que ya tiene, con el mismo concepto, no se tocan.</p>
+        `,
+        onSubmit: async ({ getValue }) => {
+            const elegido = String(getValue("ingresosCopiarOrigen"))
+            avisarRecurrentesCopiadas(await copiarRecurrentesAlAnioActual(elegido), elegido)
+            return true
+        }
+    })
+}
+
 function bindIngresosEvents() {
     const menuTrigger = document.querySelector("#ingresosActionsMenu .pageActionsMenuTrigger")
     const menuDropdown = document.getElementById("ingresosActionsDropdown")
@@ -871,21 +1538,13 @@ function bindIngresosEvents() {
 
     if (addYearButton && !addYearButton.dataset.bound) {
         addYearButton.dataset.bound = "true"
-        addYearButton.addEventListener("click", async () => {
-            const suggestedYear = String(new Date().getFullYear())
-            const year = prompt("Escribe el nuevo año (YYYY)", suggestedYear)?.trim()
-            if (!year) return
-            try {
-                await persistCurrentIngresosData()
-                await createIngresosYear(year)
-                ingresosYears = await loadIngresosYears()
-                currentIngresosYear = year
-                await renderIngresosYear(year)
-            } catch (error) {
-                console.error(error)
-                alert("No se pudo crear el año.")
-            }
-        })
+        addYearButton.addEventListener("click", openIngresosAddYearModal)
+    }
+
+    const copyRecurrentesButton = document.getElementById("copyRecurrentesBtn")
+    if (copyRecurrentesButton && !copyRecurrentesButton.dataset.bound) {
+        copyRecurrentesButton.dataset.bound = "true"
+        copyRecurrentesButton.addEventListener("click", openCopiarRecurrentesModal)
     }
 
     if (deleteYearButton && !deleteYearButton.dataset.bound) {
@@ -903,7 +1562,7 @@ function bindIngresosEvents() {
                         ? ordenarAniosRecientesPrimero(response.years)
                         : await loadIngresosYears()
                     currentIngresosYear = ingresosYears[0]
-                    currentIngresosView = "year"
+                    currentIngresosView = getIngresosVistaPorDefecto()
                     currentIngresosMonth = "enero"
                     await renderIngresosYear(currentIngresosYear)
                 }
@@ -967,7 +1626,8 @@ function renderIngresosYearButtons() {
         button.addEventListener("click", async () => {
             await persistCurrentIngresosData()
             currentIngresosYear = year
-            currentIngresosView = "year"
+            currentIngresosView = getIngresosVistaPorDefecto()
+            recCalendarSelection = null
             await renderIngresosYear(year)
         })
         list.appendChild(button)
@@ -1391,8 +2051,12 @@ function renderCurrentIngresosView() {
     const kpiStrip = document.getElementById("ingresosKpiStrip")
     if (!annualWrapper || !movementsWrapper || !monthHeader || !actions) return
 
+    const monthBar = document.getElementById("ingresosMonthBar")
+
     const showView = (view) => {
         kpiStrip?.classList.toggle("hidden", view !== "year")
+        // En recurrentes solo queda el selector de año: los meses no pintan nada ahí.
+        monthBar?.classList.toggle("hidden", view === "recurrentes")
         annualWrapper.classList.toggle("hidden", view !== "year")
         movementsWrapper.classList.toggle("hidden", view !== "month")
         recurrentesWrapper?.classList.toggle("hidden", view !== "recurrentes")
@@ -1421,6 +2085,24 @@ function renderCurrentIngresosView() {
 
 function renderRecurrentesView() {
     renderRecurrentesSummary()
+    renderRecurrentesList()
+}
+
+// Tabla y calendario miran los mismos datos con los mismos filtros: solo cambia
+// la forma. Un único sitio decide cuál se ve.
+function renderRecurrentesList() {
+    const table = document.getElementById("recTableWrapper")
+    const calendar = document.getElementById("recCalendar")
+    const isCalendar = recurrentesTab === "calendario"
+
+    table?.classList.toggle("hidden", isCalendar)
+    calendar?.classList.toggle("hidden", !isCalendar)
+
+    if (isCalendar) {
+        renderRecurrentesCalendar()
+        return
+    }
+
     renderRecurrentesTable()
 }
 
@@ -1431,6 +2113,9 @@ function renderRecurrentesSummary() {
     const rows = getRecurrentes()
     const activas = rows.filter((row) => row.activa)
     const totalAnual = activas.reduce((sum, row) => sum + getRecurrenteAnnualAmount(row), 0)
+    const mensualActual = activas.reduce((sum, row) => sum + getRecurrenteMonthlyAmount(row), 0)
+    const totalExtra = activas.reduce((sum, row) => sum + getRecurrenteExtraAnual(row), 0)
+    const numPagasExtra = activas.reduce((sum, row) => sum + row.pagasExtra.length, 0)
 
     const nextCharges = activas
         .map((row) => ({ row, next: getRecurrenteNextCharge(row) }))
@@ -1444,17 +2129,25 @@ function renderRecurrentesSummary() {
         : "Sin cobros pendientes"
 
     const pausadas = rows.length - activas.length
+    // Lo que entra un mes normal y lo que entra en el año son números distintos:
+    // el anual suma las pagas extra, que no llegan todos los meses.
     const cards = [
         {
-            label: "Ingreso mensual medio",
-            value: formatEuro(totalAnual / 12),
-            hint: `Media de ${currentIngresosYear}, con cambios de importe`
+            label: "Ingreso mensual",
+            value: formatEuro(mensualActual),
+            hint: `Sin pagas extra · ${activas.length} activa${activas.length === 1 ? "" : "s"}, ${pausadas} pausada${pausadas === 1 ? "" : "s"}`
         },
-        { label: "Ingreso anual", value: formatEuro(totalAnual), hint: "Solo ganancias activas" },
         {
-            label: "Ganancias activas",
-            value: String(activas.length),
-            hint: `${pausadas} pausada${pausadas === 1 ? "" : "s"}`
+            label: "Ingreso del año",
+            value: formatEuro(totalAnual),
+            hint: `${currentIngresosYear} · ${formatEuro(totalAnual / 12)} al mes de media`
+        },
+        {
+            label: "Pagas extra",
+            value: formatEuro(totalExtra),
+            hint: numPagasExtra
+                ? `${numPagasExtra} ${numPagasExtra === 1 ? "paga" : "pagas"} en ${currentIngresosYear}`
+                : "Ninguna este año"
         },
         { label: "Próximo cobro", value: nextValue, hint: nextHint }
     ]
@@ -1497,7 +2190,22 @@ function renderRecurrentesTable() {
         const message = totalRows
             ? "Ninguna ganancia recurrente coincide con el filtro."
             : "Aún no hay ganancias recurrentes. Añade la primera para llevar el control de tus ingresos fijos."
-        body.innerHTML = `<tr class="recEmptyRow"><td colspan="10">${message}</td></tr>`
+        // Un año sin recurrentes: el atajo para traer las de otro año va aquí mismo.
+        const origen = totalRows ? null : getAnioOrigenMensualidades(currentIngresosYear, ingresosYears)
+        const copiarHtml = origen
+            ? `<div class="mensEmptyActions"><button type="button" class="primaryButton" data-rec-copiar data-no-autohide="true">Copiar las de ${escapeIngresosHtml(origen)}</button></div>`
+            : ""
+        body.innerHTML = `<tr class="recEmptyRow"><td colspan="10">${message}${copiarHtml}</td></tr>`
+        body.querySelector("[data-rec-copiar]")?.addEventListener("click", async (event) => {
+            event.currentTarget.disabled = true
+            try {
+                avisarRecurrentesCopiadas(await copiarRecurrentesAlAnioActual(origen), origen)
+            } catch (error) {
+                console.error(error)
+                showToast("No se pudieron copiar los ingresos recurrentes.", { type: "error" })
+                renderRecurrentesTable()
+            }
+        })
         foot.innerHTML = ""
         return
     }
@@ -1517,7 +2225,7 @@ function renderRecurrentesTable() {
             const cobro = getRecurrenteCobro(row)
 
             return `
-            <tr class="${row.activa ? "" : "recRowPaused"}">
+            <tr class="movDetailRow${row.activa ? "" : " recRowPaused"}" data-rec-index="${index}">
                 <td class="recColName">
                     <span class="recNameMain">${escapeIngresosHtml(row.nombre)}</span>
                     ${row.categoria ? `<span class="recNameMeta">${escapeIngresosHtml(row.categoria)}</span>` : ""}
@@ -1557,6 +2265,202 @@ function renderRecurrentesTable() {
             <td class="numCell">${formatEuro(visibleAnual)}</td>
             <td colspan="2"></td>
         </tr>
+    `
+}
+
+// ── Calendario de cobros ────────────────────────────────────────────────────
+// Usa las clases del calendario de Mensualidades (gastos.css) para que las dos
+// vistas se lean igual; solo cambia que aquí el dinero entra y que las pagas
+// extra se marcan aparte.
+
+const REC_CAL_WEEKDAYS = ["L", "M", "X", "J", "V", "S", "D"]
+
+function getIngresosToday() {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return today
+}
+
+// Todos los cobros del año que pasan el filtro, ordenados por fecha.
+function getRecurrentesCobrosDelAno() {
+    const cobros = []
+    getFilteredRecurrentes().forEach(({ row, index }) => {
+        getRecurrenteCobros(row).forEach((cobro) => cobros.push({ ...cobro, index, activa: row.activa }))
+    })
+    return cobros.sort((a, b) => a.date - b.date || a.nombre.localeCompare(b.nombre))
+}
+
+function recCalDayKey(monthIndex, day) {
+    return `${monthIndex}-${day}`
+}
+
+/**
+ * Importe abreviado para la celda de un día del calendario.
+ *
+ * Una nómina no cabe entera en una celda de 30 px («1500,00 €» se cortaba en
+ * «15…»); el importe exacto sigue en el título de la celda y en el lateral.
+ *
+ * Args:
+ *     amount: Importe en euros.
+ *
+ * Returns:
+ *     Texto corto: "1,5k" a partir de mil, el entero redondeado por debajo.
+ *
+ * Example:
+ *     formatRecCalImporte(1500)  // "1,5k"
+ *     formatRecCalImporte(900)   // "900"
+ */
+function formatRecCalImporte(amount) {
+    if (Math.abs(amount) >= 1000) {
+        return `${(amount / 1000).toLocaleString("es-ES", { maximumFractionDigits: 1 })}k`
+    }
+    return String(Math.round(amount))
+}
+
+function buildRecCalMonth(monthIndex, cobrosDelMes, today, yearNumber) {
+    const month = INGRESOS_MONTHS[monthIndex]
+    const conDia = cobrosDelMes.filter((cobro) => !cobro.sinDia)
+    const sinDia = cobrosDelMes.filter((cobro) => cobro.sinDia)
+    const total = cobrosDelMes.reduce((sum, cobro) => sum + cobro.amount, 0)
+    const extraDelMes = cobrosDelMes.some((cobro) => cobro.esExtra)
+
+    const porDia = new Map()
+    conDia.forEach((cobro) => {
+        const day = cobro.date.getDate()
+        porDia.set(day, [...(porDia.get(day) || []), cobro])
+    })
+
+    const diasDelMes = new Date(yearNumber, monthIndex + 1, 0).getDate()
+    // getDay() cuenta desde el domingo; aquí la semana empieza en lunes.
+    const hueco = (new Date(yearNumber, monthIndex, 1).getDay() + 6) % 7
+    const celdas = Array.from({ length: hueco }, () => '<span class="mensCalDay mensCalDayBlank"></span>')
+
+    for (let day = 1; day <= diasDelMes; day += 1) {
+        const delDia = porDia.get(day) || []
+        const fecha = new Date(yearNumber, monthIndex, day)
+        const classes = ["mensCalDay"]
+        if (fecha.getTime() === today.getTime()) classes.push("mensCalDayToday")
+
+        if (!delDia.length) {
+            celdas.push(`<span class="${classes.join(" ")} mensCalDayEmpty"><span class="mensCalDayNum">${day}</span></span>`)
+            continue
+        }
+
+        const key = recCalDayKey(monthIndex, day)
+        const importe = delDia.reduce((sum, cobro) => sum + cobro.amount, 0)
+        classes.push("mensCalDayCharged", fecha <= today ? "mensCalDayPast" : "mensCalDayNext")
+        if (delDia.some((cobro) => cobro.esExtra)) classes.push("recCalDayExtra")
+        if (recCalendarSelection === key) classes.push("mensCalDaySelected")
+
+        const detalle = delDia.map((cobro) => `${cobro.nombre}: ${formatEuro(cobro.amount)}`).join(" · ")
+        celdas.push(`
+            <button type="button" class="${classes.join(" ")}" data-rec-cal-day="${key}"
+                    title="${escapeIngresosHtml(`${day} de ${month.label.toLowerCase()} · ${detalle}`)}">
+                <span class="mensCalDayNum">${day}</span>
+                <span class="mensCalDayAmount">${formatRecCalImporte(importe)}</span>
+                ${delDia.length > 1 ? `<span class="mensCalDayCount">${delDia.length}</span>` : ""}
+            </button>
+        `)
+    }
+
+    return `
+        <article class="mensCalMonth${cobrosDelMes.length ? "" : " mensCalMonthEmpty"}">
+            <header class="mensCalMonthHead">
+                <span class="mensCalMonthName">${month.label}${extraDelMes ? '<span class="recPagasBadge recPagasBadgeMini">extra</span>' : ""}</span>
+                <span class="mensCalMonthTotal">${cobrosDelMes.length ? formatEuro(total) : "—"}</span>
+            </header>
+            <div class="mensCalWeekdays">${REC_CAL_WEEKDAYS.map((d) => `<span>${d}</span>`).join("")}</div>
+            <div class="mensCalDays">${celdas.join("")}</div>
+            ${
+                sinDia.length
+                    ? `<p class="mensCalNoDay">Sin día: ${escapeIngresosHtml(sinDia.map((cobro) => cobro.nombre).join(", "))}</p>`
+                    : ""
+            }
+        </article>
+    `
+}
+
+function buildRecCalSideItem(cobro, conFecha) {
+    const fecha = conFecha
+        ? `<span class="mensCalSideDate">${cobro.sinDia ? INGRESOS_MONTHS[cobro.monthIndex].label.toLowerCase() : formatRecurrenteDate(cobro.date)}</span>`
+        : ""
+    return `
+        <li class="mensCalSideItem${cobro.activa ? "" : " mensCalSideItemPaused"}${cobro.esExtra ? " recCalSideItemExtra" : ""}">
+            <span class="mensCalSideName">${escapeIngresosHtml(cobro.nombre)}</span>
+            ${fecha}
+            <span class="mensCalSideAmount">${formatEuro(cobro.amount)}</span>
+        </li>
+    `
+}
+
+function buildRecCalDetalle(cobros, today) {
+    if (recCalendarSelection) {
+        const [monthIndex, day] = recCalendarSelection.split("-").map(Number)
+        const delDia = cobros.filter(
+            (cobro) => !cobro.sinDia && cobro.monthIndex === monthIndex && cobro.date.getDate() === day
+        )
+
+        if (delDia.length) {
+            const total = delDia.reduce((sum, cobro) => sum + cobro.amount, 0)
+            return `
+                <p class="mensCalSideLabel">${delDia[0].date <= today ? "Cobrado" : "Previsto"}</p>
+                <p class="mensCalSideTitle">${day} de ${INGRESOS_MONTHS[monthIndex].label.toLowerCase()}</p>
+                <ul class="mensCalSideList">${delDia.map((cobro) => buildRecCalSideItem(cobro, false)).join("")}</ul>
+                <p class="mensCalSideTotal"><span>Total del día</span><span>${formatEuro(total)}</span></p>
+            `
+        }
+    }
+
+    // Sin día elegido, el panel cuenta el año: lo ya cobrado y lo que viene.
+    const cobrados = cobros.filter((cobro) => cobro.date <= today)
+    const pendientes = cobros.filter((cobro) => cobro.date > today)
+    const sumar = (lista) => lista.reduce((sum, cobro) => sum + cobro.amount, 0)
+    const extras = cobros.filter((cobro) => cobro.esExtra)
+
+    return `
+        <p class="mensCalSideLabel">Ingresos de ${currentIngresosYear}</p>
+        <p class="mensCalSideTitle">${cobros.length} ${cobros.length === 1 ? "cobro" : "cobros"}</p>
+        <p class="mensCalSideTotal"><span>Cobrado</span><span>${formatEuro(sumar(cobrados))}</span></p>
+        <p class="mensCalSideTotal"><span>Por cobrar</span><span>${formatEuro(sumar(pendientes))}</span></p>
+        ${extras.length ? `<p class="mensCalSideTotal"><span>Pagas extra</span><span>${formatEuro(sumar(extras))}</span></p>` : ""}
+        <p class="mensCalSideLabel mensCalSideLabelSpaced">Lo que viene</p>
+        ${
+            pendientes.length
+                ? `<ul class="mensCalSideList">${pendientes
+                      .slice(0, 6)
+                      .map((cobro) => buildRecCalSideItem(cobro, true))
+                      .join("")}</ul>`
+                : '<p class="mensCalSideEmpty">No queda ningún cobro este año.</p>'
+        }
+        <p class="mensCalSideHint">Pulsa un día para ver qué se cobró.</p>
+    `
+}
+
+function renderRecurrentesCalendar() {
+    const container = document.getElementById("recCalendar")
+    if (!container) return
+
+    const yearNumber = Number(currentIngresosYear)
+    const cobros = Number.isInteger(yearNumber) ? getRecurrentesCobrosDelAno() : []
+
+    if (!cobros.length) {
+        const totalRows = (currentIngresosData?.recurrentes || []).length
+        container.innerHTML = `<p class="mensCalEmpty">${
+            totalRows
+                ? "Ninguna ganancia recurrente con cobros coincide con el filtro."
+                : "Aún no hay ganancias recurrentes. Añade la primera para ver el calendario de cobros."
+        }</p>`
+        return
+    }
+
+    const today = getIngresosToday()
+    const porMes = INGRESOS_MONTHS.map((month, index) => cobros.filter((cobro) => cobro.monthIndex === index))
+
+    container.innerHTML = `
+        <div class="mensCalGrid">
+            ${INGRESOS_MONTHS.map((month, index) => buildRecCalMonth(index, porMes[index], today, yearNumber)).join("")}
+        </div>
+        <aside class="mensCalSide">${buildRecCalDetalle(cobros, today)}</aside>
     `
 }
 
@@ -1604,7 +2508,13 @@ function handleRecurrentesActionClick(event) {
     }
 
     const deleteBtn = event.target.closest("[data-rec-delete]")
-    if (!deleteBtn) return
+    if (!deleteBtn) {
+        // Pulsar la fila (fuera del menú de acciones) abre su detalle.
+        if (event.target.closest(".rowActionsCell")) return
+        const rowElement = event.target.closest("tr[data-rec-index]")
+        if (rowElement) openRecurrenteDetailModal(Number(rowElement.dataset.recIndex))
+        return
+    }
 
     const index = Number(deleteBtn.dataset.recDelete)
     const row = currentIngresosData?.recurrentes?.[index]
@@ -1648,7 +2558,7 @@ function bindRecurrentesViewEvents() {
         searchInput.dataset.bound = "true"
         searchInput.addEventListener("input", () => {
             recurrentesSearch = searchInput.value
-            renderRecurrentesTable()
+            renderRecurrentesList()
         })
     }
 
@@ -1663,7 +2573,36 @@ function bindRecurrentesViewEvents() {
             filterGroup.querySelectorAll("[data-rec-filter]").forEach((item) => {
                 item.classList.toggle("active", item === chip)
             })
-            renderRecurrentesTable()
+            renderRecurrentesList()
+        })
+    }
+
+    const viewGroup = document.getElementById("recViewGroup")
+    if (viewGroup && !viewGroup.dataset.bound) {
+        viewGroup.dataset.bound = "true"
+        viewGroup.addEventListener("click", (event) => {
+            const chip = event.target.closest("[data-rec-view]")
+            if (!chip) return
+
+            recurrentesTab = chip.dataset.recView
+            viewGroup.querySelectorAll("[data-rec-view]").forEach((item) => {
+                item.classList.toggle("active", item === chip)
+            })
+            renderRecurrentesList()
+        })
+    }
+
+    const calendar = document.getElementById("recCalendar")
+    if (calendar && !calendar.dataset.bound) {
+        calendar.dataset.bound = "true"
+        calendar.addEventListener("click", (event) => {
+            const dayButton = event.target.closest("[data-rec-cal-day]")
+            if (!dayButton) return
+
+            // Pulsar el día ya elegido vuelve al resumen del año.
+            const key = dayButton.dataset.recCalDay
+            recCalendarSelection = recCalendarSelection === key ? null : key
+            renderRecurrentesCalendar()
         })
     }
 

@@ -18,6 +18,7 @@
                 <button id="addIngresoTypeRowBtn" class="pageActionsItem" type="button">Añadir ingreso</button>
                 <button class="pageActionsItem" type="button" data-abrir-categorias>Gestionar categorías</button>
                 <button id="addRecurrenteRowBtn" class="pageActionsItem" type="button">Añadir ganancia recurrente</button>
+                <button id="copyRecurrentesBtn" class="pageActionsItem" type="button">Copiar recurrentes de otro año</button>
                 <button id="downloadIngresosCsvBtn" class="pageActionsItem" type="button">Descargar CSV</button>
                 <button id="ingresosInformeBtn" class="pageActionsItem" type="button">Descargar informe (PDF)</button>
             </div>
@@ -57,7 +58,7 @@
         </div>
     </div>
 
-    <div class="ingresosMonthBar">
+    <div class="ingresosMonthBar" id="ingresosMonthBar">
         <div class="ingresosMonthTabs" id="ingresosMonthTabs"></div>
     </div>
 
@@ -71,10 +72,16 @@
                 <button type="button" class="recFilterChip" data-rec-filter="activas">Activas</button>
                 <button type="button" class="recFilterChip" data-rec-filter="pausadas">Pausadas</button>
             </div>
+            <div class="recFilterGroup" id="recViewGroup">
+                <button type="button" class="recFilterChip active" data-rec-view="tabla">Tabla</button>
+                <button type="button" class="recFilterChip" data-rec-view="calendario">Calendario</button>
+            </div>
             <button id="recAddBtn" class="primaryButton recAddBtn" type="button">+ Nueva ganancia recurrente</button>
         </div>
 
-        <div class="recTableWrapper">
+        <div class="mensCalendar recCalendar hidden" id="recCalendar"></div>
+
+        <div class="recTableWrapper" id="recTableWrapper">
             <table class="recTable">
                 <thead>
                     <tr>

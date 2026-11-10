@@ -29,6 +29,9 @@ ALTO = 180
 # documento, y Telegram no admite una foto de cabecera en un documento.
 CATEGORIAS = {
     "precios": ("Alerta de precio", "ajustes/grafico-linea.svg", "#38bdf8"),
+    "movimientos": ("Caída o subida brusca", "ajustes/umbral.svg", "#fb7185"),
+    "posicion": ("Tu posición", "ajustes/billete.svg", "#4ade80"),
+    "cartera": ("Tu cartera", "ajustes/portfolio.svg", "#fbbf24"),
     "wallets": ("Wallets", "ajustes/moneda.svg", "#f59e0b"),
     "resumen": ("Resumen diario", "ajustes/grafico-barras.svg", "#a78bfa"),
     "proveedores": ("Proveedores", "ajustes/conexion.svg", "#22d3ee"),

@@ -345,7 +345,8 @@ const PN_TIPOS_ACTIVO = [
     { valor: "cripto", texto: "Cripto" },
     { valor: "acciones", texto: "Acciones" },
     { valor: "etfs", texto: "ETFs" },
-    { valor: "comoditis", texto: "Comoditis" }
+    { valor: "comoditis", texto: "Comoditis" },
+    { valor: "indices", texto: "Índices" }
 ]
 
 let _pnConfig = { paneles: [], activo: "" }
@@ -736,7 +737,8 @@ const PN_TIPO_TV = {
     etf: "etfs",
     crypto: "cripto",
     commodity: "comoditis",
-    futures: "comoditis"
+    futures: "comoditis",
+    index: "indices"
 }
 
 function pnIdTicker(resultado) {
