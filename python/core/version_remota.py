@@ -30,6 +30,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from core import paths, settings
@@ -40,7 +41,16 @@ log = logging.getLogger(__name__)
 
 NOMBRE_CACHE = "actualizacion.remota"
 RUTA_VERSION = "python/core/version.py"
-PLANTILLA_URL = "https://raw.githubusercontent.com/{repositorio}/{rama}/{ruta}"
+
+# Se lee por la API de contenidos y no por raw.githubusercontent.com: raw va
+# detrás de una CDN con `max-age=300`, y una comprobación en los cinco minutos
+# siguientes a un push recibía la versión anterior. Como el «al día» se guarda
+# seis horas, el panel seguía negando la versión nueva toda la tarde. La API
+# lee la rama en el momento. Sin token permite 60 peticiones por hora y IP, que
+# con la caché de abajo no se acercan ni de lejos.
+PLANTILLA_URL = "https://api.github.com/repos/{repositorio}/contents/{ruta}?ref={rama}"
+ACCEPT_CONTENIDO = "application/vnd.github.raw"
+VERSION_API_GITHUB = "2022-11-28"
 
 # Un fallo se recuerda mucho menos que un acierto: puede ser un corte de un
 # minuto, y dejar el panel diciendo «no se pudo comprobar» durante seis horas
@@ -125,13 +135,15 @@ def _url(ruta: str = RUTA_VERSION) -> str | None:
     if ".." in repositorio or ".." in rama:
         return None
 
-    return PLANTILLA_URL.format(repositorio=repositorio, rama=rama, ruta=ruta)
+    # La rama va en la query: una rama con `/` tiene que ir codificada entera.
+    return PLANTILLA_URL.format(repositorio=repositorio, rama=quote(rama, safe=""), ruta=ruta)
 
 
 def _leerUrl(url: str, maximo: int) -> str:
     peticion = Request(url, headers={
         "User-Agent": f"PorfolioManager/{__version__}",
-        "Accept": "text/plain",
+        "Accept": ACCEPT_CONTENIDO,
+        "X-GitHub-Api-Version": VERSION_API_GITHUB,
     })
     with urlopen(peticion, timeout=settings.actualizacionTimeout()) as respuesta:
         return respuesta.read(maximo).decode("utf-8", errors="replace")
@@ -247,6 +259,9 @@ def _consultarAGithub() -> tuple[str | None, str | None]:
     except HTTPError as error:
         if error.code == 404:
             return None, "GitHub no encuentra el repositorio o la rama configurados"
+        # La API sin token responde 403 o 429 al agotar las 60 peticiones/hora.
+        if error.code in (403, 429):
+            return None, f"GitHub limita las consultas ahora mismo ({error.code}); prueba más tarde"
         return None, f"GitHub respondió {error.code}"
     except (TimeoutError, URLError, OSError) as error:
         return None, f"No se pudo conectar con GitHub ({error})"

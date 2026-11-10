@@ -253,8 +253,31 @@ def testLaUrlApuntaALaRamaConfigurada(monkeypatch):
     url = version_remota._url()
 
     assert url == (
-        "https://raw.githubusercontent.com/alguien/otro-repo/pruebas/python/core/version.py"
+        "https://api.github.com/repos/alguien/otro-repo/contents/python/core/version.py?ref=pruebas"
     )
+
+
+def testUnaRamaConBarraVaCodificadaEnLaQuery(monkeypatch):
+    monkeypatch.setenv("ACTUALIZACION_REPO", "alguien/otro-repo")
+    monkeypatch.setenv("ACTUALIZACION_RAMA", "release/5.x")
+
+    url = version_remota._url()
+
+    assert url.endswith("?ref=release%2F5.x")
+
+
+def testElLimiteDeLaApiSeExplicaComoTal(datosAislados, monkeypatch):
+    from urllib.error import HTTPError
+
+    def _limitada(url):
+        raise HTTPError(url, 403, "rate limit exceeded", None, None)
+
+    monkeypatch.setattr(version_remota, "_descargar", _limitada)
+
+    resultado = version_remota.consultar()
+
+    assert resultado["publicada"] is None
+    assert "limita" in resultado["error"]
 
 
 # ── Novedades ────────────────────────────────────────────────────────────────
