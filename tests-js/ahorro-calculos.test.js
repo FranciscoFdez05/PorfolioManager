@@ -84,12 +84,13 @@ describe("categorías marcadas como inversión", () => {
         expect(resumen.inversion).toBe(0)
     })
 
-    it("lo marcado sale de los gastos y queda dentro del ahorro, sin distinguir mayúsculas ni tildes", () => {
+    it("lo marcado no cuenta ni como gasto ni como ahorro, sin distinguir mayúsculas ni tildes", () => {
         const resumen = C().resumenMes(ingresos, gastos, "marzo", marcadas)
         expect(resumen.gastos).toBe(800)
         expect(resumen.inversion).toBe(600)
-        expect(resumen.ahorro).toBe(1200)
-        expect(resumen.tasa).toBe(60)
+        // 2000 - 800 de gasto - 600 invertidos: lo que queda en cuenta.
+        expect(resumen.ahorro).toBe(600)
+        expect(resumen.tasa).toBe(30)
         expect(resumen.categorias).toEqual({ Casa: 800 })
         expect(C().detectorDeInversion(["Inversión"])("INVERSION")).toBe(true)
     })
@@ -116,7 +117,7 @@ describe("categorías marcadas como inversión", () => {
         const textos = C()
             .generarObservaciones({ resumen, filas: [], objetivo: 30, etiquetaPrevio: "febrero" })
             .map((o) => o.texto)
-        expect(textos).toContain("Has invertido 600,00 € (el 50 % de lo ahorrado).")
+        expect(textos).toContain("Has invertido 600,00 € (el 30 % de tus ingresos).")
     })
 })
 
@@ -188,6 +189,49 @@ describe("presupuesto", () => {
         const resumen = C().resumenMes(anioIngresos({ mayo: [1000] }), anioGastos({ mayo: [["Casa", 100]] }), "mayo")
         const vacio = C().resumenMes(null, null, "abril")
         expect(C().filasPresupuesto(resumen, vacio, {})[0].variacion).toBeNull()
+    })
+})
+
+describe("ingresos sobre los que se aplican los %", () => {
+    it("un periodo cerrado usa sus ingresos reales aunque la media sea mayor", () => {
+        expect(C().ingresosParaPresupuesto(525, null, 795)).toEqual({ importe: 525, conMedia: false })
+    })
+
+    it("el mes en curso a medio cobrar cuenta con la media", () => {
+        expect(C().ingresosParaPresupuesto(525, 525, 795)).toEqual({ importe: 795, conMedia: true })
+    })
+
+    it("si en el mes en curso ya se ha cobrado más que la media, manda lo cobrado", () => {
+        expect(C().ingresosParaPresupuesto(1200, 1200, 795)).toEqual({ importe: 1200, conMedia: false })
+    })
+
+    it("en la vista anual solo se sustituye el mes en curso", () => {
+        // Enero a octubre: 7950 cobrados; noviembre, 525 de 795 de media.
+        const base = C().ingresosParaPresupuesto(7950 + 525, 525, 795)
+        expect(base.importe).toBeCloseTo(7950 + 795)
+        expect(base.conMedia).toBe(true)
+    })
+
+    it("sin media (año sin datos) no cambia nada", () => {
+        expect(C().ingresosParaPresupuesto(0, 0, 0)).toEqual({ importe: 0, conMedia: false })
+    })
+
+    it("las filas aplican los % a la base indicada y no a los ingresos del mes", () => {
+        // Caso real: 10 % para Mensualidades, 71,96 € cargados el día 1 y solo
+        // 525 € cobrados el día 10. Con 525 salía «excedido» (52,50 €).
+        const resumen = C().resumenMes(
+            anioIngresos({ noviembre: [525] }),
+            anioGastos({ noviembre: [] }, [{ meses: { noviembre: "71,96" } }]),
+            "noviembre"
+        )
+        const config = { presupuesto: { Mensualidades: 10 }, presupuestoEur: {} }
+        const [conMes] = C().filasPresupuesto(resumen, null, config)
+        const [conMedia] = C().filasPresupuesto(resumen, null, config, 794.97)
+
+        expect(conMes.presupuesto.importe).toBeCloseTo(52.5)
+        expect(conMes.estado).toBe("excedido")
+        expect(conMedia.presupuesto.importe).toBeCloseTo(79.497)
+        expect(conMedia.estado).toBe("cerca")
     })
 })
 

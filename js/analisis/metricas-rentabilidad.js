@@ -397,13 +397,13 @@ function mRenderAhorro(ingresosYearData, gastosYearData, ahorroConfig) {
     })
 
     const { totalMes: gastosMes } = mComputeGastosData(gastosYearData)
-    // La inversión cuenta como ahorro, no como gasto (ver mInversionDelMes).
-    const gastosMonthly = M_GASTOS_KEYS.map(
-        (k) => (gastosMes[k] || 0) - mInversionDelMes(gastosYearData, k, ahorroConfig)
-    )
+    // La inversión no es gasto ni ahorro (ver mInversionDelMes): sale de los
+    // gastos y se resta aparte, porque ese dinero ya no está en cuenta.
+    const inversionMonthly = M_GASTOS_KEYS.map((k) => mInversionDelMes(gastosYearData, k, ahorroConfig))
+    const gastosMonthly = M_GASTOS_KEYS.map((k, i) => (gastosMes[k] || 0) - inversionMonthly[i])
 
-    const ahorroMonthly = ingMonthly.map((ing, i) => ing - gastosMonthly[i])
-    const tasaMonthly = ingMonthly.map((ing, i) => (ing > 0 ? ((ing - gastosMonthly[i]) / ing) * 100 : null))
+    const ahorroMonthly = ingMonthly.map((ing, i) => ing - gastosMonthly[i] - inversionMonthly[i])
+    const tasaMonthly = ingMonthly.map((ing, i) => (ing > 0 ? (ahorroMonthly[i] / ing) * 100 : null))
 
     const activeMeses = ingMonthly
         .map((v, i) => ({ ing: v, tasa: tasaMonthly[i] }))
@@ -523,24 +523,24 @@ function mComputeResumenAnual(anualData, ahorroConfig) {
     return (anualData || [])
         .map(({ year, gastosData, ingresosData }) => {
             const { totalMes } = mComputeGastosData(gastosData)
-            // Sin la inversión, que cuenta como ahorro (ver mInversionDelMes).
-            const gastado = M_GASTOS_KEYS.reduce(
-                (s, k) => s + (totalMes[k] || 0) - mInversionDelMes(gastosData, k, ahorroConfig),
-                0
-            )
+            // La inversión no es gasto ni ahorro (ver mInversionDelMes): va aparte.
+            const invertido = M_GASTOS_KEYS.reduce((s, k) => s + mInversionDelMes(gastosData, k, ahorroConfig), 0)
+            const gastado = M_GASTOS_KEYS.reduce((s, k) => s + (totalMes[k] || 0), 0) - invertido
             const ingMes = mComputeIngresosMonthly(ingresosData)
             const ingresos = M_ING_KEYS.reduce((s, k) => s + (ingMes[k] || 0), 0)
-            const ahorrado = ingresos - gastado
+            const ahorrado = ingresos - gastado - invertido
             return {
                 year,
                 ingresos,
                 gastado,
+                invertido,
                 ahorrado,
                 tasa: ingresos > 0 ? (ahorrado / ingresos) * 100 : null,
-                pctGasto: ingresos > 0 ? (gastado / ingresos) * 100 : null
+                pctGasto: ingresos > 0 ? (gastado / ingresos) * 100 : null,
+                pctInvertido: ingresos > 0 ? (invertido / ingresos) * 100 : null
             }
         })
-        .filter((r) => r.ingresos > 0 || r.gastado > 0)
+        .filter((r) => r.ingresos > 0 || r.gastado > 0 || r.invertido > 0)
 }
 
 function mRenderAnual(anualData, ahorroConfig) {
@@ -562,7 +562,8 @@ function mRenderAnual(anualData, ahorroConfig) {
 
     const totalIngresos = resumen.reduce((s, r) => s + r.ingresos, 0)
     const totalGastado = resumen.reduce((s, r) => s + r.gastado, 0)
-    const totalAhorrado = totalIngresos - totalGastado
+    const totalInvertido = resumen.reduce((s, r) => s + r.invertido, 0)
+    const totalAhorrado = totalIngresos - totalGastado - totalInvertido
     const tasaGlobal = totalIngresos > 0 ? (totalAhorrado / totalIngresos) * 100 : 0
     const mediaAhorro = totalAhorrado / resumen.length
     const mejor = resumen.reduce((best, r) => (best === null || r.ahorrado > best.ahorrado ? r : best), null)
@@ -599,9 +600,9 @@ function mRenderAnual(anualData, ahorroConfig) {
     }
 
     mDrawAnualBarras(resumen)
-    mDrawAnualReparto(totalGastado, totalAhorrado)
+    mDrawAnualReparto(totalGastado, totalAhorrado, totalInvertido)
     mDrawAnualAcumulado(resumen)
-    mRenderAnualTabla(resumen, { totalIngresos, totalGastado, totalAhorrado, tasaGlobal })
+    mRenderAnualTabla(resumen, { totalIngresos, totalGastado, totalInvertido, totalAhorrado, tasaGlobal })
 }
 
 function mDrawAnualBarras(resumen) {
@@ -614,6 +615,9 @@ function mDrawAnualBarras(resumen) {
         esPct ? (r.pctGasto !== null ? parseFloat(r.pctGasto.toFixed(1)) : null) : r.gastado
     )
     const ahorrado = resumen.map((r) => (esPct ? (r.tasa !== null ? parseFloat(r.tasa.toFixed(1)) : null) : r.ahorrado))
+    const invertido = resumen.map((r) =>
+        esPct ? (r.pctInvertido !== null ? parseFloat(r.pctInvertido.toFixed(1)) : null) : r.invertido
+    )
 
     // En % las dos barras se apilan porque juntas son el 100 % de los ingresos.
     // En € van una al lado de otra: apiladas, el ahorro arrancaba a la altura
@@ -646,6 +650,17 @@ function mDrawAnualBarras(resumen) {
             borderColor: ahorrado.map((v) => ((v ?? 0) >= 0 ? "#2ecc71" : "#c0392b"))
         }
     ]
+    // Lo invertido no es gasto ni ahorro: serie propia, y solo si lo hay. Va
+    // detrás de Ahorrado para no mover el índice que usa tasaLabelPlugin.
+    if (resumen.some((r) => r.invertido > 0.005)) {
+        datasets.push({
+            ...barraComun,
+            label: esPct ? "Invertido (%)" : "Invertido",
+            data: invertido,
+            backgroundColor: "#3b82f688",
+            borderColor: "#3b82f6"
+        })
+    }
 
     // La tasa de ahorro vive en el tooltip y como etiqueta sobre la barra de
     // Ahorrado, no en un segundo eje: un gráfico con dos escalas (€ y %)
@@ -730,7 +745,8 @@ function mDrawAnualBarras(resumen) {
     })
 }
 
-function mDrawAnualReparto(totalGastado, totalAhorrado) {
+function mDrawAnualReparto(totalGastado, totalAhorrado, totalInvertido = 0) {
+    const conInversion = totalInvertido > 0.005
     // Un donut no sabe representar un ahorro negativo, así que en ese caso se
     // enseña la comparación como barras.
     if (totalAhorrado < 0) {
@@ -738,13 +754,13 @@ function mDrawAnualReparto(totalGastado, totalAhorrado) {
         mCreateChart("mChartAnualReparto", {
             type: "bar",
             data: {
-                labels: ["Gastado", "Ahorrado"],
+                labels: ["Gastado", "Ahorrado", ...(conInversion ? ["Invertido"] : [])],
                 datasets: [
                     {
                         label: "Acumulado",
-                        data: [totalGastado, totalAhorrado],
-                        backgroundColor: ["#e74c3c88", "#c0392b88"],
-                        borderColor: ["#e74c3c", "#c0392b"],
+                        data: [totalGastado, totalAhorrado, ...(conInversion ? [totalInvertido] : [])],
+                        backgroundColor: ["#e74c3c88", "#c0392b88", "#3b82f688"],
+                        borderColor: ["#e74c3c", "#c0392b", "#3b82f6"],
                         borderWidth: 1,
                         borderRadius: 4
                     }
@@ -763,10 +779,10 @@ function mDrawAnualReparto(totalGastado, totalAhorrado) {
         return
     }
 
-    const total = totalGastado + totalAhorrado
-    const repartoLabels = ["Gastado", "Ahorrado"]
-    const repartoValues = [totalGastado, totalAhorrado]
-    const repartoColors = ["#e74c3c", "#2ecc71"]
+    const total = totalGastado + totalAhorrado + (conInversion ? totalInvertido : 0)
+    const repartoLabels = ["Gastado", "Ahorrado", ...(conInversion ? ["Invertido"] : [])]
+    const repartoValues = [totalGastado, totalAhorrado, ...(conInversion ? [totalInvertido] : [])]
+    const repartoColors = ["#e74c3c", "#2ecc71", "#3b82f6"].slice(0, repartoLabels.length)
     mCreateChart("mChartAnualReparto", {
         type: "doughnut",
         data: {
@@ -855,6 +871,7 @@ function mRenderAnualTabla(resumen, totales) {
             <td class="mTdName">${escapeHtml(r.year)}${r.year === anioActual ? " (YTD)" : ""}</td>
             <td>${formatEuro(r.ingresos)}</td>
             <td>${formatEuro(r.gastado)}</td>
+            <td>${formatEuro(r.invertido)}</td>
             <td class="${cls}">${formatEuro(r.ahorrado)}</td>
             <td>${r.pctGasto !== null ? formatPercent(r.pctGasto) : "---"}</td>
             <td class="${cls}">${r.tasa !== null ? formatPercent(r.tasa) : "---"}</td>
@@ -870,6 +887,7 @@ function mRenderAnualTabla(resumen, totales) {
             <td class="mTdName">Total</td>
             <td>${formatEuro(totales.totalIngresos)}</td>
             <td>${formatEuro(totales.totalGastado)}</td>
+            <td>${formatEuro(totales.totalInvertido)}</td>
             <td class="${cls}">${formatEuro(totales.totalAhorrado)}</td>
             <td>${pctGasto !== null ? formatPercent(pctGasto) : "---"}</td>
             <td class="${cls}">${formatPercent(totales.tasaGlobal)}</td>

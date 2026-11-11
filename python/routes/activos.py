@@ -6,7 +6,7 @@ from core import dinero, pnl_divisa
 from core.db import getActiveDbPath, getDb
 from core.validation import jsonBody
 from providers.finnhub_client import convertAmount, fetchExchangeRate
-from stores import alertas_store, grafico_activo, rendimiento_activo, revisiones
+from stores import alertas_store, grafico_activo, rendimiento_activo, revisiones, series_tradingview
 from stores.asset_store import (
     deleteAssetFile,
     getAssetFile,
@@ -274,9 +274,22 @@ def getActivo(assetId):
 
 @activosBp.route("/api/activos/<assetId>/grafico", methods=["GET"])
 def getActivoGrafico(assetId):
-    """Serie e históricos de compras y ventas para el gráfico de la ficha."""
+    """Serie e históricos de compras y ventas para el gráfico de la ficha.
+
+    `?tv=` es el ticker de TradingView del activo (lo calcula el frontend, igual
+    que en Paneles): con él, lo que no cubren los snapshots sale de sus velas.
+    Uno con formato no válido se ignora y el gráfico usa solo los snapshots.
+    """
     try:
-        datos = grafico_activo.datosDelGrafico(slugify(assetId), request.args.get("rango", "30D").strip().upper())
+        simbolosTv = series_tradingview.normalizarSimbolos([request.args.get("tv", "")])
+    except series_tradingview.SimbolosInvalidos:
+        simbolosTv = []
+    try:
+        datos = grafico_activo.datosDelGrafico(
+            slugify(assetId),
+            request.args.get("rango", "30D").strip().upper(),
+            simboloTv=simbolosTv[0] if simbolosTv else None,
+        )
     except grafico_activo.RangoInvalido as error:
         return jsonify({"ok": False, "error": str(error)}), 400
     except grafico_activo.ActivoNoEncontrado:

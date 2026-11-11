@@ -1,5 +1,5 @@
-// La tasa de ahorro de Métricas trata como ahorro las categorías que el
-// usuario marca como inversión, con el mismo criterio que la página Ahorro
+// La tasa de ahorro de Métricas no cuenta como gasto ni como ahorro las
+// categorías que el usuario marca como inversión, con el mismo criterio que la página Ahorro
 // (js/finanzas/ahorro-calculos.js). Sin esto, las dos páginas daban tasas
 // distintas para los mismos datos.
 import { beforeAll, describe, expect, it } from "vitest"
@@ -41,13 +41,18 @@ describe("inversión en Métricas", () => {
         expect(mInversionDelMes(gastos2025, "enero", { categoriasInversion: [] })).toBe(0)
     })
 
-    it("el resumen anual no cuenta lo marcado como gasto", () => {
+    it("el resumen anual no cuenta lo marcado ni como gasto ni como ahorro", () => {
         const datos = [{ year: "2025", gastosData: gastos2025, ingresosData: ingresos2025 }]
         const [conMarcadas] = mComputeResumenAnual(datos, marcadas)
         const [sinMarcadas] = mComputeResumenAnual(datos, {})
 
         expect(conMarcadas.gastado).toBe(700)
-        expect(conMarcadas.ahorrado).toBe(1300)
+        expect(conMarcadas.invertido).toBe(400)
+        // 2000 - 700 de gasto - 400 invertidos.
+        expect(conMarcadas.ahorrado).toBe(900)
+        expect(conMarcadas.tasa).toBe(45)
         expect(sinMarcadas.gastado).toBe(1100)
+        expect(sinMarcadas.invertido).toBe(0)
+        expect(sinMarcadas.ahorrado).toBe(900)
     })
 })

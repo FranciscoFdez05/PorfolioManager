@@ -16,8 +16,8 @@ function isMensualidadMonthActive(yearData, monthKey) {
 
 /**
  * Lo apuntado en un mes en las categorías que el usuario marcó como inversión
- * (ahorroConfig.categoriasInversion), que la tasa de ahorro trata como dinero
- * apartado y no como gasto: mismo criterio que la página Ahorro
+ * (ahorroConfig.categoriasInversion), que no cuenta ni como gasto ni como
+ * ahorro (la tasa de ahorro la resta aparte): mismo criterio que la página Ahorro
  * (AhorroCalculos.detectorDeInversion). Las mensualidades de meses futuros no
  * cuentan, igual que en mComputeGastosData, para restar solo lo que allí se sumó.
  * @param {object|null} yearData Gastos del año.

@@ -18,6 +18,7 @@ function pnDefectosMapa(w) {
         tamano: mercado ? "igual" : "valor",
         eur: !mercado,
         precio: mercado,
+        invertido: mercado,
         periodos: mercado ? PN_PERIODOS.filter((p) => p.valor !== "todo") : PN_PERIODOS
     }
 }
@@ -288,6 +289,7 @@ function pnDibujarMapa(w, cuerpo) {
     if (rejilla) {
         pnRejilla(lienzo, enriquecidos, cfg, periodo, escala, def, agrupar)
         mapaDiaActivar(lienzo, periodoLinea, (celda, puntos, ventana) => {
+            pnVariacionDeLinea(celda, puntos, ventana, escala)
             pnRejillaExtremos(celda, puntos)
             pnRejillaEje(celda, ventana)
             const cerrado = celda.querySelector(".pnRjCerrado")
@@ -299,7 +301,9 @@ function pnDibujarMapa(w, cuerpo) {
 
     if (agrupar === "no") {
         pnBaldosas(lienzo, enriquecidos, { x: 0, y: 0, w: W, h: H }, cfg, periodo, escala, def)
-        mapaDiaActivar(lienzo, periodoLinea)
+        mapaDiaActivar(lienzo, periodoLinea, (celda, puntos, ventana) =>
+            pnVariacionDeLinea(celda, puntos, ventana, escala)
+        )
         return
     }
 
@@ -336,7 +340,8 @@ function pnDibujarMapa(w, cuerpo) {
         }
         pnBaldosas(lienzo, g.miembros, { x: g.x, y: g.y + franja, w: g.w, h: g.h - franja }, cfg, periodo, escala, def)
     })
-    mapaDiaActivar(lienzo, periodoLinea)
+    // La media de la franja de cada grupo no se recalcula: es de lo que ya traía variación.
+    mapaDiaActivar(lienzo, periodoLinea, (celda, puntos, ventana) => pnVariacionDeLinea(celda, puntos, ventana, escala))
 }
 
 /** Reparte un rectángulo entre activos y pinta sus baldosas. */
@@ -352,6 +357,7 @@ function pnBaldosas(lienzo, items, caja, cfg, periodo, escala, def = {}) {
     const verPct = pnSi(cfg, "pct")
     const verEur = pnSi(cfg, "eur", def.eur ?? true)
     const verPrecio = pnSi(cfg, "precio", def.precio ?? false)
+    const verInvertido = pnSi(cfg, "invertido", def.invertido ?? false)
 
     rects.forEach((r) => {
         const cw = Math.max(r.w - hueco, 2)
@@ -360,7 +366,9 @@ function pnBaldosas(lienzo, items, caja, cfg, periodo, escala, def = {}) {
         cel.className = "pnCelda"
         cel.dataset.activo = r.id
         cel.dataset.serieId = r.id
-        cel.style.cssText = `left:${r.x + hueco / 2}px;top:${r.y + hueco / 2}px;width:${cw}px;height:${ch}px;background:${pnColorMapa(r.valor, escala)}`
+        // Con ticker de TradingView, la línea sale de sus velas (mapaDiaSerieCelda).
+        if (r.tv) cel.dataset.tv = r.tv
+        cel.style.cssText =`left:${r.x + hueco / 2}px;top:${r.y + hueco / 2}px;width:${cw}px;height:${ch}px;background:${pnColorMapa(r.valor, escala)}`
         cel._pn = { ...r, periodo }
 
         const rotulo = porNombre ? r.nombre : r.simbolo || r.nombre
@@ -379,6 +387,11 @@ function pnBaldosas(lienzo, items, caja, cfg, periodo, escala, def = {}) {
         }
         if (verPrecio && ch >= 54 + lineas * 16 && cw >= 70 && r.precio > 0) {
             html += `<span class="pnCeldaMov">${escapeHtml(pnPrecio(r))}</span>`
+            lineas++
+        }
+        const invertido = verInvertido ? pnTextoInvertido(r) : ""
+        if (invertido && ch >= 54 + lineas * 16 && cw >= 70) {
+            html += `<span class="pnCeldaMov pnMoney">${escapeHtml(invertido)}</span>`
         }
         cel.innerHTML = html
         lienzo.appendChild(cel)
@@ -438,6 +451,7 @@ function pnRejilla(lienzo, items, cfg, periodo, escala, def, agrupar) {
     const porNombre = pnRotuloPorNombre(cfg)
     const verPct = pnSi(cfg, "pct")
     const verEur = pnSi(cfg, "eur", def.eur ?? true)
+    const verInvertido = pnSi(cfg, "invertido", def.invertido ?? false)
     // Fuera de «Hoy» los rótulos son fechas y los pone pnRejillaEje al llegar la serie.
     const eje =
         periodo === "dia"
@@ -455,23 +469,72 @@ function pnRejilla(lienzo, items, cfg, periodo, escala, def, agrupar) {
         cel.className = "pnCelda pnRejillaCelda"
         cel.dataset.activo = r.id
         cel.dataset.serieId = r.id
+        if (r.tv) cel.dataset.tv = r.tv
         cel.style.background = pnColorMapa(r.valor, escala)
         cel._pn = { ...r, periodo }
 
         const rotulo = porNombre ? r.nombre : r.simbolo || r.nombre
         const pct = verPct ? `<span class="pnRjPct">${r.valor === null ? "N/D" : pnPct(r.valor)}</span>` : ""
         const mov = verEur && r.mov !== null ? `<span class="pnRjMov pnMoney">${pnEurFirmado(r.mov)}</span>` : ""
+        const textoInvertido = verInvertido ? pnTextoInvertido(r) : ""
+        const invertido = textoInvertido ? `<span class="pnRjMov pnMoney">${escapeHtml(textoInvertido)}</span>` : ""
         cel.innerHTML = `
             <div class="pnRjCab">
                 <div class="pnRjIzq">
                     <span class="pnRjSimbolo">${escapeHtml(rotulo)}</span>
                     <span class="pnRjPrecio" style="font-size:${cuerpoPrecio}px">${escapeHtml(pnPrecio(r))}</span>
-                    ${mov}
+                    ${mov}${invertido}
                 </div>
                 <div class="pnRjDer">${pct}<span class="pnRjCerrado"></span><span class="pnRjExt" data-ext="max"></span><span class="pnRjExt" data-ext="min"></span></div>
             </div>${eje}`
         lienzo.appendChild(cel)
     })
+}
+
+/**
+ * Rótulo con lo invertido en un activo, o cadena vacía si no hay posición
+ * abierta: lo de la watchlist y los tickers sueltos no tienen inversión, y en
+ * una posición cerrada lo invertido ya no está en juego.
+ *
+ * @param {object} activo Fila de `pnCargarDatos` (o de la watchlist).
+ * @returns {string} «Invertido 1.234,56 €» o "".
+ */
+function pnTextoInvertido(activo) {
+    return activo?.conPosicion && activo.invertidoEur > 0 ? `Invertido ${pnEur(activo.invertidoEur)}` : ""
+}
+
+/**
+ * Variación del periodo sacada de la propia línea, para las casillas sin ella.
+ *
+ * La de Semana, Mes, Año y YTD sale de los snapshots (/api/historical-changes),
+ * que no existen para lo añadido a mano en Seguimiento ni cubren fechas antes
+ * de que la aplicación empezara a guardarlos, y la casilla quedaba gris con
+ * «N/D». Si la línea son velas de TradingView, abarca el periodo y del primer
+ * al último cierre sale la variación. Con la de los snapshots no: es el valor
+ * de la posición, y una compra en el periodo pasaría por subida. «Hoy» tampoco
+ * entra: su línea empieza en la apertura y no en el cierre anterior, que es de
+ * donde parte el % del día; ni «Desde la compra», que no tiene línea.
+ *
+ * @param {HTMLElement} celda Casilla con `_pn`.
+ * @param {Array<[number, number]>|undefined} puntos Línea del periodo.
+ * @param {{velas?: boolean}|undefined} ventana Ventana de la línea (`mapaDiaSerieCelda`).
+ * @param {number} escala % que da el color más intenso.
+ */
+function pnVariacionDeLinea(celda, puntos, ventana, escala) {
+    const d = celda._pn
+    // `deLinea`: ya se calculó así antes; en cada refresco se rehace con la línea nueva.
+    if (!d || (d.valor !== null && !d.deLinea) || d.periodo === "dia" || d.periodo === "todo") return
+    if (!ventana?.velas || !Array.isArray(puntos) || puntos.length < 2) return
+    const primero = puntos[0][1]
+    const ultimo = puntos[puntos.length - 1][1]
+    if (!(primero > 0) || !(ultimo > 0)) return
+    d.valor = (ultimo / primero - 1) * 100
+    d.deLinea = true
+    celda.style.background = pnColorMapa(d.valor, escala)
+    const pctRejilla = celda.querySelector(".pnRjPct")
+    if (pctRejilla) pctRejilla.textContent = pnPct(d.valor)
+    const pctBaldosa = celda.querySelector(".pnCeldaPct")
+    if (pctBaldosa) pctBaldosa.textContent = (d.valor >= 0 ? "▲ " : "▼ ") + pnPct(Math.abs(d.valor), false)
 }
 
 /**

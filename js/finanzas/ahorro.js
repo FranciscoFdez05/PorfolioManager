@@ -9,7 +9,7 @@
  * petición, necesarios para comparar enero con diciembre del año anterior y
  * para la media de 12 meses) y ahorroConfig de /api/settings:
  *   { objetivoAhorro: %, presupuesto: {categoría: %}, presupuestoEur: {categoría: €/mes},
- *     categoriasInversion: [categorías que cuentan como ahorro, no como gasto] }
+ *     categoriasInversion: [categorías que no cuentan ni como gasto ni como ahorro] }
  */
 
 // Colores por categoría, en orden de gasto. Sin rojo ni verde: en esta página
@@ -52,6 +52,8 @@ const AHORRO_ICONOS = {
         '<svg viewBox="0 0 20 20" fill="none"><path d="M3 14.5 7.5 10l3 3L17 6.5M12.5 6.5H17V11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     objetivo:
         '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.5" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>',
+    bombilla:
+        '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7.5 14.5h5M8.25 17h3.5M10 2.75a5 5 0 0 0-3 9c.6.45 1 1.1 1 1.85v.9h4v-.9c0-.75.4-1.4 1-1.85a5 5 0 0 0-3-9Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     sube: '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 2 9 7.5H1z" fill="currentColor"/></svg>',
     baja: '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 8 1 2.5h8z" fill="currentColor"/></svg>'
 }
@@ -209,7 +211,13 @@ function ahorroCalcularVista() {
         proyeccion: C.proyeccionFinDeAnio(estadisticas, transcurridos)
     }
     const periodo = mes ? ahorroPeriodoMes(base) : ahorroPeriodoAnio(base)
-    const filas = C.filasPresupuesto(periodo.resumen, periodo.resumenPrevio, ahorroConfigSinInversion(config))
+    const ingresosPresupuesto = ahorroIngresosPresupuesto(base, periodo.resumen)
+    const filas = C.filasPresupuesto(
+        periodo.resumen,
+        periodo.resumenPrevio,
+        ahorroConfigSinInversion(config),
+        ingresosPresupuesto.importe
+    )
     const observaciones = C.generarObservaciones({
         resumen: periodo.resumen,
         filas,
@@ -219,7 +227,32 @@ function ahorroCalcularVista() {
         mediaGastos: periodo.mediaGastos,
         estadisticas: mes ? null : estadisticas
     })
-    return { ...base, ...periodo, filas, observaciones, colores: ahorroColoresPorCategoria(filas) }
+    return {
+        ...base,
+        ...periodo,
+        filas,
+        ingresosPresupuesto,
+        observaciones,
+        colores: ahorroColoresPorCategoria(filas)
+    }
+}
+
+/**
+ * Ingresos a los que se aplican los presupuestos en % del periodo elegido: si
+ * el periodo incluye el mes en curso, ese mes cuenta al menos con los ingresos
+ * medios del año (ver AhorroCalculos.ingresosParaPresupuesto). Es la misma
+ * media que enseña la ventana de presupuesto, para que «≈ 79,50 €» allí sea lo
+ * que luego sale en la tabla.
+ * @param {{anio: string, mes: string|null, serie: object[], transcurridos: number}} base
+ * @param {object} resumen Resumen del periodo.
+ * @returns {{importe: number, conMedia: boolean}}
+ */
+function ahorroIngresosPresupuesto({ anio, mes, serie, transcurridos }, resumen) {
+    const C = AhorroCalculos
+    const enCurso = Number(anio) === new Date().getFullYear() && transcurridos > 0 ? transcurridos - 1 : -1
+    const incluyeMesEnCurso = enCurso >= 0 && (mes === null || C.indiceDeMes(mes) === enCurso)
+    if (!incluyeMesEnCurso) return C.ingresosParaPresupuesto(resumen.ingresos, null, 0)
+    return C.ingresosParaPresupuesto(resumen.ingresos, serie[enCurso].ingresos, ahorroMediasDelAnio().ingresos)
 }
 
 // Una categoría marcada como inversión no es gasto: si tenía un presupuesto de
@@ -439,12 +472,12 @@ function ahorroPintarHero(vista) {
 
     const desglose = document.getElementById("ahorroHeroDesglose")
     if (desglose) {
-        // Cuánto de lo ahorrado se fue a Inversión y cuánto queda en cuenta.
+        // Lo invertido no entra en el ahorro (que es lo que queda en cuenta):
+        // se enseña aparte para que no parezca que ha desaparecido.
         const hayInversion = resumen.inversion > 0.005
         desglose.classList.toggle("hidden", !hayInversion)
         desglose.innerHTML = hayInversion
-            ? `<span><span class="ahorroDot ahorroDotInversion"></span>Invertido <strong>${formatEuro(resumen.inversion)}</strong></span>
-               <span><span class="ahorroDot ahorroDotCuenta"></span>En cuenta <strong class="${resumen.ahorro - resumen.inversion < 0 ? "ahorroNeg" : ""}">${formatEuro(resumen.ahorro - resumen.inversion)}</strong></span>`
+            ? `<span><span class="ahorroDot ahorroDotInversion"></span>Además has invertido <strong>${formatEuro(resumen.inversion)}</strong> (no cuenta como gasto ni como ahorro)</span>`
             : ""
     }
 
@@ -887,16 +920,18 @@ function ahorroFiltrarFilas(filas, filtro) {
     return filas
 }
 
-function ahorroCeldaPresupuesto(fila, mensual) {
+function ahorroCeldaPresupuesto(fila, mensual, conMedia) {
     const p = fila.presupuesto
     if (!p) return `<span class="ahorroNum ahorroMuted">—</span><span class="ahorroNumSub">sin definir</span>`
-    const detalle =
-        p.modo === "eur"
-            ? mensual
-                ? "importe fijo"
-                : `${formatEuro(p.valor)} al mes`
-            : `${ahorroPct(p.valor, p.valor % 1 ? 1 : 0)} de los ingresos`
-    return `<span class="ahorroNum">${formatEuro(p.importe)}</span><span class="ahorroNumSub">${escapeHtml(detalle)}</span>`
+    const pct = ahorroPct(p.valor, p.valor % 1 ? 1 : 0)
+    const sobreMedia = p.modo === "pct" && conMedia
+    let detalle = `${pct} de los ingresos`
+    if (p.modo === "eur") detalle = mensual ? "importe fijo" : `${formatEuro(p.valor)} al mes`
+    else if (sobreMedia && mensual) detalle = `${pct} de los ingresos medios`
+    const titulo = sobreMedia
+        ? ' title="El mes en curso aún no tiene todos sus ingresos: se calcula con los ingresos medios del año"'
+        : ""
+    return `<span class="ahorroNum"${titulo}>${formatEuro(p.importe)}</span><span class="ahorroNumSub"${titulo}>${escapeHtml(detalle)}</span>`
 }
 
 function ahorroCeldaDisponible(fila) {
@@ -928,7 +963,7 @@ function ahorroFilaHtml(fila, vista, contexto) {
                 </div>
             </td>
             <td class="num"><span class="ahorroNum">${formatEuro(fila.gastado)}</span><span class="ahorroNumSub">${ahorroPct(fila.peso)} del gasto</span></td>
-            <td class="num">${ahorroCeldaPresupuesto(fila, Boolean(vista.mes))}</td>
+            <td class="num">${ahorroCeldaPresupuesto(fila, Boolean(vista.mes), vista.ingresosPresupuesto.conMedia)}</td>
             <td class="num">${ahorroCeldaDisponible(fila)}</td>
             <td class="num">${fila.variacion ? ahorroChipHtml(fila.variacion, contexto, false) : '<span class="ahorroMuted">—</span>'}</td>
         </tr>`
@@ -1228,7 +1263,7 @@ function ahorroFilaConfigHtml(categoria, medias) {
             </div>
             <span class="ahorroCfgEquivale" aria-live="polite"></span>
             <button type="button" class="ahorroCfgMediaBtn" ${media > 0 ? "" : "disabled"} title="Poner como presupuesto el gasto medio mensual">Usar media</button>
-            <p class="ahorroCfgNotaInversion">Marcada como inversión: cuenta como ahorro y no lleva presupuesto de gasto.</p>
+            <p class="ahorroCfgNotaInversion">Marcada como inversión: no cuenta como gasto ni como ahorro y no lleva presupuesto.</p>
         </div>`
 }
 
@@ -1244,7 +1279,7 @@ function ahorroResumenInversionHtml() {
         <section class="ahorroCfgBloque ahorroCfgInversionResumen">
             <div>
                 <span class="ahorroModalSectionLabel">Categoría de inversión</span>
-                <p class="ahorroModalHint">Lo que apuntes en ella cuenta como ahorro y no como gasto, aquí y en Métricas.</p>
+                <p class="ahorroModalHint">Lo que apuntes en ella no cuenta como gasto ni como ahorro, aquí y en Métricas.</p>
             </div>
             <div class="ahorroCfgInversionActual" id="ahorroCfgInversionActual"></div>
             <button type="button" class="ahorroCfgAccion" id="ahorroCfgInversionCambiar">Cambiar…</button>
@@ -1352,10 +1387,12 @@ function ahorroModalHtml(categorias, medias) {
                         <span class="ahorroModalSectionLabel">Presupuesto por categoría</span>
                         <div class="ahorroCfgAcciones">
                             ${conBuscador ? '<input type="search" class="ahorroCfgBuscar" id="ahorroCfgBuscar" placeholder="Buscar categoría" aria-label="Buscar categoría">' : ""}
+                            ${categorias.length ? ahorroBotonConsejosHtml() : ""}
                             <button type="button" class="ahorroCfgAccion" id="ahorroCfgRellenar" title="Pone la media mensual en las categorías sin presupuesto">Rellenar vacías con la media</button>
                             <button type="button" class="ahorroCfgAccion" id="ahorroCfgLimpiar">Quitar todos</button>
                         </div>
                     </div>
+                    <div class="ahorroConsejos" id="ahorroConsejosPanel" hidden></div>
                     ${
                         categorias.length
                             ? `<div class="ahorroCfgTabla">
@@ -1432,6 +1469,7 @@ function ahorroClickModal(evento, overlay, ingresosMedios) {
         ahorroActualizarModal()
         return
     }
+    if (ahorroClickConsejos(evento)) return
     if (evento.target.closest("#ahorroCfgRellenar")) {
         ahorroFilasEditables().forEach((f) => {
             if (!(parseFloat(f.querySelector(".ahorroModalInput").value) > 0)) ahorroUsarMedia(f)
@@ -1552,6 +1590,82 @@ function ahorroActualizarModal() {
                 : ""
     }
     ahorroPintarReparto(datos, ingresosMedios)
+    ahorroPintarConsejos(datos, ingresosMedios)
+}
+
+// ── Consejos (lamparita) ──
+// Pautas genéricas de AhorroConsejos: no tocan ni leen las categorías del
+// usuario, que pone sus porcentajes a mano. Se repintan con cada cambio porque
+// el aviso depende del objetivo escrito en la ventana.
+
+function ahorroBotonConsejosHtml() {
+    return `<button type="button" class="ahorroCfgAccion ahorroConsejosBtn" id="ahorroCfgConsejos"
+        aria-expanded="false" aria-controls="ahorroConsejosPanel"
+        title="Pautas orientativas de reparto de los ingresos">${AHORRO_ICONOS.bombilla}<span>Consejos</span></button>`
+}
+
+/**
+ * Abre o cierra el panel de consejos si el clic era en su botón.
+ * @param {MouseEvent} evento
+ * @returns {boolean} true si el clic era del botón de consejos.
+ */
+function ahorroClickConsejos(evento) {
+    const boton = evento.target.closest("#ahorroCfgConsejos")
+    if (!boton) return false
+    const panel = document.getElementById("ahorroConsejosPanel")
+    const abrir = panel.hidden
+    panel.hidden = !abrir
+    boton.classList.toggle("active", abrir)
+    boton.setAttribute("aria-expanded", String(abrir))
+    ahorroActualizarModal()
+    return true
+}
+
+function ahorroRangoEur(pauta) {
+    if (pauta.minEur === null) return ""
+    return `${formatEuro(pauta.minEur)} – ${formatEuro(pauta.maxEur)}`
+}
+
+function ahorroConsejoFilaHtml(pauta) {
+    return `
+        <div class="ahorroConsejoFila">
+            <div class="ahorroConsejoNombre">
+                <span class="ahorroConsejoTipo">${escapeHtml(pauta.nombre)}</span>
+                <span class="ahorroConsejoPauta">${escapeHtml(pauta.ejemplos)}</span>
+            </div>
+            <span class="ahorroConsejoEur">${escapeHtml(ahorroRangoEur(pauta))}</span>
+            <span class="ahorroConsejoValor">${pauta.min}–${pauta.max} %</span>
+        </div>`
+}
+
+function ahorroConsejoGrupoHtml(grupo) {
+    const tope = grupo.topeEur === null ? "" : ` · ${formatEuro(grupo.topeEur)}`
+    return `
+        <div class="ahorroConsejosGrupo">
+            <span class="ahorroModalSectionLabel">${escapeHtml(grupo.titulo)} · hasta ${grupo.tope} %${escapeHtml(tope)}</span>
+            <div class="ahorroConsejosLista">${grupo.pautas.map(ahorroConsejoFilaHtml).join("")}</div>
+        </div>`
+}
+
+function ahorroPintarConsejos(datos, ingresosMedios) {
+    const panel = document.getElementById("ahorroConsejosPanel")
+    if (!panel || panel.hidden) return
+    const { grupos, aviso } = AhorroConsejos.consejos({ ingresos: ingresosMedios, objetivo: datos.objetivo })
+    const base =
+        ingresosMedios > 0 ? ` Los euros son sobre tus ingresos medios (${formatEuro(ingresosMedios)}/mes).` : ""
+    const avisoHtml = aviso
+        ? `<ul class="ahorroConsejosAvisos"><li class="ahorroInsight ${aviso.tono}"><span class="ahorroInsightDot" aria-hidden="true"></span><span>${escapeHtml(aviso.texto)}</span></li></ul>`
+        : ""
+    panel.innerHTML = `
+        <div class="ahorroConsejosCabecera">
+            <span class="ahorroConsejosIcono">${AHORRO_ICONOS.bombilla}</span>
+            <div>
+                <span class="ahorroConsejosTitulo">Cómo repartir los ingresos</span>
+                <p class="ahorroModalHint">Pautas orientativas según la regla 50/30/20: 50 % para necesidades, 30 % para deseos y 20 % para ahorro. Úsalas como referencia y pon tú el porcentaje de cada categoría en la tabla.${escapeHtml(base)}</p>
+            </div>
+        </div>
+        ${avisoHtml}
+        ${grupos.map(ahorroConsejoGrupoHtml).join("")}`
 }
 
 /**

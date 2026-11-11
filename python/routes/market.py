@@ -25,7 +25,7 @@ from providers.tradingview_client import (
     searchSymbol as searchTradingviewSymbol,
 )
 from providers.yahoo_finance_client import searchSymbol as buscarSimboloYahoo
-from stores import benchmark, rendimiento_activo
+from stores import benchmark, rendimiento_activo, series_tradingview
 from stores.asset_store import listAssets
 from stores.asset_utils import SUPPORTED_ASSET_CURRENCIES
 from stores.divisas_historico import HistoricoInvalido, historicoPar
@@ -484,3 +484,20 @@ def getMarketQuote():
         "currency":    quote.get("currency", "EUR"),
         "lastUpdated": quote.get("lastUpdated"),
     })
+
+
+@marketBp.route("/api/market/series", methods=["GET"])
+def getMarketSeries():
+    """Velas de cierre de TradingView para la línea de las casillas del mapa.
+
+    `?symbols=A,B&periodo=dia` -> `{"ok": true, "periodo", "series": {ticker: [[ts, cierre], ...]}}`.
+    Los tickers sin velas no aparecen: el frontend usa para ellos los snapshots.
+    """
+    periodo = str(request.args.get("periodo", "dia")).strip().lower()
+    rawSymbols = str(request.args.get("symbols", ""))
+    try:
+        simbolos = series_tradingview.normalizarSimbolos(rawSymbols.split(","))
+        series = series_tradingview.seriesDeSimbolos(simbolos, periodo)
+    except (series_tradingview.PeriodoInvalido, series_tradingview.SimbolosInvalidos) as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
+    return jsonify({"ok": True, "periodo": periodo, "series": series})

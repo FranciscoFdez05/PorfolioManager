@@ -409,3 +409,205 @@ def fetchQuotes(
         if parsed:
             quotes[symbol] = parsed
     return quotes
+
+
+# ── Velas ────────────────────────────────────────────────────────────────────
+#
+# Comprobado contra el servidor real: cada sesión de gráfico admite una sola
+# serie (con dos contesta `critical_error` «exceed limit of series in the
+# session» y cierra), así que se abre una sesión por símbolo, todas en la misma
+# conexión (42 a la vez responden en ~1 s). `timescale_update` trae las velas
+# como `{"i": n, "v": [ts, apertura, máximo, mínimo, cierre, volumen?]}` y
+# `series_completed` cierra la petición; un símbolo que no existe llega como
+# `symbol_error` + `series_error`. Los índices (NASDAQ:NDX, SP:SPX) vienen con
+# retraso (`delayed_streaming_600/900`), pero vienen. La divisa en que cotiza
+# el símbolo llega antes, en `symbol_resolved` (`currency_code`: NASDAQ:AAPL →
+# USD, XETR:SAP → EUR).
+
+_SERIES_ERRORS = ("symbol_error", "series_error")
+
+
+def _handleSeriesMessage(
+    rawMessage: str,
+    socketClient: _WebSocket,
+    pending: set[str],
+    closes: dict[str, dict[int, tuple[float, float, float]]],
+    currencies: dict[str, str] | None = None,
+) -> None:
+    """Procesa un mensaje del feed de velas: latidos, divisa, velas y fin o error de sesión."""
+    if rawMessage.startswith("~h~"):
+        socketClient.sendText(encodeMessage(rawMessage))
+        return
+    try:
+        message = json.loads(rawMessage)
+    except ValueError:
+        return  # mensajes de control que no son JSON
+    if not isinstance(message, dict):
+        return
+
+    method = message.get("m")
+    params = message.get("p") or []
+    session = str(params[0]) if params else ""
+    if method in ("timescale_update", "du") and len(params) > 1 and isinstance(params[1], dict):
+        for series in params[1].values():
+            if isinstance(series, dict) and isinstance(series.get("s"), list):
+                for bar in series["s"]:
+                    _addBar(closes.setdefault(session, {}), bar)
+    elif method == "symbol_resolved" and currencies is not None and len(params) > 2 and isinstance(params[2], dict):
+        currency = str(params[2].get("currency_code") or "").strip().upper()
+        if currency:
+            currencies[session] = currency
+    elif method == "series_completed" or method in _SERIES_ERRORS:
+        pending.discard(session)
+    elif method in ("critical_error", "protocol_error"):
+        raise FeedError(f"El feed de TradingView devolvió {method}")
+
+
+def _addBar(closesBySession: dict[int, tuple[float, float, float]], bar: object) -> None:
+    """Anota cierre, máximo y mínimo de una vela; las que no traen `[ts, ..., cierre]` válido se ignoran.
+
+    Un máximo o un mínimo ilegible se sustituye por el cierre: la vela sigue
+    sirviendo para la línea, solo que sin rango.
+    """
+    values = bar.get("v") if isinstance(bar, dict) else None
+    if not isinstance(values, list) or len(values) < 5:
+        return
+    try:
+        timestamp, close = int(values[0]), float(values[4])
+    except (TypeError, ValueError):
+        return
+    if close <= 0:
+        return
+    try:
+        high, low = float(values[2]), float(values[3])
+    except (TypeError, ValueError):
+        high = low = close
+    high = max(high, close)
+    low = min(low, close) if low > 0 else close
+    closesBySession[timestamp] = (close, high, low)
+
+
+def fetchSeries(
+    symbols: Iterable[str],
+    resolution: str,
+    bars: int,
+    timeout: float | None = None,
+    socketFactory: Callable[..., _WebSocket] = _WebSocket,
+    clock: Callable[[], float] = time.monotonic,
+) -> dict[str, list[tuple[int, float]]]:
+    """Velas de cierre de varios símbolos de TradingView en una sola conexión.
+
+    Args:
+        symbols: Tickers con mercado (`NASDAQ:NDX`).
+        resolution: Resolución del feed: minutos ("5", "60", "240") o "1D".
+        bars: Cuántas velas pedir, contando hacia atrás desde la última.
+        timeout: Plazo total en segundos. Por defecto, el de [proveedores].
+        socketFactory: Constructor del cliente WebSocket, inyectable para los tests.
+        clock: Reloj monotónico, inyectable para los tests.
+
+    Returns:
+        `{ticker: [(ts, cierre), ...]}` ordenado por `ts`, solo de los que
+        tienen velas. Lo que no existe o no llega a tiempo se queda fuera.
+
+    Raises:
+        OSError: fallo de red o de TLS (incluye `FeedError`).
+
+    Example:
+        >>> fetchSeries(["NASDAQ:NDX"], "5", 300)  # doctest: +SKIP
+        {'NASDAQ:NDX': [(1793893800, 26749.43), ...]}
+    """
+    series = _fetchSeriesSessions(symbols, resolution, bars, timeout, socketFactory, clock)
+    return {symbol: [(ts, close) for ts, close, _high, _low in bars] for symbol, (_currency, bars) in series.items()}
+
+
+def fetchSeriesWithCurrency(
+    symbols: Iterable[str],
+    resolution: str,
+    bars: int,
+    timeout: float | None = None,
+    socketFactory: Callable[..., _WebSocket] = _WebSocket,
+    clock: Callable[[], float] = time.monotonic,
+) -> dict[str, tuple[str | None, list[tuple[int, float, float, float]]]]:
+    """Como `fetchSeries`, pero con la divisa de cada símbolo y el máximo y mínimo de cada vela.
+
+    La divisa hace falta para pasar las velas a otra: el ticker no la dice
+    (NASDAQ:AAPL va en USD aunque el activo se apunte en euros). El máximo y
+    el mínimo dicen si un precio se pudo pagar ese día.
+
+    Args:
+        symbols: Tickers con mercado (`NASDAQ:NDX`).
+        resolution: Resolución del feed: minutos ("5", "60", "240") o "1D".
+        bars: Cuántas velas pedir, contando hacia atrás desde la última.
+        timeout: Plazo total en segundos. Por defecto, el de [proveedores].
+        socketFactory: Constructor del cliente WebSocket, inyectable para los tests.
+        clock: Reloj monotónico, inyectable para los tests.
+
+    Returns:
+        `{ticker: (divisa, [(ts, cierre, máximo, mínimo), ...])}`, con la divisa
+        en mayúsculas o None si el feed no la dio. Mismo filtrado que `fetchSeries`.
+
+    Raises:
+        OSError: fallo de red o de TLS (incluye `FeedError`).
+
+    Example:
+        >>> fetchSeriesWithCurrency(["NASDAQ:AAPL"], "1D", 1)  # doctest: +SKIP
+        {'NASDAQ:AAPL': ('USD', [(1794407400, 268.9, 271.2, 266.0)])}
+    """
+    return _fetchSeriesSessions(symbols, resolution, bars, timeout, socketFactory, clock)
+
+
+def _fetchSeriesSessions(
+    symbols: Iterable[str],
+    resolution: str,
+    bars: int,
+    timeout: float | None,
+    socketFactory: Callable[..., _WebSocket],
+    clock: Callable[[], float],
+) -> dict[str, tuple[str | None, list[tuple[int, float, float, float]]]]:
+    """Cuerpo común de `fetchSeries` y `fetchSeriesWithCurrency`: una sesión de gráfico por símbolo."""
+    wanted = list(dict.fromkeys(str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()))
+    if not wanted:
+        return {}
+
+    totalTimeout = float(timeout or settings.proveedorTimeout())
+    deadline = clock() + totalTimeout
+    sessions = {f"cs_{secrets.token_hex(4)}_{index}": symbol for index, symbol in enumerate(wanted)}
+    pending = set(sessions)
+    closes: dict[str, dict[int, tuple[float, float, float]]] = {}
+    currencies: dict[str, str] = {}
+
+    recordApiCall("TradingView")
+    with socketFactory(
+        FEED_HOST, FEED_PORT, FEED_PATH, FEED_ORIGIN, totalTimeout, settings.proveedorMaxRespuestaBytes()
+    ) as socketClient:
+        socketClient.sendText(encodeMessage({"m": "set_auth_token", "p": ["unauthorized_user_token"]}))
+        for session, symbol in sessions.items():
+            symbolSpec = "=" + json.dumps({"symbol": symbol, "adjustment": "splits"}, separators=(",", ":"))
+            for method, params in (
+                ("chart_create_session", [session, ""]),
+                ("resolve_symbol", [session, "sym", symbolSpec]),
+                ("create_series", [session, "s", "s", "sym", resolution, int(bars), ""]),
+            ):
+                socketClient.sendText(encodeMessage({"m": method, "p": params}))
+
+        while pending:
+            remaining = deadline - clock()
+            if remaining <= 0:
+                break
+            try:
+                text = socketClient.recvText(remaining)
+            except TimeoutError:
+                break
+            for rawMessage in splitMessages(text):
+                _handleSeriesMessage(rawMessage, socketClient, pending, closes, currencies)
+
+    if pending:
+        log.info("Velas de TradingView sin completar a tiempo: %s", ", ".join(sorted(sessions[s] for s in pending)))
+
+    # Las sesiones sin completar se descartan: con parte de las velas, la línea
+    # y el máximo/mínimo serían de un tramo arbitrario.
+    return {
+        sessions[session]: (currencies.get(session), [(ts, *bar) for ts, bar in sorted(byTimestamp.items())])
+        for session, byTimestamp in closes.items()
+        if session in sessions and session not in pending and byTimestamp
+    }

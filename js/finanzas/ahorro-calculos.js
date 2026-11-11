@@ -15,8 +15,9 @@
  *     un dato falso, no la ausencia de dato.
  *   - Las categorías que el usuario marca como inversión
  *     (`opciones.categoriasInversion`, de ahorroConfig) son dinero apartado,
- *     no gastado: salen de `gastos` y `categorias`, van a `inversion` y quedan
- *     dentro de `ahorro`. No hay ninguna categoría fija: son las suyas.
+ *     no gastado: salen de `gastos` y `categorias` y van a `inversion`, que
+ *     tampoco cuenta como `ahorro` (ahorro = ingresos - gastos - inversion, lo
+ *     que queda en cuenta). No hay ninguna categoría fija: son las suyas.
  *   - Los meses se identifican por su clave en español y minúsculas, que es
  *     como los guardan Gastos e Ingresos ("enero".."diciembre").
  */
@@ -178,12 +179,14 @@ const AhorroCalculos = (() => {
      * @param {number} ingresos
      * @param {Object<string, number>} categorias Gasto por categoría (sin la inversión apartada).
      * @param {number} meses Meses que abarca el resumen.
-     * @param {number} [inversion=0] Dinero llevado a categorías de inversión, que cuenta como ahorro.
+     * @param {number} [inversion=0] Dinero llevado a categorías de inversión: ni gasto ni ahorro.
      * @returns {object} Resumen (ver la cabecera del fichero).
      */
     function construirResumen(ingresos, categorias, meses, inversion = 0) {
         const gastos = sumar(Object.values(categorias), (v) => v)
-        const ahorro = ingresos - gastos
+        // Lo invertido no es gasto, pero tampoco ahorro: es dinero que ya no
+        // está en cuenta, así que se resta aparte.
+        const ahorro = ingresos - gastos - inversion
         return {
             ingresos,
             gastos,
@@ -327,6 +330,31 @@ const AhorroCalculos = (() => {
         return null
     }
 
+    /**
+     * Ingresos sobre los que se aplican los presupuestos en %.
+     *
+     * Un mes en curso solo lleva apuntado lo cobrado hasta hoy: si la nómina o
+     * una paga aún no ha llegado, un 10 % de eso es un presupuesto ridículo y
+     * las categorías que se cargan a principio de mes (mensualidades) salen
+     * excedidas sin estarlo. Por eso el mes en curso cuenta, como mínimo, con
+     * los ingresos medios del año; si ya se ha cobrado más, manda lo cobrado.
+     *
+     * @param {number} ingresosPeriodo Ingresos reales del periodo (un mes o varios).
+     * @param {number|null} ingresosMesEnCurso Lo cobrado en el mes en curso si cae
+     *     dentro del periodo; null si el periodo está cerrado.
+     * @param {number} mediaIngresos Ingresos medios mensuales de referencia.
+     * @returns {{importe: number, conMedia: boolean}} conMedia indica que se ha
+     *     usado la media en lugar de lo cobrado en el mes en curso.
+     * @example
+     *   ingresosParaPresupuesto(525, 525, 795) // { importe: 795, conMedia: true }
+     */
+    function ingresosParaPresupuesto(ingresosPeriodo, ingresosMesEnCurso, mediaIngresos) {
+        if (ingresosMesEnCurso === null || !(mediaIngresos > ingresosMesEnCurso + UMBRAL_CENTIMO)) {
+            return { importe: ingresosPeriodo, conMedia: false }
+        }
+        return { importe: ingresosPeriodo - ingresosMesEnCurso + mediaIngresos, conMedia: true }
+    }
+
     function categoriasConPresupuesto(config) {
         const conValor = (mapa) => Object.keys(mapa || {}).filter((c) => Number(mapa[c]) > 0)
         return [...conValor(config?.presupuesto), ...conValor(config?.presupuestoEur)]
@@ -344,13 +372,15 @@ const AhorroCalculos = (() => {
      * @param {object} resumen Resumen del periodo.
      * @param {object|null} resumenPrevio Resumen del periodo con el que se compara.
      * @param {object} config ahorroConfig.
+     * @param {number} [ingresosBase] Ingresos a los que se aplican los % (ver
+     *     ingresosParaPresupuesto); por defecto, los del periodo.
      * @returns {object[]} Ordenadas por gasto, de mayor a menor.
      */
-    function filasPresupuesto(resumen, resumenPrevio, config) {
+    function filasPresupuesto(resumen, resumenPrevio, config, ingresosBase = resumen.ingresos) {
         const nombres = new Set([...Object.keys(resumen.categorias), ...categoriasConPresupuesto(config)])
         const filas = [...nombres].map((categoria) => {
             const gastado = resumen.categorias[categoria] || 0
-            const presupuesto = presupuestoDe(config, categoria, resumen.ingresos, resumen.meses)
+            const presupuesto = presupuestoDe(config, categoria, ingresosBase, resumen.meses)
             const previo = resumenPrevio?.tieneDatos ? resumenPrevio.categorias[categoria] || 0 : null
             return {
                 categoria,
@@ -526,8 +556,8 @@ const AhorroCalculos = (() => {
     function observacionInversion(resumen) {
         if (resumen.inversion <= UMBRAL_CENTIMO) return null
         const parte =
-            resumen.ahorro > UMBRAL_CENTIMO
-                ? ` (el ${formatearPct(Math.min((resumen.inversion / resumen.ahorro) * 100, 100), 0)} de lo ahorrado)`
+            resumen.ingresos > UMBRAL_CENTIMO
+                ? ` (el ${formatearPct((resumen.inversion / resumen.ingresos) * 100, 0)} de tus ingresos)`
                 : ""
         return { tono: "info", texto: `Has invertido ${formatEuro(resumen.inversion)}${parte}.` }
     }
@@ -593,6 +623,7 @@ const AhorroCalculos = (() => {
         ultimosMeses,
         variacion,
         presupuestoDe,
+        ingresosParaPresupuesto,
         filasPresupuesto,
         estadisticasAnio,
         proyeccionFinDeAnio,

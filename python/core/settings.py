@@ -266,6 +266,11 @@ CATALOGO: tuple[Ajuste, ...] = (
            minimo=0, maximo=3600,
            descripcion="Vida de la caché de cotizaciones en memoria (dashboard, cartera y gráfico "
                        "piden el mismo activo casi a la vez). 0 desactiva la caché."),
+    Ajuste("mercado", "serie_mapa_ttl_segundos", ENTERO, 120, env="MERCADO_SERIE_MAPA_TTL",
+           minimo=0, maximo=3600,
+           descripcion="Vida de la caché de las velas de TradingView que dibujan la línea de las "
+                       "casillas del mapa de Paneles y el tramo sin histórico propio del gráfico "
+                       "de la ficha del activo. 0 desactiva la caché."),
     Ajuste("mercado", "orden_respaldo", LISTA, ("finnhub", "yahoo", "tradingview", "eodhd"),
            env="MERCADO_ORDEN_RESPALDO", vaciarEsExplicito=True,
            descripcion="Proveedores que se prueban, en este orden, cuando falla el del activo. Vacío: "
@@ -610,6 +615,10 @@ def historicoTtlSegundos() -> int:
 
 def cotizacionTtlSegundos() -> int:
     return obtener("mercado.cotizacion_ttl_segundos")
+
+
+def serieMapaTtlSegundos() -> int:
+    return obtener("mercado.serie_mapa_ttl_segundos")
 
 
 def ordenRespaldoProveedores() -> list:

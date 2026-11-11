@@ -168,6 +168,16 @@ describe("puntos de compra y venta", () => {
         expect(series.compras[0]).toMatchObject({ x: 200, y: 22, indiceLinea: 1 })
     })
 
+    it("con la línea de TradingView la marca va sobre la línea aunque se pagara otro precio", () => {
+        const series = window.assetGraficoSeries(
+            { ...datos(serie, [operacion("compra", 1, { precioEur: 22 })]), conVelas: true },
+            "precio",
+            "eur"
+        )
+        expect(series.compras[0]).toMatchObject({ x: 200, y: 25, indiceLinea: 1 })
+        expect(series.compras[0].operaciones[0].precioEur).toBe(22)
+    })
+
     it("en precio y % la marca usa la misma base que la línea", () => {
         const series = window.assetGraficoSeries(
             datos(serie, [operacion("compra", 1, { precioEur: 22 })]),
@@ -236,5 +246,20 @@ describe("nota al pie", () => {
     it("en la vista de posición aclara que lo vendido no suma", () => {
         const texto = window.assetGraficoTextoNota({ operacionesSinPunto: 0 }, serie, "posicion", "EUR")
         expect(texto).toContain("Lo ya vendido no suma")
+    })
+
+    it("con velas dice de dónde sale la línea en lugar del inicio del histórico", () => {
+        const texto = window.assetGraficoTextoNota(
+            { conVelas: true, inicioHistorico: 1779000000, operacionesSinPunto: 0 },
+            serie,
+            "precio",
+            "EUR"
+        )
+        expect(texto).toBe("La línea sale de la cotización de TradingView.")
+    })
+
+    it("con velas, en la vista de posición avisa de que no descuenta comisiones", () => {
+        const texto = window.assetGraficoTextoNota({ conVelas: true, operacionesSinPunto: 0 }, serie, "posicion", "EUR")
+        expect(texto).toContain("no descuenta comisiones")
     })
 })

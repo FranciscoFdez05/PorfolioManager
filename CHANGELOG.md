@@ -22,6 +22,57 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.3.1] — 2026-11-11
+
+**Esquema de base de datos:** no lo toca (sigue en el **31**). Basta con volver a
+la imagen anterior para deshacer la actualización. Ajuste nuevo opcional:
+`[mercado] serie_mapa_ttl_segundos` (env `MERCADO_SERIE_MAPA_TTL`, por defecto
+120).
+
+### Añadido
+
+- **Ahorro › Consejos de presupuesto**: botón con una lamparita en la ventana
+  «Objetivo y presupuesto» con pautas genéricas de reparto de los ingresos
+  según la regla 50/30/20, agrupadas en necesidades (vivienda, suministros,
+  mensualidades y suscripciones, compras, transporte…) y deseos (comer fuera,
+  ocio, ropa…), cada una con su rango en % y su equivalencia en euros sobre
+  los ingresos medios. Avisa si el objetivo de ahorro queda por debajo del
+  20 %. Son solo de referencia: no leen ni rellenan las categorías del
+  usuario, que pone sus porcentajes a mano.
+- **Ficha del activo › Gráfico con la cotización de TradingView**: la línea
+  sale de las velas del ticker de TradingView del activo, el mismo que usa
+  Paneles, pasadas a euros con el cambio de cada día si está en caché o con el
+  de hoy. Ya no tiene huecos ni tramos con un precio por participación mal
+  reconstruido a partir de los snapshots, y las compras y ventas anteriores al
+  histórico propio tienen su punto en vez de quedar en «no hay histórico de esa
+  fecha». El punto de cada operación va siempre sobre la línea; si su precio
+  está entre el mínimo y el máximo de ese día, la línea pasa por él, y si no
+  (comisiones dentro del precio, otro exchange) la línea no se dobla y lo pagado
+  sigue en el tooltip. En «Mi posición» el valor se calcula con las
+  participaciones y el coste de cada día, sin descontar comisiones; la nota al
+  pie lo indica. Si el activo no tiene ticker o TradingView no responde, el
+  gráfico sale de los snapshots como antes. Las velas comparten la caché de
+  `[mercado] serie_mapa_ttl_segundos`.
+
+### Cambiado
+
+- **Categorías de inversión en Ahorro**: lo apuntado en ellas, también en
+  mensualidades de esas categorías, ya no cuenta ni como gasto ni como ahorro:
+  el ahorro es lo que queda en cuenta (ingresos − gastos − invertido) y lo
+  invertido se enseña aparte. Vale para Ahorro y para la tasa de ahorro y el
+  resumen anual de Métricas, que gana la columna y la serie «Invertido» para
+  que gastado, invertido y ahorrado sigan sumando los ingresos.
+
+### Corregido
+
+- **Ahorro**: en el mes en curso los presupuestos en % se calculaban sobre lo
+  cobrado hasta ese día. A mitad de mes, sin la paga entera apuntada, un 10 %
+  de Mensualidades daba 52,50 € en la tabla (la ventana decía ≈ 79,50 €) y
+  salía «Excedido» por los cargos de principio de mes. Ahora el mes en curso
+  cuenta como mínimo con los ingresos medios del año, los mismos que usa la
+  ventana; si ya se ha cobrado más, manda lo cobrado. Los meses cerrados no
+  cambian.
+
 ## [5.3.0] — 2026-11-10
 
 **Esquema de base de datos:** lo sube al **31** (tablas nuevas `alertas_reglas`,

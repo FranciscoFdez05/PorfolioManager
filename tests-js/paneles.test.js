@@ -434,6 +434,60 @@ describe("mapa en rejilla", () => {
         pnRejillaExtremos(el, undefined)
         expect([...el.querySelectorAll(".pnRjExt")].every((h) => h.textContent === "")).toBe(true)
     })
+
+    it("lo invertido solo sale en los activos con posición abierta", () => {
+        expect(pnTextoInvertido(activo("aapl", { invertidoEur: 1200 }))).toBe(`Invertido ${pnEur(1200)}`)
+        expect(pnTextoInvertido(activo("vendido", { conPosicion: false, invertidoEur: 1200 }))).toBe("")
+        expect(pnTextoInvertido({ id: "wl:custom_1", conPosicion: false, invertidoEur: 0 })).toBe("")
+        expect(pnTextoInvertido(null)).toBe("")
+    })
+
+    function casillaSinVariacion(periodo, valor = null) {
+        const el = document.createElement("div")
+        el.innerHTML = `<span class="pnRjPct">N/D</span>`
+        el.style.background = "gray"
+        el._pn = { valor, periodo }
+        return el
+    }
+    const linea = [
+        [1, 100],
+        [2, 90],
+        [3, 110]
+    ]
+
+    it("sin variación del periodo, la saca de las velas y colorea la casilla", () => {
+        const el = casillaSinVariacion("ytd")
+
+        pnVariacionDeLinea(el, linea, { velas: true }, 25)
+
+        expect(el._pn.valor).toBeCloseTo(10)
+        expect(el.querySelector(".pnRjPct").textContent).toBe(pnPct(10))
+        expect(el.style.background).not.toBe("gray")
+    })
+
+    it("al refrescar la rehace con la línea nueva", () => {
+        const el = casillaSinVariacion("mes")
+        pnVariacionDeLinea(el, linea, { velas: true }, 10)
+
+        pnVariacionDeLinea(el, [[1, 100], [2, 95]], { velas: true }, 10)
+
+        expect(el._pn.valor).toBeCloseTo(-5)
+    })
+
+    it("no toca la que ya traía, ni «Hoy», ni una línea de snapshots", () => {
+        const conValor = casillaSinVariacion("ytd", 3)
+        const hoy = casillaSinVariacion("dia")
+        const snapshots = casillaSinVariacion("ytd")
+
+        pnVariacionDeLinea(conValor, linea, { velas: true }, 25)
+        pnVariacionDeLinea(hoy, linea, { velas: true }, 3)
+        pnVariacionDeLinea(snapshots, linea, { dias: true }, 25)
+
+        expect(conValor._pn.valor).toBe(3)
+        expect(hoy._pn.valor).toBeNull()
+        expect(snapshots._pn.valor).toBeNull()
+        expect(snapshots.querySelector(".pnRjPct").textContent).toBe("N/D")
+    })
 })
 
 describe("mapa de mercado: la lista de Seguimiento", () => {
@@ -463,6 +517,17 @@ describe("mapa de mercado: la lista de Seguimiento", () => {
         expect(seguidos.every((a) => pnGrupoSelector(a) === "Seguimiento")).toBe(true)
         // Copias: el activo de la cartera no queda marcado como seguido.
         expect(_pnDatos.porId.get("aapl").seguido).toBeUndefined()
+    })
+
+    it("los activos nuevos llevan el nombre y el tipo guardados, no el ticker", () => {
+        globalThis.segLoadCustomItems = () => [
+            { _segId: "custom_2", nombre: "BRENT CRUDE OIL", ticker: "TVC:UKOIL", tipo: "comoditis" }
+        ]
+        const [brent] = pnActivosWatchlist()
+
+        expect(brent.nombre).toBe("BRENT CRUDE OIL")
+        expect(brent.simbolo).toBe("TVC:UKOIL")
+        expect(brent.tipo).toBe("comoditis")
     })
 
     it("sigue el orden en que se arrastraron las tarjetas en Seguimiento", () => {

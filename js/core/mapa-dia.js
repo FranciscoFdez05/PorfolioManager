@@ -10,6 +10,9 @@
 // Con horario de mercado, el eje se ciñe a la sesión del activo (mapaDiaSesion).
 // En Semana, Mes, Año y YTD la línea es la del gráfico de la ficha del activo
 // en ese rango y el eje va del inicio del periodo hasta ahora.
+// Las baldosas con ticker de TradingView (`data-tv`) dibujan antes sus velas
+// (/api/market/series), que existen también para lo que no está en la cartera;
+// los snapshots quedan de respaldo para los tickers sin velas.
 
 // La serie sale de los snapshots, que se guardan cada pocos minutos: pedirla
 // más a menudo no traería puntos nuevos.
@@ -47,8 +50,12 @@ const MAPA_DIA_TV_MAX_MARCOS = 6
 // pasar al siguiente: si TradingView no responde, no se queda atascada.
 const MAPA_DIA_TV_ESPERA_CARGA = 8000
 
+// Tickers por petición de velas: el tope que admite /api/market/series.
+const MAPA_DIA_VELAS_LOTE = 80
+
 let _mapaDiaCache = {} // periodo -> { datos, ts }
 let _mapaDiaPeticion = {} // periodo -> Promise en curso
+let _mapaDiaVelas = {} // periodo -> Map(ticker -> { puntos, ts }); `puntos` null si no tiene velas
 let _mapaDiaRefresco = null
 let _mapaDiaTvTimer = null
 let _mapaDiaTvSimbolo = ""
@@ -90,6 +97,49 @@ function mapaDiaCargar(periodo = "dia") {
             })
     }
     return _mapaDiaPeticion[periodo]
+}
+
+/**
+ * Velas de cierre de TradingView de unos tickers en un periodo, cacheadas un
+ * minuto por ticker. Los que no tienen velas también se recuerdan, para no
+ * volver a preguntar por ellos en cada repintado.
+ *
+ * @param {string} periodo "dia", "semana", "mes", "anyo" o "ytd".
+ * @param {Array<string>} simbolos Tickers de TradingView.
+ * @returns {Promise<Object<string, Array<[number, number]>>>} Ticker → velas; nunca falla.
+ */
+async function mapaDiaCargarVelas(periodo, simbolos) {
+    const cache = (_mapaDiaVelas[periodo] ||= new Map())
+    const vigente = (s) => cache.has(s) && Date.now() - cache.get(s).ts < MAPA_DIA_TTL
+    const faltan = [...new Set(simbolos)].filter((s) => s && !vigente(s))
+    const lotes = []
+    for (let i = 0; i < faltan.length; i += MAPA_DIA_VELAS_LOTE) lotes.push(faltan.slice(i, i + MAPA_DIA_VELAS_LOTE))
+    await Promise.all(
+        lotes.map(async (lote) => {
+            try {
+                const params = new URLSearchParams({ symbols: lote.join(","), periodo })
+                const res = await fetch(`/api/market/series?${params}`)
+                const json = res.ok ? await res.json() : null
+                if (!json?.ok) return
+                const ts = Date.now()
+                lote.forEach((s) => cache.set(s, { puntos: json.series?.[s] || null, ts }))
+            } catch (error) {
+                // Sin velas, las baldosas usan los snapshots: no es un error que enseñar.
+                console.error(`Mapa: no se pudieron cargar las velas (${periodo})`, error)
+            }
+        })
+    )
+    const velas = {}
+    simbolos.forEach((s) => {
+        const puntos = cache.get(s)?.puntos
+        if (puntos) velas[s] = puntos
+    })
+    return velas
+}
+
+/** Tickers de TradingView de las baldosas de un lienzo, sin repetir. */
+function mapaDiaSimbolos(lienzo) {
+    return [...new Set([...lienzo.querySelectorAll("[data-serie-id][data-tv]")].map((c) => c.dataset.tv).filter(Boolean))]
 }
 
 /**
@@ -212,6 +262,75 @@ function mapaDiaSesion(puntos, inicio, fin, hueco = MAPA_DIA_HUECO) {
 }
 
 /**
+ * Ventana del eje X para las velas de hoy de TradingView.
+ *
+ * Con velas, el mercado cerrado no deja un tramo plano como en los snapshots:
+ * simplemente no hay velas. Si la primera llega bastante después de medianoche
+ * o la última hace rato, el activo tiene horario y el eje se ciñe a sus velas;
+ * si no (la cripto), es el día entero. Sin ninguna vela hoy, el mercado lleva
+ * cerrado todo el día.
+ *
+ * @param {Array<[number, number]>} puntos Velas de hoy, ordenadas (puede estar vacía).
+ * @param {number} inicio Inicio del día (ts).
+ * @param {number} fin Fin del día (ts).
+ * @param {number} [ahora] Instante actual (ts).
+ * @returns {{inicio: number, fin: number, cerrado: boolean, plano: boolean}} La ventana.
+ */
+function mapaDiaSesionVelas(puntos, inicio, fin, ahora = Date.now() / 1000) {
+    if (!puntos.length) return { inicio, fin, cerrado: true, plano: true }
+    const primera = puntos[0][0]
+    const ultima = puntos[puntos.length - 1][0]
+    const abreDespues = primera - inicio >= MAPA_DIA_CIERRE_MIN
+    const cerrado = Math.min(ahora, fin) - ultima >= MAPA_DIA_CIERRE_MIN
+    if (!abreDespues && !cerrado) return { inicio, fin, cerrado: false, plano: false }
+    return { inicio: primera, fin: ultima, cerrado, plano: false }
+}
+
+/**
+ * Serie y ventana de una baldosa: las velas de TradingView de su ticker si las
+ * hay en la ventana del periodo y, si no, la de los snapshots.
+ *
+ * @param {HTMLElement} celda Baldosa con `data-serie-id` y quizá `data-tv`.
+ * @param {object} datos Respuesta de `mapaDiaCargar`.
+ * @param {Object<string, Array<[number, number]>>} velas Respuesta de `mapaDiaCargarVelas`.
+ * @returns {{puntos: Array<[number, number]>|undefined, ventana: object}}
+ */
+function mapaDiaSerieCelda(celda, datos, velas) {
+    const esDia = (datos.periodo || "dia") === "dia"
+    const conVelas = velas[celda.dataset.tv]
+    if (conVelas) {
+        const enVentana = conVelas.filter((p) => p[0] >= datos.inicio && p[0] <= datos.fin)
+        // `velas`: la línea es de precios, no del valor de una posición (que se
+        // mueve también con compras y ventas); quien la recibe puede sacar de
+        // ella la variación del periodo.
+        if (esDia) {
+            const ventana = { ...mapaDiaSesionVelas(enVentana, datos.inicio, datos.fin), velas: true }
+            return { puntos: enVentana.length ? enVentana : undefined, ventana }
+        }
+        if (enVentana.length >= 2) {
+            return {
+                puntos: enVentana,
+                ventana: { inicio: datos.inicio, fin: datos.fin, cerrado: false, plano: false, dias: true, velas: true }
+            }
+        }
+    }
+
+    // Fuera de «Hoy» la serie abarca varios días: ni hay sesión que recortar
+    // (las noches y los fines de semana son parte del periodo) ni cobertura mínima
+    // que exigir, que es cosa de un servidor recién arrancado a media mañana.
+    const bruta = datos.series?.[celda.dataset.serieId]
+    const serie = esDia ? mapaDiaSerieUtil(bruta) : Array.isArray(bruta) && bruta.length >= 2 ? bruta : undefined
+    const ventana = esDia
+        ? mapaDiaSesion(serie, datos.inicio, datos.fin, datos.segundosHueco || MAPA_DIA_HUECO)
+        : { inicio: datos.inicio, fin: datos.fin, cerrado: false, plano: false, dias: true }
+    // Fuera de la sesión solo quedan los puntos planos recortados. Con el
+    // mercado cerrado todo el día no hay nada que dibujar: sería una recta.
+    const puntos =
+        ventana.plano && ventana.cerrado ? undefined : serie?.filter((p) => p[0] >= ventana.inicio && p[0] <= ventana.fin)
+    return { puntos, ventana }
+}
+
+/**
  * Tiempo cubierto por datos entre dos puntos de una serie: la suma de los
  * intervalos entre puntos seguidos, sin los que pasan de `hueco`.
  *
@@ -263,25 +382,12 @@ function mapaDiaMarcasEje(inicio, fin) {
  *
  * @param {HTMLElement} lienzo Contenedor con baldosas `[data-serie-id]`.
  * @param {object} datos Respuesta de `mapaDiaCargar`.
+ * @param {Object<string, Array<[number, number]>>} [velas] Velas de TradingView por ticker.
  */
-function mapaDiaPintarEn(lienzo, datos) {
-    // Fuera de «Hoy» la serie abarca varios días: ni hay sesión que recortar
-    // (las noches y los fines de semana son parte del periodo) ni cobertura mínima
-    // que exigir, que es cosa de un servidor recién arrancado a media mañana.
-    const esDia = (datos.periodo || "dia") === "dia"
+function mapaDiaPintarEn(lienzo, datos, velas = {}) {
     lienzo.querySelectorAll("[data-serie-id]").forEach((celda) => {
         celda.querySelector(".mapaDiaLinea")?.remove()
-        const bruta = datos.series?.[celda.dataset.serieId]
-        const serie = esDia ? mapaDiaSerieUtil(bruta) : Array.isArray(bruta) && bruta.length >= 2 ? bruta : undefined
-        const ventana = esDia
-            ? mapaDiaSesion(serie, datos.inicio, datos.fin, datos.segundosHueco || MAPA_DIA_HUECO)
-            : { inicio: datos.inicio, fin: datos.fin, cerrado: false, plano: false, dias: true }
-        // Fuera de la sesión solo quedan los puntos planos recortados. Con el
-        // mercado cerrado todo el día no hay nada que dibujar: sería una recta.
-        const puntos =
-            ventana.plano && ventana.cerrado
-                ? undefined
-                : serie?.filter((p) => p[0] >= ventana.inicio && p[0] <= ventana.fin)
+        const { puntos, ventana } = mapaDiaSerieCelda(celda, datos, velas)
         lienzo._mapaDiaAlPintar?.(celda, puntos, ventana)
         if (celda.offsetWidth < MAPA_DIA_ANCHO_MIN || celda.offsetHeight < MAPA_DIA_ALTO_MIN) return
         const svg = mapaDiaSvg(puntos, datos, ventana)
@@ -311,11 +417,22 @@ function mapaDiaActivar(lienzo, periodo, alPintar = null) {
         return
     }
     lienzo.dataset.mapaDia = periodo
-    mapaDiaCargar(periodo).then((datos) => {
-        // El periodo pudo cambiar mientras llegaba la respuesta.
-        if (datos && lienzo.isConnected && lienzo.dataset.mapaDia === periodo) mapaDiaPintarEn(lienzo, datos)
-    })
+    mapaDiaRepintar(lienzo, periodo)
     mapaDiaProgramarRefresco()
+}
+
+/**
+ * Pide los snapshots del periodo y las velas de los tickers del lienzo, y pinta
+ * cuando llegan los dos. Sin snapshots no hay ventana del periodo y no se pinta.
+ *
+ * @param {HTMLElement} lienzo Contenedor de las baldosas.
+ * @param {string} periodo Periodo del mapa.
+ * @returns {Promise<void>}
+ */
+async function mapaDiaRepintar(lienzo, periodo) {
+    const [datos, velas] = await Promise.all([mapaDiaCargar(periodo), mapaDiaCargarVelas(periodo, mapaDiaSimbolos(lienzo))])
+    // El periodo pudo cambiar mientras llegaba la respuesta.
+    if (datos && lienzo.isConnected && lienzo.dataset.mapaDia === periodo) mapaDiaPintarEn(lienzo, datos, velas)
 }
 
 /**
@@ -361,15 +478,10 @@ function mapaDiaProgramarRefresco() {
         // Con la pestaña oculta no se pide nada; al volver, el siguiente ciclo lo pone al día.
         if (document.hidden) return
         _mapaDiaCache = {}
-        // Una petición por periodo, no por mapa.
-        new Set(lienzos.map((l) => l.dataset.mapaDia)).forEach((periodo) => {
-            mapaDiaCargar(periodo).then((datos) => {
-                if (!datos) return
-                lienzos
-                    .filter((l) => l.isConnected && l.dataset.mapaDia === periodo)
-                    .forEach((l) => mapaDiaPintarEn(l, datos))
-            })
-        })
+        _mapaDiaVelas = {}
+        // Los snapshots, una petición por periodo y no por mapa (mapaDiaCargar
+        // reparte la misma promesa); las velas, por mapa, solo de sus tickers.
+        lienzos.filter((l) => l.isConnected).forEach((l) => mapaDiaRepintar(l, l.dataset.mapaDia))
     }, MAPA_DIA_REFRESCO)
 }
 

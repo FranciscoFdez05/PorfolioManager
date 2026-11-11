@@ -356,6 +356,123 @@ describe("mapaDiaPintarEn fuera de «Hoy»", () => {
     })
 })
 
+describe("mapaDiaSesionVelas", () => {
+    const DIA = { inicio: local(0), fin: local(24) }
+    const velas = (desde, hasta) => serie(desde, hasta, (h) => 100 + h)
+
+    it("la cripto, con velas desde medianoche y hasta ahora, conserva el día entero", () => {
+        expect(mapaDiaSesionVelas(velas(0, 15), DIA.inicio, DIA.fin, local(15, 5))).toEqual({ ...DIA, cerrado: false, plano: false })
+    })
+
+    it("con la sesión abierta, el eje va de la primera vela a la última", () => {
+        expect(mapaDiaSesionVelas(velas(15.5, 18), DIA.inicio, DIA.fin, local(18, 10))).toEqual({
+            inicio: local(15, 30),
+            fin: local(18),
+            cerrado: false,
+            plano: false
+        })
+    })
+
+    it("sin velas desde hace rato, el mercado está cerrado", () => {
+        expect(mapaDiaSesionVelas(velas(15.5, 22), DIA.inicio, DIA.fin, local(23, 50))).toMatchObject({
+            inicio: local(15, 30),
+            fin: local(22),
+            cerrado: true
+        })
+    })
+
+    it("sin ninguna vela hoy, cerrado todo el día", () => {
+        expect(mapaDiaSesionVelas([], DIA.inicio, DIA.fin, local(12))).toEqual({ ...DIA, cerrado: true, plano: true })
+    })
+})
+
+describe("mapaDiaPintarEn con velas de TradingView", () => {
+    function lienzoCon(id, tv) {
+        const lienzo = document.createElement("div")
+        const el = document.createElement("div")
+        el.dataset.serieId = id
+        if (tv) el.dataset.tv = tv
+        Object.defineProperty(el, "offsetWidth", { value: 200 })
+        Object.defineProperty(el, "offsetHeight", { value: 150 })
+        lienzo.appendChild(el)
+        lienzo._mapaDiaAlPintar = (_el, p, ventana) => (lienzo.recibido = { p, ventana })
+        return { lienzo, el }
+    }
+
+    it("usa las velas del ticker antes que los snapshots y recorta a la ventana", () => {
+        const { lienzo, el } = lienzoCon("wl:custom_1", "TVC:UKOIL")
+        const ayer = [local(0) - 600, 1]
+        const deHoy = serie(0, 1, (h) => 90 + h)
+
+        mapaDiaPintarEn(
+            lienzo,
+            { periodo: "semana", inicio: local(0), fin: local(24), series: { "wl:custom_1": serie(0, 5, () => 1) } },
+            { "TVC:UKOIL": [ayer, ...deHoy] }
+        )
+
+        expect(lienzo.recibido.p).toEqual(deHoy)
+        expect(lienzo.recibido.ventana.velas).toBe(true)
+        expect(el.querySelector(".mapaDiaLinea")).not.toBeNull()
+    })
+
+    it("sin velas del ticker vuelve a los snapshots", () => {
+        const { lienzo } = lienzoCon("accion", "XETR:NQSE")
+        const snapshots = serie(0, 5, (h) => 10 + h)
+
+        mapaDiaPintarEn(
+            lienzo,
+            { periodo: "semana", inicio: local(0), fin: local(24), series: { accion: snapshots } },
+            { "OTRO:TICKER": serie(0, 5, () => 1) }
+        )
+
+        expect(lienzo.recibido.p).toEqual(snapshots)
+        expect(lienzo.recibido.ventana.velas).toBeUndefined()
+    })
+
+    it("en «Hoy», sin velas de hoy, pasa el mercado como cerrado y no pinta línea", () => {
+        const { lienzo, el } = lienzoCon("indice", "SP:SPX")
+
+        mapaDiaPintarEn(
+            lienzo,
+            { periodo: "dia", inicio: local(0), fin: local(24), segundosHueco: HUECO, series: {} },
+            { "SP:SPX": [[local(0) - 3600, 7500], [local(0) - 1800, 7510]] }
+        )
+
+        expect(lienzo.recibido.p).toBeUndefined()
+        expect(lienzo.recibido.ventana).toMatchObject({ cerrado: true, plano: true })
+        expect(el.querySelector(".mapaDiaLinea")).toBeNull()
+    })
+})
+
+describe("mapaDiaCargarVelas", () => {
+    it("pide los tickers que faltan, recuerda los que no tienen velas y no repite", async () => {
+        const respuesta = { ok: true, periodo: "ytd", series: { "SP:SPX": [[1, 2], [3, 4]] } }
+        const fetchFalso = vi.fn().mockResolvedValue({ ok: true, json: async () => respuesta })
+        vi.stubGlobal("fetch", fetchFalso)
+
+        const velas = await mapaDiaCargarVelas("ytd", ["SP:SPX", "FOO:NOPE", "SP:SPX"])
+        const otraVez = await mapaDiaCargarVelas("ytd", ["SP:SPX", "FOO:NOPE"])
+
+        expect(velas).toEqual({ "SP:SPX": [[1, 2], [3, 4]] })
+        expect(otraVez).toEqual(velas)
+        expect(fetchFalso).toHaveBeenCalledTimes(1)
+        const url = new URL(fetchFalso.mock.calls[0][0], "http://x")
+        expect(url.pathname).toBe("/api/market/series")
+        expect(url.searchParams.get("symbols")).toBe("SP:SPX,FOO:NOPE")
+        expect(url.searchParams.get("periodo")).toBe("ytd")
+        vi.unstubAllGlobals()
+    })
+
+    it("si la petición falla devuelve vacío sin romper", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("red")))
+        const consola = vi.spyOn(console, "error").mockImplementation(() => {})
+
+        expect(await mapaDiaCargarVelas("anyo", ["SP:SPX"])).toEqual({})
+        consola.mockRestore()
+        vi.unstubAllGlobals()
+    })
+})
+
 describe("mapaDiaMarcasFecha", () => {
     it("tres fechas en medianoches, lejos de los bordes", () => {
         const fin = local(15)

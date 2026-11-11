@@ -5,6 +5,9 @@
 // python/stores/grafico_activo.py), así que van en euros y empiezan donde empieza
 // ese histórico. Cambiar de vista o de unidad no vuelve a pedir nada: el servidor
 // manda las dos series y aquí solo se elige cuál pintar.
+// Con el ticker de TradingView del activo (el mismo que usa Paneles), la línea
+// sale de sus velas y los snapshots quedan de respaldo: así las compras
+// anteriores al histórico propio también tienen punto.
 
 const ASSET_GRAFICO_RANGOS = [
     { clave: "1D", etiqueta: "1 D" },
@@ -84,8 +87,11 @@ function assetGraficoValorDelPunto(punto, vista, unidad, precioBase) {
 // Altura de la marca de una operación. En la vista de precio es lo que se pagó o
 // cobró; la línea solo da la cotización de un momento de ese día. En la de posición
 // la operación no tiene un valor propio, así que se apoya en la línea.
-function assetGraficoValorDeMarca(operacion, valorLinea, vista, unidad, precioBase) {
-    if (vista !== "precio" || !Number.isFinite(operacion.precioEur)) return valorLinea
+// Con la línea de TradingView (`sobreLinea`) la marca va siempre en la línea: el
+// precio pagado suele quedar fuera de la cotización de ese día (comisiones dentro
+// del precio, otro exchange) y la marca flotaba suelta. Lo pagado sigue en el tooltip.
+function assetGraficoValorDeMarca(operacion, valorLinea, vista, unidad, precioBase, sobreLinea = false) {
+    if (sobreLinea || vista !== "precio" || !Number.isFinite(operacion.precioEur)) return valorLinea
     if (unidad === "eur") return operacion.precioEur
     return precioBase ? (operacion.precioEur / precioBase - 1) * 100 : valorLinea
 }
@@ -119,7 +125,7 @@ function assetGraficoSeries(datos, vista, unidad) {
             sinValor += 1
             return
         }
-        const y = assetGraficoValorDeMarca(operacion, valor, vista, unidad, precioBase)
+        const y = assetGraficoValorDeMarca(operacion, valor, vista, unidad, precioBase, !!datos.conVelas)
         // Dos compras del mismo día a precios distintos ya no coinciden en altura.
         const clave = `${operacion.indice}|${y}`
         if (!grupo.has(clave)) {
@@ -326,7 +332,10 @@ function assetGraficoEscribirLeyenda(series) {
 // punto parecería un fallo.
 function assetGraficoTextoNota(datos, series, vista, moneda) {
     const partes = []
-    if (datos.inicioHistorico) {
+    if (datos.conVelas) {
+        partes.push("La línea sale de la cotización de TradingView.")
+        if (vista === "posicion") partes.push("La posición se calcula con esa cotización y no descuenta comisiones.")
+    } else if (datos.inicioHistorico) {
         partes.push(`Histórico disponible desde el ${assetGraficoFormatearFecha(datos.inicioHistorico, false)}.`)
     }
     const fuera = (datos.operacionesSinPunto || 0) + series.operacionesSinValor
@@ -631,11 +640,30 @@ function assetGraficoDibujar() {
     )
 }
 
+/**
+ * Ticker de TradingView del activo abierto, el mismo que usan Paneles y el
+ * gráfico de TradingView de la ficha.
+ *
+ * @returns {string} El ticker, o "" si no se puede calcular.
+ */
+function assetGraficoSimboloTv() {
+    try {
+        return String(buildTVSymbol(buildCurrentAssetPayload()) || "").trim()
+    } catch (error) {
+        // Sin ticker el gráfico sale igual, solo con los snapshots.
+        console.error("Gráfico del activo: no se pudo calcular el ticker de TradingView", error)
+        return ""
+    }
+}
+
 async function assetGraficoCargar(assetId) {
     const token = ++_assetGraficoToken
     const { rango } = assetGraficoEstado()
     try {
-        const respuesta = await fetch(`/api/activos/${encodeURIComponent(assetId)}/grafico?rango=${rango}`)
+        const params = new URLSearchParams({ rango })
+        const tv = assetGraficoSimboloTv()
+        if (tv) params.set("tv", tv)
+        const respuesta = await fetch(`/api/activos/${encodeURIComponent(assetId)}/grafico?${params}`)
         const cuerpo = await respuesta.json()
         // Otro rango u otro activo pueden haberse pedido entretanto.
         if (token !== _assetGraficoToken) return

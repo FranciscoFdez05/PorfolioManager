@@ -645,6 +645,7 @@ Object.assign(PN_AJUSTES, {
             if (c.clave === "tamano") return { ...c, defecto: "igual" }
             if (c.clave === "eur") return { ...c, defecto: false }
             if (c.clave === "precio") return { ...c, defecto: true }
+            if (c.clave === "invertido") return { ...c, defecto: true }
             return c
         })
     })),

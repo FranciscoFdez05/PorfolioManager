@@ -180,6 +180,12 @@ def _tmpDeDatosAislado(tmp_path_factory, monkeypatch):
     from providers import tradingview_feed
 
     monkeypatch.setattr(tradingview_feed, "fetchQuotes", lambda symbols, timeout=None, **kwargs: {})
+    monkeypatch.setattr(tradingview_feed, "fetchSeries", lambda symbols, resolution, bars, **kwargs: {})
+    monkeypatch.setattr(tradingview_feed, "fetchSeriesWithCurrency", lambda symbols, resolution, bars, **kwargs: {})
+    # La caché de velas es del proceso: sin vaciarla, un test vería las de otro.
+    from stores import series_tradingview
+
+    series_tradingview.vaciarCache()
 
     # Ritmo entre llamadas a Esplora: con las respuestas falsas de los tests no
     # protege de nada y añadiría un segundo de espera real por llamada. Los

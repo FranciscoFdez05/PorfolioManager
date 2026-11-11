@@ -12,7 +12,7 @@ import pytest
 
 from core.db import getDb
 from routes.activos import activosBp
-from stores import asset_store, grafico_activo
+from stores import asset_store, grafico_activo, series_tradingview
 
 HOY = date(2026, 6, 30)
 AHORA = datetime.combine(HOY, time(18)).timestamp()
@@ -558,6 +558,138 @@ class TestSeriePeriodo:
             seriePeriodo("siglo")
 
 
+class VelasFalsas:
+    """`series_tradingview.velasDelGrafico` falso: velas fijas y anota cada llamada."""
+
+    def __init__(self, divisa="EUR", velas=None):
+        self.respuesta = (divisa, velas or []) if velas else None
+        self.llamadas = []
+
+    def __call__(self, simbolo, rango, desdeTs=0, ahoraTs=None):
+        self.llamadas.append({"simbolo": simbolo, "rango": rango, "desdeTs": desdeTs})
+        return self.respuesta
+
+
+def velasDiarias(desde: date, hasta: date, cierre=lambda dia: 10.0, amplitud=0.05):
+    """Una vela por día a las 15:30, como las de una bolsa europea, con máximo y mínimo a ±`amplitud`."""
+    velas = []
+    for i in range((hasta - desde).days + 1):
+        valor = cierre(desde + timedelta(days=i))
+        velas.append([marca(desde + timedelta(days=i), 15) + 1800, valor, valor * (1 + amplitud), valor * (1 - amplitud)])
+    return velas
+
+
+def graficoConVelas(velas, rango="1A"):
+    return grafico_activo.datosDelGrafico("acme", rango, ahora=AHORA, simboloTv="XETR:ACME", velas=velas)
+
+
+@pytest.mark.usefixtures("tempDb", "sinRed")
+class TestVelasDeTradingview:
+    def testLaCompraAnteriorAlHistoricoTienePuntoYLaLineaPasaPorEl(self):
+        diaCompra = HOY - timedelta(days=60)
+        crearActivo([compra(diaCompra, 10, 10)])
+        snapshot(marca(HOY - timedelta(days=1)), 160, 100)
+        velas = VelasFalsas(velas=velasDiarias(HOY - timedelta(days=90), HOY - timedelta(days=1), lambda dia: 10.2))
+
+        datos = graficoConVelas(velas)
+
+        assert datos["conVelas"] is True
+        assert datos["operacionesSinPunto"] == 0
+        operacion = datos["operaciones"][0]
+        punto = datos["puntos"][operacion["indice"]]
+        # 10 € está dentro del día (9,69-10,71): la línea pasa por lo pagado.
+        assert punto["fuente"] == "operacion"
+        assert (punto["ts"], punto["precio"]) == (operacion["ts"], 10)
+        assert (punto["valor"], punto["coste"]) == (100, 100)
+        assert velas.llamadas == [{"simbolo": "XETR:ACME", "rango": "1A", "desdeTs": int(AHORA - 365 * 86400)}]
+
+    def testConVelasLaLineaNoUsaLosSnapshots(self):
+        crearActivo([compra(HOY - timedelta(days=60), 10, 10)])
+        # Snapshots con un precio por participación de 15 y 16: no deben aparecer.
+        snapshot(marca(HOY - timedelta(days=5)), 150, 100)
+        snapshot(marca(HOY - timedelta(days=1)), 160, 100)
+        velas = VelasFalsas(velas=velasDiarias(HOY - timedelta(days=20), HOY - timedelta(days=1)))
+
+        puntos = graficoConVelas(velas)["puntos"]
+
+        assert len(puntos) == 20
+        assert {p["fuente"] for p in puntos} == {"tradingview"}
+        assert {p["precio"] for p in puntos} == {10}
+
+    def testPrecioFueraDelRangoDelDiaNoDoblaLaLinea(self):
+        diaCompra = HOY - timedelta(days=10)
+        crearActivo([compra(diaCompra, 1, 20)])
+        velas = VelasFalsas(velas=velasDiarias(HOY - timedelta(days=20), HOY - timedelta(days=1)))
+
+        datos = graficoConVelas(velas)
+
+        assert {p["fuente"] for p in datos["puntos"]} == {"tradingview"}
+        punto = datos["puntos"][datos["operaciones"][0]["indice"]]
+        assert date.fromtimestamp(punto["ts"]) == diaCompra
+
+    def testUnaSolaVelaNoBastaYUsaLosSnapshots(self):
+        crearActivo([compra(HOY - timedelta(days=60), 10, 10)])
+        snapshot(marca(HOY - timedelta(days=1)), 160, 100)
+        velas = VelasFalsas(velas=velasDiarias(HOY - timedelta(days=2), HOY - timedelta(days=2)))
+
+        datos = graficoConVelas(velas)
+
+        assert datos["conVelas"] is False
+        assert [p["precio"] for p in datos["puntos"]] == [16]
+
+    def testConvierteLasVelasAEurosYReconstruyeLaPosicion(self):
+        diaCompra = HOY - timedelta(days=60)
+        crearActivo([compra(diaCompra, 4, 30)], currency="USD")
+        velas = VelasFalsas(
+            divisa="USD",
+            velas=velasDiarias(diaCompra - timedelta(days=1), diaCompra, cierre=lambda dia: 40.0),
+        )
+
+        antes, delDia = graficoConVelas(velas)["puntos"]
+
+        # Sin cambio histórico en caché, el de hoy (sinRed): 1 USD = 0,5 EUR.
+        assert antes["precio"] == delDia["precio"] == 20
+        assert (antes["valor"], antes["coste"]) == (0, 0)
+        # 4 participaciones × 20 €; el coste, 120 USD al cambio de hoy.
+        assert (delDia["valor"], delDia["coste"]) == (80, 60)
+
+    def testSinVelasQuedaComoAntes(self):
+        crearActivo([compra(HOY - timedelta(days=60), 10, 10)])
+        snapshot(marca(HOY - timedelta(days=1)), 160, 100)
+
+        datos = graficoConVelas(VelasFalsas())
+
+        assert datos["conVelas"] is False
+        assert datos["operacionesSinPunto"] == 1
+        assert len(datos["puntos"]) == 1
+
+    def testSinTickerNoPideVelas(self):
+        crearActivo([compra(HOY - timedelta(days=60), 10, 10)])
+        velas = VelasFalsas(velas=velasDiarias(HOY - timedelta(days=90), HOY))
+
+        datos = grafico_activo.datosDelGrafico("acme", "1A", ahora=AHORA, velas=velas)
+
+        assert velas.llamadas == []
+        assert datos["conVelas"] is False
+
+    def testDescartaLasVelasFueraDelRango(self):
+        crearActivo([compra(HOY - timedelta(days=3), 1, 10)])
+        velas = VelasFalsas(velas=velasDiarias(HOY - timedelta(days=12), HOY - timedelta(days=1)))
+
+        puntos = graficoConVelas(velas, rango="7D")["puntos"]
+
+        assert min(p["ts"] for p in puntos) >= AHORA - 7 * 86400
+
+    def testEnTodoPideDesdeElPrimerMovimiento(self):
+        diaCompra = HOY - timedelta(days=400)
+        crearActivo([compra(diaCompra, 1, 10), compra(HOY - timedelta(days=10), 1, 10)])
+        velas = VelasFalsas()
+
+        graficoConVelas(velas, rango="TODO")
+
+        assert velas.llamadas[0]["desdeTs"] == int(datetime.combine(diaCompra, time.min).timestamp())
+
+
 class TestRuta:
     @pytest.fixture
     def cliente(self, clienteAutenticado, tempDb, sinRed):
@@ -613,3 +745,27 @@ class TestRuta:
 
     def testActivoInexistenteEs404(self, cliente):
         assert cliente.get("/api/activos/nada/grafico").status_code == 404
+
+    def testPasaElTickerNormalizado(self, cliente, monkeypatch):
+        crearActivo()
+        pedidos = []
+        monkeypatch.setattr(
+            series_tradingview, "velasDelGrafico",
+            lambda simbolo, rango, **kwargs: pedidos.append((simbolo, rango)),
+        )
+
+        respuesta = cliente.get("/api/activos/acme/grafico?rango=1a&tv=xetr:sap")
+
+        assert respuesta.status_code == 200
+        assert respuesta.get_json()["conVelas"] is False
+        assert pedidos == [("XETR:SAP", "1A")]
+
+    def testTickerNoValidoSeIgnora(self, cliente, monkeypatch):
+        crearActivo()
+        pedidos = []
+        monkeypatch.setattr(series_tradingview, "velasDelGrafico", lambda *args, **kwargs: pedidos.append(args))
+
+        respuesta = cliente.get("/api/activos/acme/grafico?rango=1A&tv=%3Cscript%3E")
+
+        assert respuesta.status_code == 200
+        assert pedidos == []

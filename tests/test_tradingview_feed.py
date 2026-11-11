@@ -16,6 +16,8 @@ from providers import tradingview_client, tradingview_feed
 # conftest sustituye `fetchQuotes` en cada test para que nada abra conexiones
 # reales; la de verdad se guarda aquí, al importar, antes de ese parche.
 _realFetchQuotes = tradingview_feed.fetchQuotes
+_realFetchSeries = tradingview_feed.fetchSeries
+_realFetchSeriesWithCurrency = tradingview_feed.fetchSeriesWithCurrency
 
 
 def _framed(*messages):
@@ -144,6 +146,149 @@ def testFetchQuotesErrorCriticoSube():
 
     with pytest.raises(tradingview_feed.FeedError):
         _realFetchQuotes(["TVC:SPX"], timeout=5, socketFactory=fake.factory)
+
+
+# --- Velas (fetchSeries) -------------------------------------------------------
+
+
+def _sesiones(fake):
+    """Sesión de gráfico creada para cada símbolo, en el orden en que se pidieron."""
+    enviados = [json.loads(tradingview_feed.splitMessages(text)[0]) for text in fake.sent]
+    sesiones = [m["p"][0] for m in enviados if m["m"] == "chart_create_session"]
+    simbolos = [json.loads(m["p"][2][1:])["symbol"] for m in enviados if m["m"] == "resolve_symbol"]
+    return dict(zip(simbolos, sesiones))
+
+
+def _velas(sesion, *cierres, desde=1000, paso=300):
+    barras = [{"i": i, "v": [desde + i * paso, 1.0, 2.0, 0.5, cierre, 10.0]} for i, cierre in enumerate(cierres)]
+    return {"m": "timescale_update", "p": [sesion, {"s": {"s": barras}}]}
+
+
+class GuionVelas(FakeWebSocket):
+    """Socket falso que contesta según las sesiones que ha abierto el cliente.
+
+    Las sesiones llevan un sufijo aleatorio, así que las tramas no se pueden
+    escribir de antemano: `guion(sesiones)` las construye al primer `recvText`.
+    """
+
+    def __init__(self, guion):
+        super().__init__([])
+        self.guion = guion
+        self.preparado = False
+
+    def recvText(self, timeout):
+        if not self.preparado:
+            self.frames = [_framed(*mensajes) for mensajes in self.guion(_sesiones(self))]
+            self.preparado = True
+        return super().recvText(timeout)
+
+
+def testFetchSeriesUnaSesionPorSimboloYCierresOrdenados():
+    fake = GuionVelas(lambda s: [
+        [_velas(s["NASDAQ:NDX"], 10.0, 11.0, 12.0)],
+        [{"m": "series_completed", "p": [s["NASDAQ:NDX"], "s", "delayed_streaming_900"]}],
+        [_velas(s["TVC:UKOIL"], 90.0, 91.0), {"m": "series_completed", "p": [s["TVC:UKOIL"], "s", "streaming"]}],
+    ])
+
+    series = _realFetchSeries(["nasdaq:ndx", "TVC:UKOIL", "NASDAQ:NDX"], "5", 300, timeout=5, socketFactory=fake.factory)
+
+    assert series == {
+        "NASDAQ:NDX": [(1000, 10.0), (1300, 11.0), (1600, 12.0)],
+        "TVC:UKOIL": [(1000, 90.0), (1300, 91.0)],
+    }
+    # El feed admite una sola serie por sesión de gráfico: una sesión por símbolo.
+    assert len(set(_sesiones(fake).values())) == 2
+    creadas = [json.loads(tradingview_feed.splitMessages(t)[0]) for t in fake.sent]
+    assert [m["p"][4:6] for m in creadas if m["m"] == "create_series"] == [["5", 300], ["5", 300]]
+    assert fake.closed
+
+
+def testFetchSeriesOmiteSimbolosInexistentesSinEsperar():
+    fake = GuionVelas(lambda s: [
+        [{"m": "symbol_error", "p": [s["FOO:NOPE"], "sym", "invalid symbol"]}],
+        [_velas(s["SP:SPX"], 1.0, 2.0), {"m": "series_completed", "p": [s["SP:SPX"], "s"]}],
+        # Si siguiera esperando a FOO:NOPE leería esta trama y luego TimeoutError.
+        [_velas(s["SP:SPX"], 99.0)],
+    ])
+
+    series = _realFetchSeries(["FOO:NOPE", "SP:SPX"], "5", 300, timeout=5, socketFactory=fake.factory)
+
+    assert series == {"SP:SPX": [(1000, 1.0), (1300, 2.0)]}
+    assert len(fake.frames) == 1
+
+
+def testFetchSeriesDescartaLasSesionesSinCompletar():
+    fake = GuionVelas(lambda s: [[_velas(s["SP:SPX"], 1.0, 2.0)]])
+
+    assert _realFetchSeries(["SP:SPX"], "5", 300, timeout=5, socketFactory=fake.factory) == {}
+
+
+def testFetchSeriesIgnoraVelasMalFormadasYDevuelveElLatido():
+    fake = GuionVelas(lambda s: [
+        ["~h~3"],
+        [
+            {"m": "timescale_update", "p": [s["SP:SPX"], {"s": {"s": [
+                {"i": 0, "v": [1000, 1, 1, 1, 5.0]},
+                {"i": 1, "v": ["x", 1, 1, 1, 6.0]},
+                {"i": 2, "v": [1600, 1, 1, 1]},
+                {"i": 3, "v": [1900, 1, 1, 1, 0]},
+                "basura",
+            ]}}]},
+            {"m": "series_completed", "p": [s["SP:SPX"], "s"]},
+        ],
+    ])
+
+    series = _realFetchSeries(["SP:SPX"], "5", 300, timeout=5, socketFactory=fake.factory)
+
+    assert series == {"SP:SPX": [(1000, 5.0)]}
+    assert tradingview_feed.encodeMessage("~h~3") in fake.sent
+
+
+def testFetchSeriesErrorCriticoSube():
+    fake = GuionVelas(lambda s: [[{"m": "critical_error", "p": ["x", "exceed limit of series in the session"]}]])
+
+    with pytest.raises(tradingview_feed.FeedError):
+        _realFetchSeries(["SP:SPX"], "5", 300, timeout=5, socketFactory=fake.factory)
+
+
+def testFetchSeriesWithCurrencyDevuelveLaDivisaDeCadaSimbolo():
+    fake = GuionVelas(lambda s: [
+        [
+            {"m": "symbol_resolved", "p": [s["NASDAQ:AAPL"], "sym", {"name": "AAPL", "currency_code": "usd"}]},
+            {"m": "symbol_resolved", "p": [s["XETR:SAP"], "sym", {"name": "SAP"}]},
+        ],
+        [_velas(s["NASDAQ:AAPL"], 1.0, 2.0), {"m": "series_completed", "p": [s["NASDAQ:AAPL"], "s"]}],
+        [_velas(s["XETR:SAP"], 3.0), {"m": "series_completed", "p": [s["XETR:SAP"], "s"]}],
+    ])
+
+    series = _realFetchSeriesWithCurrency(["NASDAQ:AAPL", "XETR:SAP"], "1D", 2, timeout=5, socketFactory=fake.factory)
+
+    # `_velas` pone máximo 2 y mínimo 0,5; un cierre de 3 sube el máximo a 3.
+    assert series == {
+        "NASDAQ:AAPL": ("USD", [(1000, 1.0, 2.0, 0.5), (1300, 2.0, 2.0, 0.5)]),
+        "XETR:SAP": (None, [(1000, 3.0, 3.0, 0.5)]),
+    }
+
+
+def testFetchSeriesWithCurrencyMaximoYMinimoIlegiblesUsanElCierre():
+    fake = GuionVelas(lambda s: [[
+        {"m": "timescale_update", "p": [s["SP:SPX"], {"s": {"s": [
+            {"i": 0, "v": [1000, 1, "x", None, 5.0]},
+            {"i": 1, "v": [1300, 1, 7.0, 0, 6.0]},
+        ]}}]},
+        {"m": "series_completed", "p": [s["SP:SPX"], "s"]},
+    ]])
+
+    series = _realFetchSeriesWithCurrency(["SP:SPX"], "1D", 2, timeout=5, socketFactory=fake.factory)
+
+    assert series == {"SP:SPX": (None, [(1000, 5.0, 5.0, 5.0), (1300, 6.0, 7.0, 6.0)])}
+
+
+def testFetchSeriesSinSimbolosNoConecta():
+    def noDebeConectar(*args, **kwargs):
+        raise AssertionError("no debería abrir conexión")
+
+    assert _realFetchSeries([" "], "5", 300, socketFactory=noDebeConectar) == {}
 
 
 # --- Enmarcado RFC 6455 sobre un socket local ---------------------------------

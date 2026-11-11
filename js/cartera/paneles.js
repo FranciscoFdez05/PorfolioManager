@@ -683,9 +683,11 @@ function pnActivosWatchlist() {
         .filter((item) => item && item._segId && !item.assetId)
         .map((item) => ({
             id: "wl:" + item._segId,
-            nombre: item.name || item.symbol || item.ticker || "",
-            simbolo: String(item.symbol || item.ticker || item.name || "").toUpperCase(),
-            tipo: String(item.type || "acciones").toLowerCase(),
+            // La lista guardada usa los campos en español (`nombre`, `tipo`; ver
+            // segMergeAndRender en seguimiento.js); los ingleses quedan por si llega ya convertida.
+            nombre: item.nombre || item.name || item.symbol || item.ticker || "",
+            simbolo: String(item.symbol || item.ticker || item.nombre || item.name || "").toUpperCase(),
+            tipo: String(item.tipo || item.type || "acciones").toLowerCase(),
             currency: normalizeCurrencyCode(item.currency || "EUR"),
             precio: parseLooseNumber(item.price) || 0,
             dia: pnPorcentaje(item.change),

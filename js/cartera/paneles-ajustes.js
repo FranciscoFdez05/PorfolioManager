@@ -167,6 +167,13 @@ const PN_AJUSTES = {
                 { clave: "pct", tipo: "check", etiqueta: "Variación en %", defecto: true },
                 { clave: "eur", tipo: "check", etiqueta: "Movimiento en €", defecto: true },
                 { clave: "precio", tipo: "check", etiqueta: "Precio", defecto: false },
+                {
+                    clave: "invertido",
+                    tipo: "check",
+                    etiqueta: "Importe invertido",
+                    ayuda: "Solo en los activos con posición abierta.",
+                    defecto: false
+                },
                 { clave: "leyenda", tipo: "check", etiqueta: "Leyenda de colores", defecto: false },
                 {
                     clave: "precargaTv",

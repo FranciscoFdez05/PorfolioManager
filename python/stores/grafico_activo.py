@@ -11,10 +11,16 @@ operaciones solo tienen fecha, sin hora, y a veces se apuntan días después de
 hacerse: mientras tanto el snapshot todavía no las incluía, y dividir entre la
 cantidad de esa fecha daría una caída de precio que nunca existió. Por eso el
 coste del snapshot, que sí refleja lo que había al guardarlo, decide la cantidad.
+
+Si el frontend manda el ticker de TradingView del activo y tiene velas en el
+rango, la línea sale entera de ellas (ver `puntosDeVelas`), como en Paneles, y
+los snapshots quedan de respaldo. Así las compras anteriores al histórico propio
+también tienen dónde colocar su punto.
 """
 
 import bisect
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from decimal import Decimal
@@ -22,7 +28,7 @@ from decimal import Decimal
 from core import dinero
 from core.db import getDb
 from core.fifo import FifoError, parseFecha
-from stores import rendimiento_activo
+from stores import rendimiento_activo, series_tradingview
 from stores.fx_historico import tasa, tipoActualConMemo
 
 log = logging.getLogger(__name__)
@@ -390,6 +396,138 @@ def colocarOperaciones(operaciones: list[dict], puntos: list[dict]) -> tuple[lis
     return colocadas, sinPunto
 
 
+@dataclass(frozen=True)
+class _Vela:
+    """Vela de TradingView ya en euros."""
+
+    ts: int
+    cierre: Decimal
+    maximo: Decimal
+    minimo: Decimal
+
+
+def velasEnEuros(velas: list[list], divisa: str, tipo) -> list[_Vela]:
+    """Velas pasadas a euros, la unidad de la línea del gráfico.
+
+    Con el cambio de cada día si está en caché y, si no, con el de hoy: igual
+    que el precio de las operaciones (`_precioEnEuros`), así una compra y la
+    vela de su día se comparan con el mismo cambio. No se descarga nada
+    mientras se espera el gráfico.
+
+    Args:
+        velas: `[[ts, cierre, máximo, mínimo], ...]` en `divisa`.
+        divisa: Divisa en que cotiza el ticker.
+        tipo: Función `(desde, hacia) -> Decimal | None` con el cambio de hoy.
+
+    Returns:
+        Las velas en euros; las que no tienen ningún cambio posible se omiten.
+    """
+    cambios: dict[date, Decimal | None] = {}
+    resultado = []
+    for ts, cierre, maximo, minimo in velas:
+        dia = date.fromtimestamp(ts)
+        if dia not in cambios:
+            cambio, _origen, _fecha = tasa(divisa, dia, permitirDescarga=False)
+            cambios[dia] = cambio if cambio is not None else tipo(divisa, "EUR")
+        cambio = cambios[dia]
+        if cambio is not None:
+            resultado.append(_Vela(
+                int(ts), Decimal(str(cierre)) * cambio, Decimal(str(maximo)) * cambio, Decimal(str(minimo)) * cambio,
+            ))
+    return resultado
+
+
+def _puntoDePrecio(ts: int, precio: Decimal, tramos: list[_Tramo], dias: list[date], fuente: str) -> dict:
+    """Punto de la línea con un precio conocido y la posición de su día.
+
+    El valor y el coste se reconstruyen con la posición de esa fecha
+    (participaciones × precio y coste de los lotes), como `cantidadDelSnapshot`
+    cuando no hay coste que cuadrar. Es una aproximación: no descuenta
+    comisiones.
+    """
+    indice = bisect.bisect_right(dias, date.fromtimestamp(ts)) - 1
+    tramo = tramos[indice] if indice >= 0 else None
+    cantidad = tramo.cantidad if tramo else _CERO
+    coste = tramo.costeEur if tramo else _CERO
+    return {
+        "ts": ts,
+        "valor": float(dinero.redondear(cantidad * precio, 2)),
+        "coste": float(dinero.redondear(coste, 2)),
+        "precio": float(dinero.redondear(precio, 8)),
+        "fuente": fuente,
+    }
+
+
+def puntosDeVelas(velas: list[_Vela], tramos: list[_Tramo]) -> list[dict]:
+    """Puntos de la línea sacados de las velas: el cierre de cada una.
+
+    Args:
+        velas: Resultado de `velasEnEuros`, ordenado por `ts`.
+        tramos: Resultado de `construirTramos`.
+
+    Returns:
+        Los puntos, en el formato de `construirPuntos` y con `"fuente": "tradingview"`.
+    """
+    dias = [tramo.dia for tramo in tramos]
+    return [_puntoDePrecio(vela.ts, vela.cierre, tramos, dias, "tradingview") for vela in velas]
+
+
+def puntosDeOperacionesEnVelas(operaciones: list[dict], velas: list[_Vela], tramos: list[_Tramo]) -> list[dict]:
+    """Un punto en la línea con el precio de cada operación, para que pase por su marca.
+
+    Con velas diarias la línea solo pasa por el cierre, y la marca de una compra,
+    que va a la altura de lo que se pagó, quedaba suelta. Es lo mismo que hace
+    `puntosDeOperaciones` con los snapshots del día, pero aquí no hay snapshots
+    que elegir: el punto es el propio precio de la operación. Solo se pone si ese
+    precio está entre el mínimo y el máximo de las velas de su día; si no
+    (comisiones metidas en el precio, otro mercado, un dato mal apuntado), la
+    línea no se dobla hacia un precio que no cotizó.
+
+    Args:
+        operaciones: Operaciones del rango, con `precioEur`.
+        velas: Resultado de `velasEnEuros`.
+        tramos: Resultado de `construirTramos`.
+
+    Returns:
+        Los puntos, uno por instante, con `"fuente": "operacion"`.
+    """
+    rangoDelDia: dict[date, tuple[Decimal, Decimal]] = {}
+    for vela in velas:
+        dia = date.fromtimestamp(vela.ts)
+        minimo, maximo = rangoDelDia.get(dia, (vela.minimo, vela.maximo))
+        rangoDelDia[dia] = (min(minimo, vela.minimo), max(maximo, vela.maximo))
+
+    dias = [tramo.dia for tramo in tramos]
+    puntos: dict[int, dict] = {}
+    for operacion in operaciones:
+        if operacion["precioEur"] is None or operacion["ts"] in puntos:
+            continue
+        precio = Decimal(str(operacion["precioEur"]))
+        rango = rangoDelDia.get(date.fromtimestamp(operacion["ts"]))
+        if rango and rango[0] <= precio <= rango[1]:
+            puntos[operacion["ts"]] = _puntoDePrecio(operacion["ts"], precio, tramos, dias, "operacion")
+    return list(puntos.values())
+
+
+def _desdeParaVelas(rango: str, desdeTs: int, tramos: list[_Tramo], primerSnapshot: int | None) -> int:
+    """Desde cuándo hacen falta velas: el inicio del rango o, en «TODO», el primer movimiento."""
+    if desdeTs or rango != "TODO":
+        return desdeTs
+    primerMovimiento = next((tramo.dia for tramo in tramos if tramo.dia != date.max), None)
+    if primerMovimiento is not None:
+        return int(datetime.combine(primerMovimiento, time.min).timestamp())
+    return primerSnapshot or 0
+
+
+def _velasDelRango(simboloTv: str, rango: str, desdeTs: int, ahora: float, tipo, velas: Callable) -> list[_Vela]:
+    """Velas del ticker en euros dentro del rango; vacía si no hay o falla el feed."""
+    respuesta = velas(simboloTv, rango, desdeTs=desdeTs, ahoraTs=ahora)
+    if not respuesta:
+        return []
+    divisa, crudas = respuesta
+    return velasEnEuros([vela for vela in crudas if desdeTs <= vela[0] <= ahora], divisa, tipo)
+
+
 def _primerSnapshot(conn, assetId: str) -> int | None:
     fila = conn.execute(
         "SELECT ts FROM asset_snapshots WHERE asset_id = ? AND price_eur > 0 ORDER BY ts LIMIT 1",
@@ -398,20 +536,31 @@ def _primerSnapshot(conn, assetId: str) -> int | None:
     return fila["ts"] if fila else None
 
 
-def datosDelGrafico(assetId: str, rango: str, ahora: float | None = None) -> dict:
+def datosDelGrafico(
+    assetId: str,
+    rango: str,
+    ahora: float | None = None,
+    simboloTv: str | None = None,
+    velas: Callable[..., tuple[str, list[list]] | None] | None = None,
+) -> dict:
     """Puntos y operaciones de un activo en el rango pedido.
 
     Args:
         assetId: Id del activo.
         rango: Una de las claves de `RANGOS`.
         ahora: Instante de referencia; por defecto, el actual.
+        simboloTv: Ticker de TradingView del activo, ya normalizado. Si tiene
+            velas en el rango, la línea sale de ellas y no de los snapshots.
+        velas: Función que da las velas; por defecto,
+            `series_tradingview.velasDelGrafico`. Inyectable para los tests.
 
     Returns:
-        `{"rango", "moneda", "segundosHueco", "inicioHistorico", "puntos",
-        "operaciones", "operacionesSinPunto"}`. Los importes de `puntos` van en
-        euros, y el precio de cada operación en la divisa en que se hizo. Cada
-        operación lleva además `precioEur`, la altura de su marca en la vista de
-        precio, o None si no se puede convertir.
+        `{"rango", "moneda", "segundosHueco", "inicioHistorico", "conVelas",
+        "puntos", "operaciones", "operacionesSinPunto"}`. Los importes de
+        `puntos` van en euros, y el precio de cada operación en la divisa en que
+        se hizo. Cada operación lleva además `precioEur`, la altura de su marca
+        en la vista de precio, o None si no se puede convertir. `conVelas` dice
+        si la línea sale de las velas de TradingView.
 
     Raises:
         RangoInvalido: Si `rango` no existe.
@@ -436,7 +585,6 @@ def datosDelGrafico(assetId: str, rango: str, ahora: float | None = None) -> dic
 
     tipo = tipoActualConMemo()
     tramos = construirTramos(datos, esCripto, moneda, tipo)
-    puntos = construirPuntos(_leerSnapshots(conn, assetId, desdeTs, ajustes["cubeta"]), tramos, moneda)
 
     # Se compara por día: la operación de ayer cae dentro de «las últimas 24 h» si
     # el rango llega a ese día, porque no se sabe a qué hora se hizo.
@@ -454,15 +602,35 @@ def datosDelGrafico(assetId: str, rango: str, ahora: float | None = None) -> dic
         ),
         key=lambda op: op["ts"],
     )
-    extras = puntosDeOperaciones(conn, assetId, enRango, desdeTs, tramos, moneda)
-    puntos = sorted({punto["ts"]: punto for punto in [*puntos, *extras]}.values(), key=lambda punto: punto["ts"])
+    primerSnapshot = _primerSnapshot(conn, assetId)
+    velasRango = []
+    if simboloTv:
+        velasRango = _velasDelRango(
+            simboloTv, rango, _desdeParaVelas(rango, desdeTs, tramos, primerSnapshot), ahora, tipo,
+            velas or series_tradingview.velasDelGrafico,
+        )
+
+    if len(velasRango) >= 2:
+        # Con velas, la línea sale entera de ellas, como en Paneles. Mezclarlas
+        # con los snapshots dejaba huecos (snapshots sin precio reconstruible
+        # cuentan como cubiertos) y tramos con un precio por participación mal
+        # reconstruido. Los snapshots quedan para cuando no hay velas.
+        conOperaciones = puntosDeOperacionesEnVelas(enRango, velasRango, tramos)
+        porInstante = {punto["ts"]: punto for punto in [*conOperaciones, *puntosDeVelas(velasRango, tramos)]}
+        puntos = sorted(porInstante.values(), key=lambda punto: punto["ts"])
+    else:
+        velasRango = []
+        puntos = construirPuntos(_leerSnapshots(conn, assetId, desdeTs, ajustes["cubeta"]), tramos, moneda)
+        extras = puntosDeOperaciones(conn, assetId, enRango, desdeTs, tramos, moneda)
+        puntos = sorted({punto["ts"]: punto for punto in [*puntos, *extras]}.values(), key=lambda punto: punto["ts"])
     operaciones, sinPunto = colocarOperaciones(enRango, puntos)
 
     return {
         "rango": rango,
         "moneda": "EUR",
         "segundosHueco": ajustes["hueco"],
-        "inicioHistorico": _primerSnapshot(conn, assetId),
+        "inicioHistorico": primerSnapshot,
+        "conVelas": bool(velasRango),
         "puntos": puntos,
         "operaciones": operaciones,
         "operacionesSinPunto": sinPunto,
