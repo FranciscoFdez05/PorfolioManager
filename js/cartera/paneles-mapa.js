@@ -523,7 +523,12 @@ function pnTextoInvertido(activo) {
 function pnVariacionDeLinea(celda, puntos, ventana, escala) {
     const d = celda._pn
     // `deLinea`: ya se calculó así antes; en cada refresco se rehace con la línea nueva.
-    if (!d || (d.valor !== null && !d.deLinea) || d.periodo === "dia" || d.periodo === "todo") return
+    // «Hoy» solo entra con un 0 exacto: es lo que da el feed cuando el cierre anterior
+    // se ha igualado al precio (mercado cerrado o índice sin abrir) y tapa la subida o
+    // bajada que la línea sí enseña. Con cualquier otro valor manda el % del proveedor.
+    if (!d || d.periodo === "todo") return
+    const sinVariacion = d.periodo === "dia" ? d.valor === 0 : d.valor === null
+    if (!sinVariacion && !d.deLinea) return
     if (!ventana?.velas || !Array.isArray(puntos) || puntos.length < 2) return
     const primero = puntos[0][1]
     const ultimo = puntos[puntos.length - 1][1]

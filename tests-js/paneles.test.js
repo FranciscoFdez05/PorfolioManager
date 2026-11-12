@@ -474,7 +474,19 @@ describe("mapa en rejilla", () => {
         expect(el._pn.valor).toBeCloseTo(-5)
     })
 
-    it("no toca la que ya traía, ni «Hoy», ni una línea de snapshots", () => {
+    it("«Hoy» con 0 exacto del feed toma la variación de la línea; con otro valor no la toca", () => {
+        const plano = casillaSinVariacion("dia", 0)
+        const conValor = casillaSinVariacion("dia", 1.5)
+
+        pnVariacionDeLinea(plano, linea, { velas: true }, 3)
+        pnVariacionDeLinea(conValor, linea, { velas: true }, 3)
+
+        expect(plano._pn.valor).toBeCloseTo(10)
+        expect(plano.querySelector(".pnRjPct").textContent).toBe(pnPct(10))
+        expect(conValor._pn.valor).toBe(1.5)
+    })
+
+    it("no toca la que ya traía, ni «Hoy» sin dato, ni una línea de snapshots", () => {
         const conValor = casillaSinVariacion("ytd", 3)
         const hoy = casillaSinVariacion("dia")
         const snapshots = casillaSinVariacion("ytd")
