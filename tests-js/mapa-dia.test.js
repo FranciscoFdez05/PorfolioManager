@@ -85,6 +85,20 @@ describe("mapaDiaSvg", () => {
         expect(mapaDiaSvg(undefined, datos)).toBe("")
         expect(mapaDiaSvg([[INICIO, 1]], datos)).toBe("")
     })
+
+    it("fuera de «Hoy» une los puntos separados por un hueco; en «Hoy» lo corta", () => {
+        const datos = { inicio: INICIO, fin: FIN, segundosHueco: HUECO }
+        const puntos = [
+            [INICIO, 1],
+            [INICIO + 10, 2],
+            [INICIO + HUECO * 5, 3],
+            [INICIO + HUECO * 5 + 10, 2]
+        ]
+        const trazos = (svg) => svg.match(/class="mapaDiaTrazo" d="([^"]*)"/)[1].match(/M/g).length
+
+        expect(trazos(mapaDiaSvg(puntos, datos, { inicio: INICIO, fin: FIN }))).toBe(2)
+        expect(trazos(mapaDiaSvg(puntos, datos, { inicio: INICIO, fin: FIN, dias: true }))).toBe(1)
+    })
 })
 
 describe("mapaDiaPintarEn", () => {

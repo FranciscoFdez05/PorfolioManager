@@ -187,7 +187,10 @@ function mapaDiaTrazado(puntos, inicio, fin, hueco) {
  */
 function mapaDiaSvg(puntos, datos, ventana = datos) {
     if (!Array.isArray(puntos) || puntos.length < 2) return ""
-    const { linea, area } = mapaDiaTrazado(puntos, ventana.inicio, ventana.fin, datos.segundosHueco || MAPA_DIA_HUECO)
+    // Fuera de «Hoy» las noches y los fines de semana son huecos normales del mercado, no
+    // falta de datos: la línea los une en vez de partirse en un trozo por sesión.
+    const hueco = ventana.dias ? Infinity : datos.segundosHueco || MAPA_DIA_HUECO
+    const { linea, area } = mapaDiaTrazado(puntos, ventana.inicio, ventana.fin, hueco)
     return `<svg class="mapaDiaLinea" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
         <path class="mapaDiaArea" d="${area}"/>
         <path class="mapaDiaTrazo" d="${linea}" vector-effect="non-scaling-stroke"/>
