@@ -64,6 +64,10 @@ Limitaciones:
 
 ## Mi dinero
 
+### Métricas
+
+Las métricas de gastos e ingresos sin las del resto de la cartera: KPIs, gráficos por mes y por tipo (con el total en el centro del anillo), comparativa mensual y saldo del mes. Pulsar una porción de los anillos de **Gastos** o **Ingresos** abre la tabla con los movimientos de esa categoría, con buscador y total. La página **Métricas** de la barra principal sigue mostrándolo todo, con el filtro **Gastos & Ingresos**.
+
 ### Cuentas
 
 Una tarjeta por cuenta con su tipo, su saldo y una miniatura del saldo en lo que va de año; a la derecha, el reparto del dinero por cuenta y por tipo.

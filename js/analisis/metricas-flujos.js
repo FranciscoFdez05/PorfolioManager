@@ -340,7 +340,8 @@ function mRenderGastosTipoChart(tipoData) {
                 legend: { display: false },
                 tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, tipoTotal) } }
             }
-        }
+        },
+        plugins: [mDonutTotalPlugin()]
     })
     mRenderDonutLeyenda("mChartGastosTipo", tipoLabels, tipoColors, tipoValues, tipoTotal)
     const canvas = document.getElementById("mChartGastosTipo")
@@ -385,7 +386,18 @@ function openGastosTipoPopup(tipoLabel) {
         })
     }
 
+    mAbrirPopupTipo(`Gastos · ${tipoLabel}`, rows)
+}
+
+/**
+ * Abre el popup con la tabla de movimientos de una categoría (Gastos o Ingresos).
+ *
+ * @param {string} titulo Texto de la cabecera.
+ * @param {{fecha: string, mes: string, nombre: string, cuenta: string, cantidad: number}[]} rows Movimientos.
+ */
+function mAbrirPopupTipo(titulo, rows) {
     document.getElementById("gastosTipoPopup")?.remove()
+    document.getElementById("gastosTipoBackdrop")?.remove()
 
     const mainContent = document.querySelector(".mainContent")
     if (!mainContent) return
@@ -420,7 +432,7 @@ function openGastosTipoPopup(tipoLabel) {
     popup.style.cssText = `position:fixed;top:${popupT}px;left:${popupL}px;width:${popupW}px;height:${popupH}px;z-index:900;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.6);`
     popup.innerHTML = `
         <div class="gtPopupHeader">
-            <span class="gtPopupTitle">Gastos · ${escapeHtml(tipoLabel)}</span>
+            <span class="gtPopupTitle">${escapeHtml(titulo)}</span>
             <input type="text" id="gtPopupSearch" class="gtPopupSearch" placeholder="Buscar concepto...">
             <span class="gtPopupTotal" id="gtPopupTotalLabel">Total: ${formatEuro(total)} · ${escapeHtml(rows.length)} movimientos</span>
             <button class="gtPopupClose" id="gtPopupCloseBtn" title="Cerrar" aria-label="Cerrar">${iconoHtml("Cerrar")}</button>

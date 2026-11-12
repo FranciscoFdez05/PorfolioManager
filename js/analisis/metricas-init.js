@@ -551,7 +551,15 @@ function mRenderTradingRendimiento(rows) {
 
 // ──────────────────────────────────────────────────────────────────────────
 
-async function initMetricasLogic() {
+/**
+ * Arranca la pantalla de Métricas.
+ *
+ * @param {{soloDinero?: boolean}} [options] Con `soloDinero` (Mi dinero › Métricas)
+ *     solo se enseñan los apartados de gastos e ingresos y se esconde el filtro
+ *     por categorías; no toca la categoría que el usuario dejó elegida en Métricas.
+ */
+async function initMetricasLogic(options = {}) {
+    const soloDinero = options.soloDinero === true
     Object.values(_metricasCharts).forEach((c) => c?.destroy())
     _metricasCharts = {}
     _metricasDisplayType = window._metricasDisplayType ?? "doughnut"
@@ -802,7 +810,14 @@ async function initMetricasLogic() {
 
         // Restaurar la categoría que el usuario dejó seleccionada (sin scroll:
         // al entrar en la página se empieza arriba).
-        const _savedNavCat = getChartPref("metricasNavCat", null)
+        if (soloDinero) {
+            document.getElementById("mNavBar")?.classList.add("hidden")
+            const titulo = document.querySelector(".metricasTitle")
+            if (titulo) titulo.textContent = "Métricas de Mi dinero"
+            _mActiveCats = new Set(["gastos", "ingresos"])
+            mApplyNavFilter()
+        }
+        const _savedNavCat = soloDinero ? null : getChartPref("metricasNavCat", null)
         const _savedNavTab = _savedNavCat
             ? navTabsContainer?.querySelector(`.mNavTab[data-mcat="${_savedNavCat}"] input`)
             : null

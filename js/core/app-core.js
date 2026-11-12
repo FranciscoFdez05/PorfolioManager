@@ -51,7 +51,8 @@ const _PAGE_DIRS = {
 // mantener dos copias de la tabla, el calendario y los filtros.
 const _PAGE_FRAGMENT_ALIAS = {
     mensualidades: "gastos",
-    ingresosRecurrentes: "ingresos"
+    ingresosRecurrentes: "ingresos",
+    metricasDinero: "metricas"
 }
 
 // El identificador de página (data-page, ajustes guardados, módulos) no cambia,
@@ -126,6 +127,7 @@ const _MODULE_PAGES = {
         "ingresos",
         "mensualidades",
         "ingresosRecurrentes",
+        "metricasDinero",
         "ahorro",
         "cuentas",
         "movimientosCuentas",
@@ -1336,6 +1338,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initBonosLogic()
         } else if (page === "metricas") {
             await initMetricasLogic()
+        } else if (page === "metricasDinero") {
+            await initMetricasLogic({ soloDinero: true })
         } else if (page === "activos") {
             await initActivosPageLogic()
         } else if (page === "heatmap") {

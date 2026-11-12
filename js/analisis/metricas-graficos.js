@@ -237,6 +237,45 @@ function mDonutBorderWidth(values, total) {
 }
 
 /**
+ * Plugin de Chart.js que escribe en el hueco de un donut el total de las
+ * porciones visibles (se recalcula al ocultar una desde la leyenda).
+ *
+ * El tamaño de letra sale del radio interior para que quepa en cualquier
+ * tamaño de tarjeta; el color se hereda del canvas para respetar el tema.
+ *
+ * @returns {object} Plugin inline para la opción `plugins` del gráfico.
+ */
+function mDonutTotalPlugin() {
+    return {
+        id: "mDonutTotal",
+        afterDraw(chart) {
+            const arco = chart.getDatasetMeta(0)?.data?.[0]
+            const valores = chart.data.datasets[0]?.data || []
+            if (!arco) return
+            const total = valores.reduce((s, v, i) => (chart.getDataVisibility(i) ? s + Number(v) : s), 0)
+            const texto = formatEuro(total)
+            const { ctx } = chart
+            const radio = arco.innerRadius
+            let tamano = Math.max(12, Math.min(26, radio * 0.34))
+            ctx.save()
+            ctx.textAlign = "center"
+            ctx.textBaseline = "middle"
+            ctx.fillStyle = getComputedStyle(chart.canvas).color
+            ctx.font = `700 ${tamano}px sans-serif`
+            // El hueco es un círculo: el texto debe caber en ~85% del diámetro interior.
+            const maxAncho = radio * 1.7
+            const ancho = ctx.measureText(texto).width
+            if (ancho > maxAncho) {
+                tamano = Math.max(9, (tamano * maxAncho) / ancho)
+                ctx.font = `700 ${tamano}px sans-serif`
+            }
+            ctx.fillText(texto, arco.x, arco.y)
+            ctx.restore()
+        }
+    }
+}
+
+/**
  * Pinta la leyenda HTML de un donut en `#<chartId>Leyenda`, con scroll propio.
  *
  * Pulsar un elemento oculta o muestra su porción, como la leyenda de Chart.js.

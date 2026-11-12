@@ -66,6 +66,51 @@ function mComputeIngresosTipo(ingresosYearData, monthKey) {
     return totals
 }
 
+/**
+ * Abre la tabla con los ingresos de una categoría del donut, respetando el mes elegido.
+ *
+ * Las categorías del donut son los nombres de los ingresos recurrentes y el
+ * tipo de cada movimiento suelto, igual que en mComputeIngresosTipo.
+ *
+ * @param {object|null} ingresosYearData Ingresos del año.
+ * @param {string} tipoLabel Categoría pulsada.
+ */
+function mAbrirIngresosTipoPopup(ingresosYearData, tipoLabel) {
+    const monthScope = _metricasIngresosMonth === "all" ? M_ING_KEYS : [_metricasIngresosMonth]
+    const rows = []
+    const etiquetaMes = (mk) => M_ING_LABELS[M_ING_KEYS.indexOf(mk)] || mk
+
+    ;(ingresosYearData?.recurrentes || []).forEach((rec) => {
+        if ((rec.nombre || "Recurrentes").trim() !== tipoLabel) return
+        monthScope.forEach((mk) => {
+            const val = parseEuroNumber(rec.meses?.[mk] || "")
+            if (val > 0)
+                rows.push({
+                    fecha: "—",
+                    mes: etiquetaMes(mk),
+                    nombre: rec.nombre || "—",
+                    cuenta: nombreDeCuenta(rec.cuentasCobro?.[mk] || rec.cuenta),
+                    cantidad: val
+                })
+        })
+    })
+    monthScope.forEach((mk) => {
+        ;(ingresosYearData?.months?.[mk]?.rows || []).forEach((r) => {
+            const val = parseEuroNumber(r.cantidad || "")
+            if ((r.tipo || "Sin tipo").trim() !== tipoLabel || val <= 0) return
+            rows.push({
+                fecha: r.fecha || "—",
+                mes: etiquetaMes(mk),
+                nombre: r.nombre || "—",
+                cuenta: nombreDeCuenta(r.cuenta),
+                cantidad: val
+            })
+        })
+    })
+
+    mAbrirPopupTipo(`Ingresos · ${tipoLabel}`, rows)
+}
+
 function mRenderIngresosCharts(ingresosYearData) {
     const totalMes = mComputeIngresosMonthly(ingresosYearData)
     const totalTipo = mComputeIngresosTipo(ingresosYearData, _metricasIngresosMonth)
@@ -124,14 +169,21 @@ function mRenderIngresosCharts(ingresosYearData) {
             options: {
                 ...M_CHART_DEFAULTS,
                 cutout: "55%",
+                onClick: (_e, elements) => {
+                    if (!elements.length) return
+                    mAbrirIngresosTipoPopup(ingresosYearData, tipoLabels[elements[0].index])
+                },
                 plugins: {
                     ...M_CHART_DEFAULTS.plugins,
                     legend: { display: false },
                     tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, tipoTotal) } }
                 }
-            }
+            },
+            plugins: [mDonutTotalPlugin()]
         })
         mRenderDonutLeyenda("mChartIngresosTipo", tipoLabels, tipoColors, tipoValues, tipoTotal)
+        const canvasTipo = document.getElementById("mChartIngresosTipo")
+        if (canvasTipo) canvasTipo.style.cursor = "pointer"
     } else {
         mDestroyChart("mChartIngresosTipo")
         mRenderDonutLeyenda("mChartIngresosTipo", [], [], [], 0)

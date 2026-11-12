@@ -22,6 +22,36 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.3.2] — 2026-11-12
+
+**Esquema de base de datos:** no lo toca (sigue en el **31**). Basta con volver a
+la imagen anterior para deshacer la actualización.
+
+### Añadido
+
+- **Mi dinero › Métricas**: ventana nueva con solo las métricas de gastos e
+  ingresos (KPIs, gráficos por mes y por tipo, comparativa y saldo del mes), sin
+  el filtro por categorías. La página Métricas conserva todo lo suyo y no
+  comparte con ella la categoría elegida.
+- **Métricas › Ingresos**: al pulsar una porción del gráfico «Por tipo» se
+  abre la tabla con los ingresos de esa categoría, igual que ya hacía Gastos,
+  con buscador, orden por columnas y total. Respeta el mes elegido.
+- **Métricas › Gastos e Ingresos**: el total aparece en el centro de los
+  gráficos de anillo y se recalcula al ocultar una categoría desde la leyenda.
+
+### Corregido
+
+- **Paneles › Mapa**: en «Hoy», cuando el proveedor da una variación de
+  exactamente 0 % (cierre anterior igualado al precio: mercado cerrado o índice
+  sin abrir), se usa la variación de la línea del gráfico en vez de tapar la
+  subida o bajada que sí se ve. Con cualquier otro valor manda el % del
+  proveedor.
+- **Mapa del día**: fuera de «Hoy» las noches y los fines de semana se tratan
+  como pausas normales del mercado y la línea se une en vez de partirse en un
+  trozo por sesión. «Hoy» conserva los cortes por falta de datos.
+
+---
+
 ## [5.3.1] — 2026-11-11
 
 **Esquema de base de datos:** no lo toca (sigue en el **31**). Basta con volver a
