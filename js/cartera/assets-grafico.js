@@ -40,6 +40,60 @@ const ASSET_GRAFICO_EJE_CON_DIA = 200 * 86400
 let _assetGraficoChart = null
 let _assetGraficoToken = 0
 let _assetGraficoDatos = null
+// Ventana de fechas (AAAA-MM-DD) elegida a mano. Con alguna fecha puesta manda sobre
+// el rango; se queda en memoria y se vacía al cambiar de activo.
+let _assetGraficoVentana = { desde: "", hasta: "" }
+// Los datos ya recortados a la ventana: la cabecera los lee en cada movimiento del cursor.
+let _assetGraficoVisibles = null
+// Días con compra o venta del activo abierto; null hasta que se conocen.
+let _assetGraficoDias = null
+
+function assetGraficoHayVentana() {
+    return Boolean(_assetGraficoVentana.desde || _assetGraficoVentana.hasta)
+}
+
+// Con ventana se pide «Todo» al servidor: una ventana puede caer en cualquier punto del
+// histórico y el recorte se hace aquí.
+function assetGraficoRangoEfectivo() {
+    return assetGraficoHayVentana() ? "TODO" : assetGraficoEstado().rango
+}
+
+// Inicio del primer día y final del último, en hora local, en segundos.
+function assetGraficoLimitesVentana(ventana) {
+    const inicio = ventana.desde ? new Date(`${ventana.desde}T00:00:00`).getTime() / 1000 : -Infinity
+    const fin = ventana.hasta ? new Date(`${ventana.hasta}T23:59:59`).getTime() / 1000 : Infinity
+    return { min: Number.isNaN(inicio) ? -Infinity : inicio, max: Number.isNaN(fin) ? Infinity : fin }
+}
+
+/**
+ * Deja solo los puntos y las operaciones de la ventana de fechas.
+ *
+ * Los índices de las operaciones se reajustan a la lista recortada, porque apuntan a
+ * la posición del punto de su día.
+ *
+ * @param {object} datos Respuesta del servidor.
+ * @param {{desde: string, hasta: string}} ventana Fechas AAAA-MM-DD; vacías, sin límite.
+ * @returns {object} `datos` tal cual si no hay ventana; si la hay, una copia recortada.
+ */
+function assetGraficoRecortar(datos, ventana) {
+    if (!ventana.desde && !ventana.hasta) return datos
+    const { min, max } = assetGraficoLimitesVentana(ventana)
+    const indiceNuevo = new Map()
+    const puntos = []
+    ;(datos.puntos || []).forEach((punto, indice) => {
+        if (punto.ts < min || punto.ts > max) return
+        indiceNuevo.set(indice, puntos.length)
+        puntos.push(punto)
+    })
+    const operaciones = (datos.operaciones || [])
+        .filter((operacion) => indiceNuevo.has(operacion.indice))
+        .map((operacion) => ({ ...operacion, indice: indiceNuevo.get(operacion.indice) }))
+    return { ...datos, puntos, operaciones }
+}
+
+function assetGraficoConHora(rango) {
+    return !assetGraficoHayVentana() && (rango === "1D" || rango === "7D")
+}
 
 function assetGraficoPreferencia(clave, opciones, defecto) {
     const guardada = getChartPref(clave, defecto)
@@ -236,6 +290,44 @@ function assetGraficoSelector(nombre, opciones, activa) {
     return `<div class="mToggleGroup" role="group">${botones}</div>`
 }
 
+// Misma cápsula de fechas que el seguimiento de wallets (css/pages/operaciones.css),
+// con el calendario propio para poder señalar los días con operaciones.
+// Hoy en AAAA-MM-DD y hora local. No hay operaciones futuras: el calendario apaga lo
+// posterior, como en el seguimiento de wallets.
+function assetGraficoHoy() {
+    const ahora = new Date()
+    const mes = String(ahora.getMonth() + 1).padStart(2, "0")
+    const dia = String(ahora.getDate()).padStart(2, "0")
+    return `${ahora.getFullYear()}-${mes}-${dia}`
+}
+
+// Límites de cada campo: «Desde» no pasa de «Hasta» ni de hoy, y «Hasta» no baja de «Desde».
+function assetGraficoLimitesCampo(campo, ventana) {
+    return campo === "desde" ? { max: ventana.hasta || assetGraficoHoy() } : { min: ventana.desde, max: assetGraficoHoy() }
+}
+
+function assetGraficoCampoFechaHtml(campo, etiqueta, valor) {
+    const { min, max } = assetGraficoLimitesCampo(campo, _assetGraficoVentana)
+    const atributos = `${min ? ` min="${escapeHtml(min)}"` : ""} max="${escapeHtml(max)}"`
+    return `
+        <label class="walletsSegRangoCampo">
+            <span>${etiqueta}</span>
+            <input type="date" class="walletsSegFechaInput${valor ? "" : " vacio"}" data-grafico-fecha="${campo}" value="${escapeHtml(valor)}"${atributos}>
+            <button type="button" class="walletsSegFechaBtn" data-grafico-calendario="${campo}" aria-label="Elegir fecha ${campo}" aria-haspopup="dialog" aria-expanded="false" title="Abrir calendario"><span class="icono iconoCalendario" aria-hidden="true"></span></button>
+        </label>`
+}
+
+function assetGraficoFechasHtml() {
+    const { desde, hasta } = _assetGraficoVentana
+    return `
+        <div class="walletsSegRango${assetGraficoHayVentana() ? " activo" : ""}" id="assetGraficoFechas" role="group" aria-label="Buscar por fecha">
+            ${assetGraficoCampoFechaHtml("desde", "Desde", desde)}
+            <span class="walletsSegRangoSep" aria-hidden="true">→</span>
+            ${assetGraficoCampoFechaHtml("hasta", "Hasta", hasta)}
+            <button type="button" class="walletsSegFechasQuitarBtn${assetGraficoHayVentana() ? "" : " hidden"}" id="assetGraficoFechasQuitar" aria-label="Quitar fechas" title="Quitar fechas"><span class="icono iconoCerrar" aria-hidden="true"></span></button>
+        </div>`
+}
+
 function assetGraficoEtiquetaVista(vista) {
     return vista === "precio" ? "Precio por participación" : "Ganancia o pérdida de lo que sigue en cartera"
 }
@@ -256,7 +348,8 @@ function assetGraficoPintarEsqueleto(seccion) {
                 <div class="assetGraficoControles">
                     ${assetGraficoSelector("vista", ASSET_GRAFICO_VISTAS, vista)}
                     ${assetGraficoSelector("unidad", ASSET_GRAFICO_UNIDADES, unidad)}
-                    ${assetGraficoSelector("rango", ASSET_GRAFICO_RANGOS, rango)}
+                    ${assetGraficoSelector("rango", ASSET_GRAFICO_RANGOS, assetGraficoHayVentana() ? "" : rango)}
+                    ${assetGraficoFechasHtml()}
                 </div>
             </div>
             <div class="assetGraficoLienzo" id="assetGraficoLienzo"><canvas id="assetGraficoCanvas"></canvas></div>
@@ -301,14 +394,14 @@ function assetGraficoActualizarCabecera(puntoLinea) {
     const { vista, unidad, rango } = assetGraficoEstado()
     const punto = puntoLinea.punto
     assetGraficoEscribir("assetGraficoValor", assetGraficoFormatearValor(puntoLinea.y, vista, unidad))
-    assetGraficoEscribir("assetGraficoFecha", assetGraficoFormatearFecha(punto.ts, rango === "1D" || rango === "7D"))
+    assetGraficoEscribir("assetGraficoFecha", assetGraficoFormatearFecha(punto.ts, assetGraficoConHora(rango)))
 
     const cambio = document.getElementById("assetGraficoCambio")
     if (!cambio) return
     let texto = assetGraficoDetalleDelPunto(punto, vista, unidad)
     let positivo = punto.valor >= punto.coste
     if (vista === "precio") {
-        const base = assetGraficoPrecioBase(_assetGraficoDatos.puntos)
+        const base = assetGraficoPrecioBase((_assetGraficoVisibles || _assetGraficoDatos).puntos)
         const variacion = base && Number.isFinite(punto.precio) ? (punto.precio / base - 1) * 100 : null
         texto = variacion === null ? "" : assetGraficoFormatearPct(variacion)
         positivo = (variacion ?? 0) >= 0
@@ -524,14 +617,17 @@ function assetGraficoDibujar() {
     if (!lienzo || !canvas || !_assetGraficoDatos || typeof Chart === "undefined") return
 
     const { rango, vista, unidad } = assetGraficoEstado()
-    const series = assetGraficoSeries(_assetGraficoDatos, vista, unidad)
+    _assetGraficoVisibles = assetGraficoRecortar(_assetGraficoDatos, _assetGraficoVentana)
+    const series = assetGraficoSeries(_assetGraficoVisibles, vista, unidad)
     assetGraficoEscribir("assetGraficoEtiqueta", assetGraficoEtiquetaVista(vista))
 
     if (!series.ultimo || series.linea.filter((punto) => Number.isFinite(punto.y)).length < 2) {
         const hayHistorico = Boolean(_assetGraficoDatos.inicioHistorico)
         assetGraficoMostrarVacio(
             hayHistorico
-                ? "No hay suficientes datos de este activo en este periodo. Prueba con un rango más amplio."
+                ? assetGraficoHayVentana()
+                    ? "No hay suficientes datos de este activo entre esas fechas. Prueba con otras."
+                    : "No hay suficientes datos de este activo en este periodo. Prueba con un rango más amplio."
                 : "Todavía no hay histórico de este activo. Se construye con las valoraciones que la aplicación guarda periódicamente mientras hay posición abierta."
         )
         return
@@ -610,7 +706,7 @@ function assetGraficoDibujar() {
                     callbacks: {
                         title: (items) => {
                             const ts = items[0]?.raw?.x
-                            return ts ? assetGraficoFormatearFecha(ts, rango === "1D" || rango === "7D") : ""
+                            return ts ? assetGraficoFormatearFecha(ts, assetGraficoConHora(rango)) : ""
                         },
                         label: (contexto) => assetGraficoEtiquetasTooltip(contexto, vista, unidad)
                     }
@@ -636,7 +732,7 @@ function assetGraficoDibujar() {
     assetGraficoEscribirLeyenda(series)
     assetGraficoEscribir(
         "assetGraficoNota",
-        assetGraficoTextoNota(_assetGraficoDatos, series, vista, pagina?.dataset.assetCurrency)
+        assetGraficoTextoNota(_assetGraficoVisibles, series, vista, pagina?.dataset.assetCurrency)
     )
 }
 
@@ -656,19 +752,65 @@ function assetGraficoSimboloTv() {
     }
 }
 
+async function assetGraficoPedir(assetId, rango) {
+    const params = new URLSearchParams({ rango })
+    const tv = assetGraficoSimboloTv()
+    if (tv) params.set("tv", tv)
+    const respuesta = await fetch(`/api/activos/${encodeURIComponent(assetId)}/grafico?${params}`)
+    const cuerpo = await respuesta.json()
+    if (!respuesta.ok || !cuerpo.ok) throw new Error(cuerpo.error || `HTTP ${respuesta.status}`)
+    return cuerpo
+}
+
+/**
+ * Días con operaciones, para señalarlos en el calendario.
+ *
+ * @param {object[]} operaciones Operaciones del gráfico, con `fecha` en dd-mm-aaaa.
+ * @returns {Map<string, Set<string>>} Fecha AAAA-MM-DD -> tipos de operación ese día.
+ */
+function assetGraficoDiasConOperaciones(operaciones) {
+    const dias = new Map()
+    ;(operaciones || []).forEach((operacion) => {
+        const [dia, mes, anio] = String(operacion.fecha || "").split("-")
+        if (!dia || !mes || !anio) return
+        const iso = `${anio}-${mes}-${dia}`
+        if (!dias.has(iso)) dias.set(iso, new Set())
+        dias.get(iso).add(operacion.tipo)
+    })
+    return dias
+}
+
+// El calendario tiene que señalar todas las operaciones y no solo las del rango que se
+// ve: si el gráfico no tiene «Todo» cargado, se pide aparte y se guarda para el activo.
+async function assetGraficoAsegurarDias(assetId) {
+    if (_assetGraficoDias) return
+    try {
+        const cuerpo =
+            _assetGraficoDatos?.rango === "TODO" ? _assetGraficoDatos : await assetGraficoPedir(assetId, "TODO")
+        _assetGraficoDias = assetGraficoDiasConOperaciones(cuerpo.operaciones)
+    } catch (error) {
+        // Sin las marcas el calendario sirve igual.
+        console.error("No se pudieron cargar las operaciones para el calendario", error)
+    }
+}
+
+async function assetGraficoAbrirCalendario(boton, assetId) {
+    const input = boton.closest("label")?.querySelector("[data-grafico-fecha]")
+    if (!input) return
+    await assetGraficoAsegurarDias(assetId)
+    input.calendarioMarcas = (iso) => [..._assetGraficoDias?.get(iso) || []]
+    abrirCalendarioFecha(input, boton)
+}
+
 async function assetGraficoCargar(assetId) {
     const token = ++_assetGraficoToken
-    const { rango } = assetGraficoEstado()
+    const rango = assetGraficoRangoEfectivo()
     try {
-        const params = new URLSearchParams({ rango })
-        const tv = assetGraficoSimboloTv()
-        if (tv) params.set("tv", tv)
-        const respuesta = await fetch(`/api/activos/${encodeURIComponent(assetId)}/grafico?${params}`)
-        const cuerpo = await respuesta.json()
+        const cuerpo = await assetGraficoPedir(assetId, rango)
         // Otro rango u otro activo pueden haberse pedido entretanto.
         if (token !== _assetGraficoToken) return
-        if (!respuesta.ok || !cuerpo.ok) throw new Error(cuerpo.error || `HTTP ${respuesta.status}`)
         _assetGraficoDatos = cuerpo
+        if (cuerpo.rango === "TODO") _assetGraficoDias = assetGraficoDiasConOperaciones(cuerpo.operaciones)
         assetGraficoDibujar()
     } catch (error) {
         if (token !== _assetGraficoToken) return
@@ -687,12 +829,55 @@ function assetGraficoPulsar(boton, assetId) {
 
     if (boton.dataset.graficoRango) {
         setChartPref("assetGraficoRango", boton.dataset.graficoRango)
+        assetGraficoLimpiarVentana()
         assetGraficoCargar(assetId)
         return
     }
     if (boton.dataset.graficoVista) setChartPref("assetGraficoVista", boton.dataset.graficoVista)
     if (boton.dataset.graficoUnidad) setChartPref("assetGraficoUnidad", boton.dataset.graficoUnidad)
     assetGraficoDibujar()
+}
+
+function assetGraficoLimpiarVentana() {
+    _assetGraficoVentana = { desde: "", hasta: "" }
+    assetGraficoSincronizarFechas()
+}
+
+// Deja los campos de fecha, la cápsula y los botones de rango acordes con la ventana:
+// con fechas el rango deja de estar activo, y cada fecha limita a la otra para que no
+// se pueda cruzar el periodo.
+function assetGraficoSincronizarFechas() {
+    const seccion = document.getElementById("assetGraficoSection")
+    if (!seccion) return
+    seccion.querySelectorAll("[data-grafico-fecha]").forEach((input) => {
+        const campo = input.dataset.graficoFecha
+        const { min, max } = assetGraficoLimitesCampo(campo, _assetGraficoVentana)
+        input.value = _assetGraficoVentana[campo]
+        input.classList.toggle("vacio", !input.value)
+        input.max = max
+        if (min) input.min = min
+        else input.removeAttribute("min")
+    })
+    seccion.querySelector("#assetGraficoFechas")?.classList.toggle("activo", assetGraficoHayVentana())
+    seccion.querySelector("#assetGraficoFechasQuitar")?.classList.toggle("hidden", !assetGraficoHayVentana())
+
+    const { rango } = assetGraficoEstado()
+    seccion.querySelectorAll("[data-grafico-rango]").forEach((boton) => {
+        const activo = !assetGraficoHayVentana() && boton.dataset.graficoRango === rango
+        boton.classList.toggle("active", activo)
+        boton.setAttribute("aria-pressed", String(activo))
+    })
+}
+
+function assetGraficoCambiarFecha(input, assetId) {
+    _assetGraficoVentana = { ..._assetGraficoVentana, [input.dataset.graficoFecha]: input.value }
+    assetGraficoSincronizarFechas()
+    assetGraficoCargar(assetId)
+}
+
+function assetGraficoQuitarFechas(assetId) {
+    assetGraficoLimpiarVentana()
+    assetGraficoCargar(assetId)
 }
 
 // Se llama al abrir la pestaña y no al pintar la ficha: la mayoría de las veces que
@@ -705,10 +890,31 @@ function renderAssetGraficoSection() {
     if (seccion.dataset.assetId !== assetId) {
         seccion.dataset.assetId = assetId
         _assetGraficoDatos = null
+        _assetGraficoVisibles = null
+        _assetGraficoVentana = { desde: "", hasta: "" }
+        _assetGraficoDias = null
         assetGraficoPintarEsqueleto(seccion)
         seccion.addEventListener("click", (evento) => {
             const boton = evento.target.closest(".mToggleBtn")
             if (boton) assetGraficoPulsar(boton, assetId)
+            const calendario = evento.target.closest("[data-grafico-calendario]")
+            if (calendario) {
+                // Dentro de un <label>: sin esto el clic también enfocaría el input.
+                evento.preventDefault()
+                assetGraficoAbrirCalendario(calendario, assetId)
+            }
+            if (evento.target.closest("#assetGraficoFechasQuitar")) assetGraficoQuitarFechas(assetId)
+        })
+        // Alt+↓ es el atajo del navegador para abrir su calendario nativo: abre el propio.
+        seccion.addEventListener("keydown", (evento) => {
+            const input = evento.target.closest("[data-grafico-fecha]")
+            if (!input || !evento.altKey || evento.key !== "ArrowDown") return
+            evento.preventDefault()
+            assetGraficoAbrirCalendario(input.closest("label").querySelector("[data-grafico-calendario]"), assetId)
+        })
+        seccion.addEventListener("change", (evento) => {
+            const input = evento.target.closest("[data-grafico-fecha]")
+            if (input) assetGraficoCambiarFecha(input, assetId)
         })
     }
     assetGraficoCargar(assetId)

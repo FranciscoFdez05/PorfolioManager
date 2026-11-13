@@ -333,16 +333,23 @@ def listAssets():
         # El mismo cálculo que la tabla principal (rendimiento-batch): en Decimal
         # y con el mismo lector de importes. Antes eran dos copias, esta en float.
         datos = posiciones.get(assetId, {})
+        esCripto = str(r["type"] or "").strip().lower() == "cripto"
+        moneda = str(r["currency"] or "EUR").strip().upper() or "EUR"
         totales = rendimiento_activo.calcular(
             datos.get("filas", []),
             datos.get("operaciones", []),
-            str(r["type"] or "").strip().lower() == "cripto",
+            esCripto,
             r["price"],
             datos.get("ventas", []),
             datos.get("transacciones", []),
             datos.get("conversiones", []),
-            str(r["currency"] or "EUR").strip().upper() or "EUR",
+            moneda,
             tipoDeCambio,
+            vivos=rendimiento_activo.lotesVivosCacheados(
+                conn, assetId, datos.get("filas", []), datos.get("operaciones", []), esCripto,
+                datos.get("ventas", []), datos.get("transacciones", []), datos.get("conversiones", []),
+                moneda, tipoDeCambio,
+            ),
         ).paraJson()
 
         result.append({

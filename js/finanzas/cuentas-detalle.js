@@ -325,8 +325,8 @@ function cntVistaIngresosGastos() {
 async function cntMontarIngresosGastos(modal, cuenta) {
     let movimientos
     try {
-        movimientos = (await cntCargarMovimientosCuenta(cuenta.id)).filter(
-            (m) => m.origen === "ingreso" || m.origen === "gasto"
+        movimientos = unirGastosFraccionados(
+            (await cntCargarMovimientosCuenta(cuenta.id)).filter((m) => m.origen === "ingreso" || m.origen === "gasto")
         )
     } catch (error) {
         console.error("Error cargando los movimientos de la cuenta:", error)
@@ -434,7 +434,7 @@ function cntRenderIngresosGastos(modal) {
                     <td class="cntCeldaFecha">${escapeGastosHtml(m.fecha)}</td>
                     <td title="${escapeGastosHtml(m.nota || "")}">
                         <span class="cntFlecha ${esIngreso ? "cntFlechaEntra" : "cntFlechaSale"}" aria-label="${esIngreso ? "Ingreso" : "Gasto"}"></span>
-                        ${m.nombre ? escapeGastosHtml(m.nombre) : '<span class="cuentasSinConcepto">Sin concepto</span>'}
+                        ${m.nombre ? escapeGastosHtml(m.nombre) : '<span class="cuentasSinConcepto">Sin concepto</span>'}${m.fraccionado ? '<span class="gastosMensualidadTag" title="Pago fraccionado: importe total que salió de la cuenta">Fraccionado</span>' : ""}
                     </td>
                     <td><span class="cntCategoria">${escapeGastosHtml(m.contraparte || "—")}</span></td>
                     <td class="numCell ${esIngreso ? "cuentasPos" : "cuentasNeg"}">${esIngreso ? cntSigned(importe) : formatEuro(-importe)}</td>

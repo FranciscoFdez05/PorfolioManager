@@ -269,6 +269,7 @@ function mDrawPasivosOrigen(dividendos, cuentas, bonos, rentaFija) {
                 }
             ]
         },
+        plugins: [mDonutTotalPlugin()],
         options: {
             ...M_CHART_DEFAULTS,
             cutout: "60%",
@@ -627,6 +628,7 @@ function mDrawPmTipos(fondos) {
                 }
             ]
         },
+        plugins: [mDonutTotalPlugin()],
         options: {
             ...M_CHART_DEFAULTS,
             cutout: "60%",

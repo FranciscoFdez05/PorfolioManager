@@ -115,18 +115,14 @@ def construirTramos(datos: dict, esCripto: bool, moneda: str, tipo) -> list[_Tra
         elige cuadrando por coste, porque ninguna fecha cae en él.
     """
     aEuros = Decimal("1") if moneda == "EUR" else (tipo(moneda, "EUR") or Decimal("1"))
-    tramos = []
-    for dia in [*_fechasDeMovimientos(datos), None]:
-        lotes = rendimiento_activo.lotesVivos(
-            datos["filas"], datos["operaciones"], esCripto, datos["ventas"], dia,
-            datos["transacciones"], datos["conversiones"], moneda, tipo,
-        )
-        tramos.append(_Tramo(
-            dia or date.max,
-            sum((lote["cantidad"] for lote in lotes), _CERO),
-            sum((lote["coste"] for lote in lotes), _CERO) * aEuros,
-        ))
-    return tramos
+    dias = [*_fechasDeMovimientos(datos), None]
+    # Una sola pasada FIFO para todos los días: rehacerla entera por cada día con
+    # movimientos costaba O(días x eventos) y dominaba /api/activos-serie-dia.
+    posiciones = rendimiento_activo.posicionPorDias(
+        datos["filas"], datos["operaciones"], esCripto, datos["ventas"], dias,
+        datos["transacciones"], datos["conversiones"], moneda, tipo,
+    )
+    return [_Tramo(dia or date.max, posiciones[dia][0], posiciones[dia][1] * aEuros) for dia in dias]
 
 
 def cantidadDelSnapshot(
@@ -646,11 +642,46 @@ _HUECO_DIA = 2 * _HORA
 
 def _leerSnapshotsDesde(conn, desdeTs: int, hastaTs: int, cubeta: int) -> dict[str, list]:
     # Una sola consulta para todos los activos en vez de una por baldosa. Como en
-    # `_leerSnapshots`, el MAX() hace que cada cubeta se quede con su último snapshot.
+    # `_leerSnapshots`, cada cubeta se queda con su último snapshot.
+    # Antes era un GROUP BY asset_id, ts / ? sobre toda la ventana: SQLite no puede
+    # usar un índice para agrupar por una expresión, así que ordenaba en un B-tree
+    # temporal las 500-850 mil filas del año (~1 s, 70 % de la petición). Ahora se
+    # busca, por cada par (activo, cubeta), la última fila con el índice
+    # (asset_id, ts) que ya existe: 4.900 búsquedas en lugar de 850.000 filas.
+    # Los ids de activo salen de un recorrido suelto del mismo índice (MIN con
+    # asset_id > anterior) y los límites de cada cubeta se recortan a la ventana.
+    desdeTs, hastaTs, cubeta = int(desdeTs), int(hastaTs), int(cubeta)
     filas = conn.execute(
-        "SELECT asset_id, MAX(ts) AS ts, price_eur, cost_eur FROM asset_snapshots "
-        "WHERE ts >= ? AND ts < ? AND price_eur > 0 GROUP BY asset_id, ts / ? ORDER BY asset_id, ts",
-        (desdeTs, hastaTs, cubeta),
+        """
+        WITH RECURSIVE
+          ids(id) AS (
+            SELECT MIN(asset_id) FROM asset_snapshots
+            UNION ALL
+            SELECT (SELECT MIN(asset_id) FROM asset_snapshots WHERE asset_id > ids.id)
+            FROM ids WHERE ids.id IS NOT NULL
+          ),
+          cubetas(k) AS (
+            SELECT ? / ?
+            UNION ALL
+            SELECT k + 1 FROM cubetas WHERE k < (? - 1) / ?
+          )
+        SELECT s.asset_id, s.ts, s.price_eur, s.cost_eur
+        FROM (
+          SELECT
+            (SELECT m.id FROM asset_snapshots m
+              WHERE m.asset_id = ids.id
+                AND m.ts >= MAX(?, cubetas.k * ?) AND m.ts < MIN(?, (cubetas.k + 1) * ?)
+                AND m.price_eur > 0
+              ORDER BY m.ts DESC LIMIT 1) AS snapshotId
+          FROM ids, cubetas WHERE ids.id IS NOT NULL
+        ) ultimos
+        JOIN asset_snapshots s ON s.id = ultimos.snapshotId
+        ORDER BY s.asset_id, s.ts
+        """,
+        (
+            desdeTs, cubeta, hastaTs, cubeta,
+            desdeTs, cubeta, hastaTs, cubeta,
+        ),
     ).fetchall()
     porActivo: dict[str, list] = {}
     for fila in filas:

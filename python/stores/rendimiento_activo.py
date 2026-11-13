@@ -13,11 +13,13 @@ divisa (con el tipo de cambio de cada compra) lo añade la ruta batch encima de
 estos totales.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
 from core import dinero
+from core.cache_foto import CachePorFoto
 from core.fifo import FifoError, parseFecha
 
 CERO = Decimal("0")
@@ -160,37 +162,12 @@ def cargarPosiciones(conn) -> dict:
     return posiciones
 
 
-def lotesVivos(filas, operaciones, esCripto: bool, ventas=(), hasta=None, transacciones=(), conversiones=(),
-               moneda: str = "EUR", tipo=None) -> list:
-    """Lotes de compra que siguen en cartera tras aplicar las ventas por FIFO.
+def _eventosOrdenados(filas, operaciones, esCripto: bool, ventas, transacciones, conversiones,
+                      moneda: str, tipo) -> list:
+    """Compras y ventas de un activo como eventos `(fecha, orden, esVenta, cantidad, coste, fx)`.
 
-    Cada lote es `{"cantidad", "coste", "fx"}`: lo que queda de la compra, el
-    coste bruto de esa parte y el tipo de cambio anotado en la compra (cadena
-    vacía si no lo hay). Las ventas consumen de los lotes más antiguos y, si
-    piden más de lo que hay, solo se llevan lo disponible, igual que el
-    navegador. En cripto, la comisión en cripto reduce lo comprado y aumenta lo
-    vendido.
-
-    Args:
-        filas: Filas de `activo_rows`.
-        operaciones: Filas de `activo_operation_rows` en estado Completado.
-        esCripto: Si el activo es de tipo cripto.
-        ventas: Filas de la tabla `ventas` del activo (fecha, cantidad): también
-            sacan participaciones de la cartera, igual que en el navegador.
-        hasta: Si se indica (un `date`), solo cuentan las operaciones hasta ese
-            día incluido: la posición que había entonces.
-        transacciones: Filas de `transacciones` del activo: las recibidas suman
-            participaciones sin coste, las enviadas las restan con su comisión de
-            red y las que van entre wallets solo pierden la comisión.
-        conversiones: Filas de `activo_conversion_rows` del activo. Se unen a las
-            filas de la ficha con tipo «convertidos», que son las mismas
-            conversiones en el formato antiguo; las repetidas cuentan una vez.
-        moneda: Divisa del activo, en la que sale el coste de cada lote.
-        tipo: Función `(desde, hacia) -> Decimal | None` con el cambio de hoy. Sin
-            ella los importes no se convierten.
-
-    Returns:
-        Lista de lotes vivos, de más antiguo a más reciente.
+    Los une de todas las fuentes (ficha, operaciones, ventas, transacciones y
+    conversiones) y los deja en el orden en que se aplican a los lotes.
     """
     eventos = []
     conversionesAntiguas = []
@@ -259,30 +236,168 @@ def lotesVivos(filas, operaciones, esCripto: bool, ventas=(), hasta=None, transa
             _fechaOrden(fila["fecha"]), len(eventos), esSalida, numero(fila["cantidad"]), CERO, "",
         ))
 
+    return sorted(eventos, key=lambda e: (e[0], e[1]))
+
+
+def _aplicarEvento(lotes: list, esVenta: bool, cantidad: Decimal, coste: Decimal, fx) -> None:
+    """Añade una compra a los lotes o consume de los más antiguos una venta (FIFO)."""
+    if not esVenta:
+        if cantidad > 0:
+            lotes.append({"cantidad": cantidad, "coste": coste, "fx": fx})
+        return
+    pendiente = cantidad
+    for lote in lotes:
+        if pendiente <= 0:
+            break
+        tomado = min(lote["cantidad"], pendiente)
+        if tomado <= 0:
+            continue
+        lote["coste"] -= lote["coste"] * tomado / lote["cantidad"]
+        lote["cantidad"] -= tomado
+        pendiente -= tomado
+
+
+def lotesVivos(filas, operaciones, esCripto: bool, ventas=(), hasta=None, transacciones=(), conversiones=(),
+               moneda: str = "EUR", tipo=None) -> list:
+    """Lotes de compra que siguen en cartera tras aplicar las ventas por FIFO.
+
+    Cada lote es `{"cantidad", "coste", "fx"}`: lo que queda de la compra, el
+    coste bruto de esa parte y el tipo de cambio anotado en la compra (cadena
+    vacía si no lo hay). Las ventas consumen de los lotes más antiguos y, si
+    piden más de lo que hay, solo se llevan lo disponible, igual que el
+    navegador. En cripto, la comisión en cripto reduce lo comprado y aumenta lo
+    vendido.
+
+    Args:
+        filas: Filas de `activo_rows`.
+        operaciones: Filas de `activo_operation_rows` en estado Completado.
+        esCripto: Si el activo es de tipo cripto.
+        ventas: Filas de la tabla `ventas` del activo (fecha, cantidad): también
+            sacan participaciones de la cartera, igual que en el navegador.
+        hasta: Si se indica (un `date`), solo cuentan las operaciones hasta ese
+            día incluido: la posición que había entonces.
+        transacciones: Filas de `transacciones` del activo: las recibidas suman
+            participaciones sin coste, las enviadas las restan con su comisión de
+            red y las que van entre wallets solo pierden la comisión.
+        conversiones: Filas de `activo_conversion_rows` del activo. Se unen a las
+            filas de la ficha con tipo «convertidos», que son las mismas
+            conversiones en el formato antiguo; las repetidas cuentan una vez.
+        moneda: Divisa del activo, en la que sale el coste de cada lote.
+        tipo: Función `(desde, hacia) -> Decimal | None` con el cambio de hoy. Sin
+            ella los importes no se convierten.
+
+    Returns:
+        Lista de lotes vivos, de más antiguo a más reciente.
+    """
     lotes = []
-    for fecha, _indice, esVenta, cantidad, coste, fx in sorted(eventos, key=lambda e: (e[0], e[1])):
+    for fecha, _indice, esVenta, cantidad, coste, fx in _eventosOrdenados(
+        filas, operaciones, esCripto, ventas, transacciones, conversiones, moneda, tipo
+    ):
         if hasta is not None and fecha > hasta:
             continue
-        if not esVenta:
-            if cantidad > 0:
-                lotes.append({"cantidad": cantidad, "coste": coste, "fx": fx})
-            continue
-        pendiente = cantidad
-        for lote in lotes:
-            if pendiente <= 0:
-                break
-            tomado = min(lote["cantidad"], pendiente)
-            if tomado <= 0:
-                continue
-            lote["coste"] -= lote["coste"] * tomado / lote["cantidad"]
-            lote["cantidad"] -= tomado
-            pendiente -= tomado
+        _aplicarEvento(lotes, esVenta, cantidad, coste, fx)
 
     return [lote for lote in lotes if lote["cantidad"] > 0]
 
 
+def posicionPorDias(filas, operaciones, esCripto: bool, ventas, dias: list, transacciones=(),
+                    conversiones=(), moneda: str = "EUR", tipo=None) -> dict:
+    """Cantidad y coste vivos de un activo en varios días, con una sola pasada FIFO.
+
+    Equivale a llamar a `lotesVivos(..., hasta=dia)` por cada día y sumar sus
+    lotes, pero ordena y aplica los eventos una vez en vez de rehacerlo entero
+    por día: con N días y M eventos pasa de O(N·M) a O(N+M).
+
+    Args:
+        filas: Filas de `activo_rows`.
+        operaciones: Filas de `activo_operation_rows` en estado Completado.
+        esCripto: Si el activo es de tipo cripto.
+        ventas: Filas de la tabla `ventas` del activo.
+        dias: Días a evaluar (`date`), en cualquier orden. `None` pide la
+            posición completa, incluidas las operaciones con fecha ilegible, que
+            ningún día alcanza (igual que `lotesVivos` con `hasta=None`).
+        transacciones: Filas de `transacciones` del activo.
+        conversiones: Filas de `activo_conversion_rows` del activo.
+        moneda: Divisa del activo, en la que sale el coste.
+        tipo: Función `(desde, hacia) -> Decimal | None` con el cambio de hoy.
+
+    Returns:
+        `{dia: (cantidad, coste)}` con la suma de los lotes vivos ese día.
+    """
+    eventos = _eventosOrdenados(filas, operaciones, esCripto, ventas, transacciones, conversiones, moneda, tipo)
+    lotes: list = []
+    resultado = {}
+    siguiente = 0
+
+    def resumen() -> tuple:
+        vivos = [lote for lote in lotes if lote["cantidad"] > 0]
+        return sum((l["cantidad"] for l in vivos), CERO), sum((l["coste"] for l in vivos), CERO)
+
+    for dia in sorted({d for d in dias if d is not None}):
+        while siguiente < len(eventos) and eventos[siguiente][0] <= dia:
+            _aplicarEvento(lotes, *eventos[siguiente][2:])
+            siguiente += 1
+        resultado[dia] = resumen()
+    if None in dias:
+        for evento in eventos[siguiente:]:
+            _aplicarEvento(lotes, *evento[2:])
+        resultado[None] = resumen()
+    return resultado
+
+
+# Lotes vivos por activo, para no recalcular el FIFO de todos los activos en cada
+# petición (/api/activos y rendimiento-batch lo hacían entero cada vez). Vale
+# mientras la foto de la base no cambie: cualquier alta, baja o edición de
+# operaciones, ventas, transacciones o conversiones la invalida (ver
+# core/cache_foto.py), sin engancharse a cada ruta de escritura.
+_cacheLotes = CachePorFoto(maxEntradas=5000)
+
+
+def lotesVivosCacheados(conn, assetId: str, filas, operaciones, esCripto: bool, ventas=(), transacciones=(),
+                        conversiones=(), moneda: str = "EUR", tipo: Callable | None = None) -> list:
+    """`lotesVivos` de la posición completa de un activo, memorizado mientras la base no cambie.
+
+    Los tipos de cambio no están en la base que huella la caché (vienen de otra
+    caché y del proveedor), así que cada entrada recuerda los pares que consultó
+    y con qué valor; solo se reutiliza si `tipo` sigue dando lo mismo.
+
+    Args:
+        conn: Conexión de la que salieron las filas.
+        assetId: Id del activo; con el tipo de activo y la divisa, la clave.
+        filas: Filas de `activo_rows` del activo.
+        operaciones: Filas de `activo_operation_rows` en estado Completado.
+        esCripto: Si el activo es de tipo cripto.
+        ventas: Filas de `ventas` del activo.
+        transacciones: Filas de `transacciones` del activo.
+        conversiones: Filas de `activo_conversion_rows` del activo.
+        moneda: Divisa del activo.
+        tipo: Función `(desde, hacia) -> Decimal | None`, o None si no se convierte.
+
+    Returns:
+        Los lotes vivos; son copias, el llamador puede modificarlos.
+    """
+
+    def calcular() -> tuple:
+        cambios: dict = {}
+
+        def tipoRegistrado(desde, hacia):
+            cambio = tipo(desde, hacia)
+            cambios[(desde, hacia)] = cambio
+            return cambio
+
+        lotes = lotesVivos(filas, operaciones, esCripto, ventas, None, transacciones, conversiones, moneda,
+                           None if tipo is None else tipoRegistrado)
+        return lotes, cambios
+
+    def sigueVigente(cambios: dict) -> bool:
+        return all(tipo(*par) == cambio for par, cambio in cambios.items())
+
+    lotes = _cacheLotes.obtener(conn, (assetId, esCripto, moneda, tipo is None), calcular, sigueVigente)
+    return [dict(lote) for lote in lotes]
+
+
 def calcular(filas, operaciones, esCripto: bool, precio, ventas=(), transacciones=(), conversiones=(),
-             moneda: str = "EUR", tipo=None) -> Totales:
+             moneda: str = "EUR", tipo=None, vivos=None) -> Totales:
     """Totales a partir de las filas del activo y sus operaciones completadas.
 
     `filas` son filas de `activo_rows` (tipo_operacion, participaciones,
@@ -294,8 +409,12 @@ def calcular(filas, operaciones, esCripto: bool, precio, ventas=(), transaccione
 
     El invertido es el coste de lo que sigue en cartera: las ventas retiran el
     coste FIFO de lo vendido, no solo las participaciones.
+
+    `vivos` son los lotes ya calculados (ver `lotesVivosCacheados`); sin ellos
+    se calculan aquí.
     """
-    vivos = lotesVivos(filas, operaciones, esCripto, ventas, None, transacciones, conversiones, moneda, tipo)
+    if vivos is None:
+        vivos = lotesVivos(filas, operaciones, esCripto, ventas, None, transacciones, conversiones, moneda, tipo)
     participaciones = sum((lote["cantidad"] for lote in vivos), CERO)
     invertidoBruto = sum((lote["coste"] for lote in vivos), CERO)
     # En cripto la comisión que resta del invertido es la de divisa; la de cripto

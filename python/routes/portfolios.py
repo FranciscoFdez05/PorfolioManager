@@ -22,6 +22,7 @@ from core import paths, settings, zip_seguro
 from core.copia_sqlite import copiar as copiarSqlite
 from core.escritura import escribirJsonAtomico, limpiarTemporal, rutaTemporal, temporalPara
 from routes.ajustes import configuracionDelZip
+from stores import historico_tipos
 from stores.asset_utils import slugify
 
 log = logging.getLogger(__name__)
@@ -165,6 +166,19 @@ def newPortfolio():
         return jsonify({"ok": False, "error": str(e)}), 400
 
 
+def _precalentarTrasCambio() -> None:
+    """Calcula en segundo plano el histórico por tipo de la cartera recién activada.
+
+    Sin esto, la primera visita a Métricas o Ventas tras el cambio paga el
+    agrupado completo de asset_snapshots (1 s con ~850 k filas). Es solo una
+    optimización: un fallo aquí no puede deshacer ni romper un cambio ya hecho.
+    """
+    try:
+        historico_tipos.precalentar()
+    except Exception as error:
+        log.warning("[portfolios] No se pudo lanzar el precalentado tras cambiar de cartera: %s", error)
+
+
 @portfoliosBp.route("/api/portfolios/switch", methods=["POST"])
 def doSwitch():
     data = request.get_json(silent=True) or {}
@@ -173,6 +187,7 @@ def doSwitch():
         return jsonify({"ok": False, "error": "ID requerido"}), 400
     try:
         switchPortfolio(pid)
+        _precalentarTrasCambio()
         return jsonify({"ok": True})
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400

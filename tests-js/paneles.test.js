@@ -556,6 +556,41 @@ describe("mapa de mercado: la lista de Seguimiento", () => {
         }
     })
 
+    it("con una lista con nombre solo salen sus activos; si ya no existe, todos", () => {
+        globalThis.segListaIds = (id) => (id === "l1" ? new Set(["custom_1"]) : null)
+        try {
+            expect(pnActivosSeguimiento("l1").map((a) => a.id)).toEqual(["wl:custom_1"])
+            expect(pnActivosSeguimiento("borrada").map((a) => a.id)).toEqual(["aapl", "wl:custom_1"])
+            expect(pnActivosSeguimiento("").map((a) => a.id)).toEqual(["aapl", "wl:custom_1"])
+        } finally {
+            delete globalThis.segListaIds
+        }
+    })
+
+    it("el mapa de mercado elige entre el Portfolio y las listas, sin opción «todos»", () => {
+        const listas = [
+            { id: "l1", nombre: "Cripto", ids: [] },
+            { id: "l2", nombre: "Vigilar", ids: [] }
+        ]
+        globalThis.segListasLeer = () => listas
+        try {
+            expect(pnSeleccionMapa({ lista: "l2" })).toEqual({ tipo: "lista", id: "l2", nombre: "Vigilar" })
+            expect(pnSeleccionMapa({ lista: "__portfolio" }).tipo).toBe("portfolio")
+            // Sin elegir, o con la lista borrada, la primera: nunca «todos».
+            expect(pnSeleccionMapa({}).id).toBe("l1")
+            expect(pnSeleccionMapa({ lista: "borrada" }).id).toBe("l1")
+        } finally {
+            delete globalThis.segListasLeer
+        }
+        // Sin listas creadas, todo Seguimiento.
+        expect(pnSeleccionMapa({}).tipo).toBe("seguimiento")
+    })
+
+    it("con Portfolio el mapa de mercado parte de los activos con posición", () => {
+        const items = pnActivosMapaMercado({ lista: "__portfolio" })
+        expect(items.every((a) => a.conPosicion)).toBe(true)
+    })
+
     it("sin activos elegidos, el mapa de mercado parte de Seguimiento", () => {
         const items = pnActivosDelWidget({}, { soloPosiciones: false, porDefecto: pnActivosSeguimiento() })
         expect(items.map((a) => a.id)).toEqual(["aapl", "wl:custom_1"])

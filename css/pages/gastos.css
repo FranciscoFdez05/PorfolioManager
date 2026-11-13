@@ -1539,6 +1539,48 @@
     margin-top: auto;
 }
 
+/* ── Popup de gasto fraccionado: una fila por persona que devuelve ── */
+.fraccionadoDevoluciones {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fraccionadoDevolucion {
+    display: grid;
+    grid-template-columns: minmax(110px, 1.4fr) minmax(70px, 0.8fr) minmax(110px, 1.6fr) auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+/* El margen inferior de los campos del popup descuadraba el botón «Quitar». */
+.fraccionadoDevolucion .assetModalInput,
+.fraccionadoDevolucion .assetModalSelect {
+    margin-bottom: 0;
+}
+
+/* El desplegable de cuenta lo sustituye .csWrapper (inline-block, con margen y 40 px de alto):
+   se iguala a los 38 px de los campos para que toda la fila quede a la misma altura. */
+.gastosCreateModal .fraccionadoDevolucion .csWrapper {
+    display: block;
+    min-width: 0;
+}
+
+.gastosCreateModal .fraccionadoDevolucion .csTrigger {
+    min-height: 38px;
+    margin-bottom: 0;
+}
+
+.gastosCreateModal .fraccionadoDevolucion .csLabel {
+    min-height: 38px;
+}
+
+.fraccionadoDevolucion .fraccionadoQuitar {
+    height: 38px;
+    margin: 0;
+}
+
 /* ── Mes de Gastos e Ingresos: tabla compacta y, al lado, el reparto del mes ── */
 .movMonthLayout {
     display: grid;
@@ -1764,7 +1806,8 @@
         margin-top: 0;
     }
 
-    /* En Ingresos el botón va pegado al fondo de la página, no debajo de la tabla. */
+    /* En Ingresos y Gastos el botón va pegado al fondo de la página, no debajo de la tabla. */
+    .fitPageActive .gastosActions,
     .fitPageActive .ingresosActions {
         margin-top: auto;
     }

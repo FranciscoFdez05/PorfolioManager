@@ -41,7 +41,7 @@ from admin.backup_manager import (  # noqa: E402
     esperarCopiaEnCurso,
     startScheduler as startBackupScheduler,
 )
-from core import paths, pulso, settings  # noqa: E402
+from core import paths, pulso, registro_interno, settings  # noqa: E402
 
 log = logging.getLogger("worker")
 
@@ -106,6 +106,7 @@ def _alParar(senal, _marco) -> None:
 
 def main() -> int:
     logging.basicConfig(level=settings.nivelLog(), format=settings.formatoLog())
+    registro_interno.configurar("worker")
     signal.signal(signal.SIGTERM, _alParar)
     signal.signal(signal.SIGINT, _alParar)
     log.info("[worker] Arrancando copias, snapshots, Telegram y avisos")

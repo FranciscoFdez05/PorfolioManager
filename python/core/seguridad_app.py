@@ -103,7 +103,15 @@ _COMPRESION_MIN_BYTES = 500
 # encima la copia comprimida de un caso así, sobre una petición ocasional, no
 # compensa frente al coste de CPU y memoria. Los estáticos (JS/CSS, el grueso
 # del tráfico repetido) están muy por debajo de este tope.
-_COMPRESION_MAX_BYTES = 3 * 1024 * 1024
+# Con 3 MiB, /api/history/by-type de una cartera con años de snapshots (4,4 MB
+# de JSON, 280 KB comprimido, ~20 ms de gzip) viajaba sin comprimir. 12 MiB lo
+# cubre con holgura y deja fuera los volcados de 25 MB.
+_COMPRESION_MAX_BYTES = 12 * 1024 * 1024
+# Nivel de zlib para las respuestas dinámicas, que se comprimen en cada
+# petición. Medido sobre by-type ALL (4,4 MB): nivel 6 = ~34 ms, nivel 3 =
+# ~20 ms con ~300 KB (6 % más que el nivel 6). Los estáticos se cachean
+# comprimidos, pero usan el mismo nivel por simplicidad.
+_COMPRESION_NIVEL = 3
 
 # Versión comprimida de los estáticos, por ruta y ETag. Comprimir era ~1 ms de
 # los ~2,3 ms de servir un JS, y el mismo fichero se comprimía en cada
@@ -484,7 +492,7 @@ def instalar(app, *, limiteEscrituras=None, limitePesadas=None):
 
         response.direct_passthrough = False
         if comprimido is None:
-            comprimido = gzip.compress(response.get_data(), compresslevel=6)
+            comprimido = gzip.compress(response.get_data(), compresslevel=_COMPRESION_NIVEL)
             if clave:
                 _guardarGzip(clave, comprimido)
         else:

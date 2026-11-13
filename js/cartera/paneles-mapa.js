@@ -37,6 +37,71 @@ function pnPeriodoMapa(w) {
     )
 }
 
+// Valor de `cfg.lista` para «Portfolio»; no choca con un id de lista (`l…`).
+const PN_LISTA_PORTFOLIO = "__portfolio"
+
+/**
+ * De dónde parte el mapa de mercado cuando no hay activos elegidos a mano: del
+ * Portfolio o de una lista de Seguimiento. No hay una opción «todos»: sin elegir,
+ * o si la elegida se borró, vale la primera lista; y si aún no hay ninguna, todo
+ * Seguimiento (la lista que se crea la primera vez lo lleva entero).
+ *
+ * @param {object} cfg Ajustes del widget.
+ * @returns {{tipo: "portfolio"|"lista"|"seguimiento", id: string, nombre: string}} La selección.
+ */
+function pnSeleccionMapa(cfg) {
+    if (cfg.lista === PN_LISTA_PORTFOLIO) return { tipo: "portfolio", id: PN_LISTA_PORTFOLIO, nombre: "Portfolio" }
+    const listas = typeof segListasLeer === "function" ? segListasLeer() : []
+    const elegida = listas.find((l) => l.id === cfg.lista) || listas[0]
+    if (elegida) return { tipo: "lista", id: elegida.id, nombre: elegida.nombre }
+    return { tipo: "seguimiento", id: "", nombre: "Seguimiento" }
+}
+
+/**
+ * Los activos de los que parte el mapa de mercado (`pnSeleccionMapa`).
+ *
+ * @param {object} cfg Ajustes del widget.
+ * @returns {Array<object>} Los activos de la lista elegida o, con Portfolio, los que tienen posición.
+ */
+function pnActivosMapaMercado(cfg) {
+    const seleccion = pnSeleccionMapa(cfg)
+    if (seleccion.tipo === "portfolio") {
+        return (_pnDatos?.activos || []).filter((a) => a.conPosicion && (cfg.ocultos === true || !a.oculto))
+    }
+    return pnActivosSeguimiento(seleccion.tipo === "lista" ? seleccion.id : "")
+}
+
+/**
+ * Desplegable «Lista» de la cabecera del mapa de mercado: el Portfolio o una de
+ * las listas de Seguimiento del usuario.
+ *
+ * @param {object} w Widget del mapa.
+ * @param {HTMLElement} ctrls Contenedor de los controles de la cabecera.
+ * @param {object} def Valores por defecto del mapa (`pnDefectosMapa`).
+ */
+function pnChipLista(w, ctrls, def) {
+    if (!def.mercado) return
+    const seleccion = pnSeleccionMapa(w.cfg)
+    const listas = typeof segListasLeer === "function" ? segListasLeer() : []
+    const items = [{ valor: PN_LISTA_PORTFOLIO, texto: "Portfolio" }]
+    // Sin listas, Seguimiento entero es lo único que hay además del Portfolio.
+    if (!listas.length) items.push({ valor: "", texto: "Seguimiento" })
+    listas.forEach((l) => items.push({ valor: l.id, texto: l.nombre }))
+    pnChip(
+        ctrls,
+        seleccion.nombre,
+        items,
+        seleccion.id,
+        (v) => {
+            if (v) w.cfg.lista = v
+            else delete w.cfg.lista
+            pnGuardar()
+            pnPintarWidget(w)
+        },
+        "Lista"
+    )
+}
+
 function pnPintarMapa(w, cuerpo, ctrls) {
     const turno = pnTurno(w)
     const cfg = w.cfg
@@ -49,12 +114,13 @@ function pnPintarMapa(w, cuerpo, ctrls) {
     const chipActivos = document.createElement("button")
     chipActivos.type = "button"
     chipActivos.className = "pnChip"
-    const textoChip = () => pnTextoFiltro(cfg, def.mercado ? "Seguimiento" : "Toda la cartera")
+    // El de mercado ya dice su lista en el chip «Lista»: aquí no se repite el nombre.
+    const textoChip = () => pnTextoFiltro(cfg, def.mercado ? "Activos" : "Toda la cartera")
     chipActivos.innerHTML = `<span>${escapeHtml(textoChip())}</span><span class="pnChipFlecha">▾</span>`
     pnControlCabecera(chipActivos, "Activos", (ancla) =>
         pnSelectorActivos(ancla, {
             opciones: pnOpcionesMapa(cfg, def.mercado),
-            textoVacio: def.mercado ? "la lista de Seguimiento" : "toda la cartera",
+            textoVacio: def.mercado ? `«${pnSeleccionMapa(cfg).nombre}»` : "toda la cartera",
             seleccion: pnLista(cfg, "activos"),
             alCambiar: (ids) => {
                 if (ids.length) cfg.activos = ids
@@ -75,6 +141,7 @@ function pnPintarMapa(w, cuerpo, ctrls) {
         })
     )
     ctrls.appendChild(chipActivos)
+    pnChipLista(w, ctrls, def)
     pnChip(
         ctrls,
         def.periodos.find((p) => p.valor === periodo).texto,
@@ -230,7 +297,7 @@ function pnDibujarMapa(w, cuerpo) {
     // El de mercado, sin activos elegidos, enseña la lista de Seguimiento de la Watchlist.
     let items = pnActivosDelWidget(cfg, {
         soloPosiciones: false,
-        porDefecto: def.mercado ? pnActivosSeguimiento() : null
+        porDefecto: def.mercado ? pnActivosMapaMercado(cfg) : null
     })
     if (!def.mercado && !pnLista(cfg, "activos").length) items = items.filter((a) => a.conPosicion)
     // Por valor, lo que no tiene posición no tiene tamaño: se queda fuera y se
@@ -245,7 +312,11 @@ function pnDibujarMapa(w, cuerpo) {
                 : def.mercado
                   ? pnLista(cfg, "activos").length
                       ? "Ninguno de los activos elegidos es de este tipo"
-                      : "No hay activos en Seguimiento: añádelos en Activos › Watchlist o elígelos en «Seguimiento»"
+                      : pnSeleccionMapa(cfg).tipo === "lista"
+                        ? `La lista «${escapeHtml(pnSeleccionMapa(cfg).nombre)}» no tiene activos: añádelos en Activos › Watchlist › Listas`
+                        : pnSeleccionMapa(cfg).tipo === "portfolio"
+                          ? "No hay activos con posición en el portfolio"
+                          : "No hay activos en Seguimiento: añádelos en Activos › Watchlist o elígelos en «Activos»"
                   : "No hay activos para mostrar"
         }</div>`
         return

@@ -21,9 +21,15 @@ CLAVE_OVERRIDES = "seguimientoOverrides"
 # Orden de las tarjetas elegido arrastrándolas: `_segId` de cada una. Nunca vivió
 # en el navegador, así que no tiene clave antigua que migrar ni que fusionar.
 CLAVE_ORDEN = "seguimientoOrden"
+# Listas con nombre que son subconjuntos de la de Seguimiento: `{idLista: {nombre,
+# ids}}`, con los `_segId` de sus activos. Los mapas de Activos > Paneles eligen
+# cuál enseñar. Tampoco vivió nunca en el navegador.
+CLAVE_LISTAS = "seguimientoListas"
 
 MAX_ELEMENTOS = 2000
+MAX_LISTAS = 50
 _MAX_CLAVE = 40
+_MAX_NOMBRE_LISTA = 60
 _MAX_TEXTO = 5000
 
 # Nombres que usaba el navegador. El sufijo es el portfolio; sin él, es una clave
@@ -91,6 +97,40 @@ def normalizarOrden(valor) -> list[str]:
         Los identificadores válidos, con `MAX_ELEMENTOS` como tope.
     """
     return normalizarOcultos(valor)
+
+
+def normalizarListas(valor) -> dict[str, dict]:
+    """Las listas con nombre de Seguimiento: `{idLista: {"nombre": str, "ids": [str]}}`.
+
+    Una lista sin identificador o sin nombre se descarta; los `_segId` repetidos
+    de una lista se quedan en uno. No se comprueba que los activos existan: uno
+    quitado de Seguimiento deja su id aquí y el navegador lo ignora, igual que
+    hace con el orden de las tarjetas.
+
+    Args:
+        valor: Lo recibido; cualquier cosa que no sea un diccionario da uno vacío.
+
+    Returns:
+        Las listas válidas, en su orden y con `MAX_LISTAS` como tope.
+
+    Example:
+        >>> normalizarListas({"a": {"nombre": " Cripto ", "ids": ["x", "x"]}})
+        {'a': {'nombre': 'Cripto', 'ids': ['x']}}
+    """
+    if not isinstance(valor, dict):
+        return {}
+    limpias: dict[str, dict] = {}
+    for idLista, lista in valor.items():
+        if len(limpias) >= MAX_LISTAS:
+            break
+        if not isinstance(idLista, str) or not idLista.strip() or len(idLista) > _MAX_CLAVE:
+            continue
+        if not isinstance(lista, dict) or not isinstance(lista.get("nombre"), str):
+            continue
+        nombre = lista["nombre"].strip()[:_MAX_NOMBRE_LISTA]
+        if nombre:
+            limpias[idLista] = {"nombre": nombre, "ids": normalizarOcultos(lista.get("ids"))}
+    return limpias
 
 
 def normalizarOverrides(valor) -> dict:

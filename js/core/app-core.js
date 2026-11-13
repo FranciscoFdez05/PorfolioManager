@@ -292,6 +292,12 @@ function applyModulesVisibility() {
         })
     }
 
+    // Un grupo de menú sin ningún módulo encendido se quedaría como un botón vacío.
+    document.querySelectorAll("[data-grupo]").forEach((grupo) => {
+        const hayVisible = [...grupo.querySelectorAll("[data-module]")].some((el) => el.style.display !== "none")
+        grupo.style.display = hayVisible ? "" : "none"
+    })
+
     // Si se acaba de apagar el módulo de la página abierta, hay que moverse.
     const actual = window._paginaActual
     if (actual && !paginaVisible(actual)) {
@@ -409,8 +415,10 @@ async function loadGlobalSettings() {
                 lista: data.seguimientoLista ?? [],
                 ocultos: data.seguimientoOcultos ?? [],
                 overrides: data.seguimientoOverrides ?? {},
-                orden: data.seguimientoOrden ?? []
+                orden: data.seguimientoOrden ?? [],
+                listas: data.seguimientoListas ?? {}
             }
+            window.dispatchEvent(new CustomEvent("seguimiento:listas"))
             await window.segMigrarAlServidor?.(data.portfolioId)
             window._sidebarCollapsed = data.sidebarCollapsed ?? false
             window._monedaBase = data.monedaBase ?? "EUR"
@@ -906,17 +914,32 @@ function initScrollLateral(elemento, clases) {
     // El de la ventana se da de baja solo cuando la tira ya no está en la
     // página: las de dentro de una página se crean de nuevo en cada visita y si
     // no, se irían acumulando manejadores sobre nodos que ya no existen.
-    const alRedimensionar = () => {
-        if (!elemento.isConnected) {
-            window.removeEventListener("resize", alRedimensionar)
-            return
-        }
-        actualizarBordes()
-    }
-    window.addEventListener("resize", alRedimensionar)
+    // Esperar a que llegue un resize para darse de baja no bastaba: si la
+    // ventana no se redimensiona, cada visita dejaba su listener y con él toda
+    // la página descartada. Ahora hay un único listener y el registro se
+    // poda al montar cada tira nueva.
+    _registrarTiraEnVentana(elemento, actualizarBordes)
 
     actualizarBordes()
     return actualizarBordes
+}
+
+const _tirasEnVentana = new Set()
+let _tirasResizeActivo = false
+
+function _registrarTiraEnVentana(elemento, actualizar) {
+    _tirasEnVentana.forEach((tira) => {
+        if (!tira.elemento.isConnected) _tirasEnVentana.delete(tira)
+    })
+    _tirasEnVentana.add({ elemento, actualizar })
+    if (_tirasResizeActivo) return
+    _tirasResizeActivo = true
+    window.addEventListener("resize", () => {
+        _tirasEnVentana.forEach((tira) => {
+            if (!tira.elemento.isConnected) _tirasEnVentana.delete(tira)
+            else tira.actualizar()
+        })
+    })
 }
 
 // Recalcular de cada tira ya montada. WeakMap y no dataset: lo guardado es una
@@ -1244,6 +1267,11 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
         if (typeof window._pnCleanup === "function") {
             window._pnCleanup()
             window._pnCleanup = null
+        }
+
+        if (typeof window._metricasCleanup === "function") {
+            window._metricasCleanup()
+            window._metricasCleanup = null
         }
 
         if (typeof window.flushPendingPageChanges === "function") {

@@ -279,12 +279,15 @@
                     </div>
                 </div>
 
-                <button class="navBtn" data-page="planesInversion" data-module="planes">Planes</button>
-                <div class="navDropdown" data-module="alertas">
-                    <button class="navDropdownBtn" type="button">Alertas ▾</button>
+                <!-- Planes y Alertas siguen siendo módulos independientes
+                     (cada uno lleva su data-module); el contenedor no, y se oculta solo
+                     cuando se apagan los dos (applyModulesVisibility). -->
+                <div class="navDropdown" data-grupo="planificacion">
+                    <button class="navDropdownBtn" type="button">Planificación ▾</button>
                     <div class="navDropdownMenu">
-                        <button class="navBtn navDropdownItem" data-page="alertas">Todas las alertas</button>
-                        <button class="navBtn navDropdownItem" data-page="alertasAvisos">Últimos avisos</button>
+                        <button class="navBtn navDropdownItem" data-page="planesInversion" data-module="planes">Planes</button>
+                        <button class="navBtn navDropdownItem" data-page="alertas" data-module="alertas">Alertas</button>
+                        <button class="navBtn navDropdownItem" data-page="alertasAvisos" data-module="alertas">Últimos avisos</button>
                     </div>
                 </div>
                 <button class="navBtn" data-page="herramientas" data-module="herramientas">Herramientas</button>
@@ -363,9 +366,10 @@
                     <button class="sidebarFilterBtn active" data-modo="activo" type="button" title="Pulsar un activo abre su ficha">Activo</button>
                     <button class="sidebarFilterBtn" data-modo="grafico" type="button" title="Pulsar un activo abre su gráfico">Gráfico</button>
                 </div>
+                <!-- Qué enseña la lista de abajo: el Portfolio o una de las listas
+                     de Seguimiento del usuario. Lo rellena sidebarActualizarListas. -->
                 <div class="sidebarFilterBar" id="sidebarFilterBar">
-                    <button class="sidebarFilterBtn active" data-filter="portfolio" type="button">Portfolio</button>
-                    <button class="sidebarFilterBtn" data-filter="watchlist" type="button">Watchlist</button>
+                    <button class="sidebarFilterBtn active sidebarListaBtn" id="sidebarListaBtn" type="button" aria-haspopup="menu" title="Elegir qué activos se muestran">Portfolio ▾</button>
                 </div>
             </div>
 
@@ -796,6 +800,11 @@
             <button class="sttNavBtn" data-stt="modulos" type="button">
                 <span class="icono iconoModulos" aria-hidden="true"></span>
                 Módulos
+            </button>
+
+            <button class="sttNavBtn" data-stt="registro" type="button">
+                <span class="icono iconoArchivo" aria-hidden="true"></span>
+                Registro
             </button>
 
         </nav>
@@ -2376,6 +2385,40 @@
             </div>
         </div>
 
+        <!-- ── Registro ── -->
+        <div class="sttPage" id="sttPage-registro">
+            <h2 class="sttPageTitle">Registro</h2>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <span class="icono iconoArchivo" aria-hidden="true"></span>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Registro interno</div>
+                        <div class="ajustesSectionDesc">Copia en archivo del log de cada proceso, incluidos los errores no capturados del navegador. En Docker, web y worker comparten la carpeta de logs.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesRegistroEstado" id="ajustesRegistroEstado">Cargando…</div>
+                <div class="ajustesActions">
+                    <select id="ajustesRegistroProceso" class="ajustesSelect" data-no-custom>
+                        <option value="web">Web (incluye errores del navegador)</option>
+                        <option value="worker">Worker (copias, snapshots, avisos)</option>
+                    </select>
+                    <select id="ajustesRegistroNivel" class="ajustesSelect" data-no-custom>
+                        <option value="DEBUG">Todo</option>
+                        <option value="INFO">Info o superior</option>
+                        <option value="WARNING">Avisos y errores</option>
+                        <option value="ERROR">Solo errores</option>
+                    </select>
+                    <button id="ajustesRegistroRecargar" class="primaryButton" type="button" data-no-autohide="true">Recargar</button>
+                    <button id="ajustesRegistroCopiar" class="primaryButton" type="button" data-no-autohide="true">Copiar</button>
+                </div>
+                <pre class="ajustesRegistroLog" id="ajustesRegistroLog" tabindex="0">Cargando…</pre>
+            </div>
+        </div>
+
     </div><!-- /.sttContent -->
 </div><!-- /.sttOverlay -->
 
@@ -2439,6 +2482,7 @@
 <script defer src="js/ajustes/ajustes-copias.js"></script>
 <script defer src="js/ajustes/ajustes-acceso.js"></script>
 <script defer src="js/ajustes/ajustes-actualizacion.js"></script>
+<script defer src="js/ajustes/ajustes-registro.js"></script>
 <script defer src="js/ajustes/ajustes.js"></script>
 <script defer src="js/core/shared-utils.js"></script>
 <script defer src="js/core/flujos-grafo.js"></script>
@@ -2446,6 +2490,7 @@
 <script defer src="js/core/mapa-dia.js"></script>
 <script defer src="js/analisis/heatmap.js"></script>
 <script defer src="js/analisis/seguimiento.js"></script>
+<script defer src="js/analisis/seguimiento-listas.js"></script>
 <script defer src="js/analisis/fundamentales.js"></script>
 <script defer src="js/analisis/sentimiento.js"></script>
 <script defer src="js/cartera/paneles.js"></script>

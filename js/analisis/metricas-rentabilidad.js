@@ -766,6 +766,7 @@ function mDrawAnualReparto(totalGastado, totalAhorrado, totalInvertido = 0) {
                     }
                 ]
             },
+            plugins: [mDonutTotalPlugin()],
             options: {
                 ...M_CHART_DEFAULTS,
                 plugins: {

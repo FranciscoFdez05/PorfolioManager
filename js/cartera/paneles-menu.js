@@ -164,11 +164,15 @@ function pnGrupoSelector(o) {
  * «Nuevo» si se dio de alta solo para seguirlo), que el selector enseña. Son
  * copias: los activos de `_pnDatos` no se marcan.
  *
+ * @param {string} [idLista] Lista con nombre de Seguimiento (`seguimiento-listas.js`).
+ *     Sin ella, o si ya no existe, salen todos los seguidos.
  * @returns {Array<object>} Los activos seguidos que existen.
  */
-function pnActivosSeguimiento() {
+function pnActivosSeguimiento(idLista = "") {
     let lista = typeof segLoadCustomItems === "function" ? segLoadCustomItems() : []
     lista = Array.isArray(lista) ? lista : []
+    const enLista = idLista && typeof segListaIds === "function" ? segListaIds(idLista) : null
+    if (enLista) lista = lista.filter((entrada) => enLista.has(entrada?._segId))
     // El orden en que se arrastraron las tarjetas en Seguimiento, si lo hay; si no, el de alta.
     if (typeof segAplicarOrden === "function") lista = segAplicarOrden(lista, window._seguimientoDatos?.orden)
     const nuevos = new Map(pnActivosWatchlist().map((a) => [a.id, a]))

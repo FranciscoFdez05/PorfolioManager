@@ -169,7 +169,24 @@ function mOcultarApartadosSinDatos() {
     })
 }
 
-function mRenderAll(payload) {
+// Cede el hilo si lleva mucho sin hacerlo. Montar las 42 gráficas de golpe es
+// una sola tarea de 300-400 ms que congela la página; con esto cada trozo sale
+// por debajo de ~100 ms y el navegador pinta y atiende eventos entre medias.
+const M_PRESUPUESTO_TAREA_MS = 40
+let _mRenderToken = 0
+
+function mCancelarRender() {
+    _mRenderToken++
+}
+
+/**
+ * Pinta todos los apartados de Métricas troceando el trabajo.
+ *
+ * @param {object} payload Datos de buildMetricasPayload.
+ * @returns {Promise<boolean>} false si se salió de la página (o se empezó otro
+ *     render) mientras se pintaba y el resto de la inicialización sobra.
+ */
+async function mRenderAll(payload) {
     const {
         summaries,
         dividendos,
@@ -187,41 +204,60 @@ function mRenderAll(payload) {
     const b = bonos || [],
         rf = rentaFija || []
     const pm = privateMarket || []
-    mRenderDistTipos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric, pm)
-    mRenderDistActivos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric, pm)
-    mRenderRendTipos(summaries)
-    mRenderRendActivos(summaries)
     const colorMap = Object.fromEntries(summaries.map((s) => [s.name, s.color]).filter(([, c]) => c))
-    mRenderDividendos(dividendos, colorMap)
-    mRenderDivMensual(dividendos, colorMap)
-    mRenderInteresesSection(payload.intereses, payload.cuentasRemuneradas)
-    mRenderInvertidoPeriodo(inversiones || { byMonth: {}, byYear: {} })
-    mRenderPasivosCharts(dividendos, payload.intereses || [])
-    mRenderBonosTipos(b)
-    mRenderBonosInst(b)
-    mRenderRentaFijaTipos(rf)
-    mRenderRentaFijaInst(rf)
-    mRenderIngresosHistorico(dividendos, payload.cuentasRemuneradas || [], b, rf)
-    mRenderVencimientos(b, rf)
-    mRenderPrivateMarket(pm)
-    mRenderGastos(gastosYearsList || [], gastosYearData || null)
-    mRenderIngresos(ingresosYearData || null)
-    mRenderIngresosSection(ingresosYearsList || [], ingresosYearData || null)
-    mRenderComparativa(ingresosYearData || null, gastosYearData || null)
-    mRenderSaldoMes(ingresosYearsList || [], ingresosYearData || null, gastosYearData || null)
-    mRenderTopTable(summaries)
-    mRenderTrading(tradingRows || [])
     const liveValue = summaries.reduce((s, a) => s + a.netoActualEur, 0)
     const liveInvested = summaries.reduce((s, a) => s + a.invertidoEur, 0)
-    mRenderConcentracion(summaries)
-    mRenderRentabilidadAnual(snapshotHistory || [], liveValue, liveInvested, payload.rentabilidad?.cobertura || {})
-    mRenderRiesgo(payload.rentabilidad)
-    mRenderAhorro(
-        ingresosYearData || null,
-        gastosYearData || null,
-        payload.ahorroConfig || { objetivoAhorro: 30, presupuesto: {} }
-    )
-    mRenderAnual(payload.anualData || [], payload.ahorroConfig)
+    const pasos = [
+        () => mRenderDistTipos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric, pm),
+        () => mRenderDistActivos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric, pm),
+        () => mRenderRendTipos(summaries),
+        () => mRenderRendActivos(summaries),
+        () => mRenderDividendos(dividendos, colorMap),
+        () => mRenderDivMensual(dividendos, colorMap),
+        () => mRenderInteresesSection(payload.intereses, payload.cuentasRemuneradas),
+        () => mRenderInvertidoPeriodo(inversiones || { byMonth: {}, byYear: {} }),
+        () => mRenderPasivosCharts(dividendos, payload.intereses || []),
+        () => mRenderBonosTipos(b),
+        () => mRenderBonosInst(b),
+        () => mRenderRentaFijaTipos(rf),
+        () => mRenderRentaFijaInst(rf),
+        () => mRenderIngresosHistorico(dividendos, payload.cuentasRemuneradas || [], b, rf),
+        () => mRenderVencimientos(b, rf),
+        () => mRenderPrivateMarket(pm),
+        () => mRenderGastos(gastosYearsList || [], gastosYearData || null),
+        () => mRenderIngresos(ingresosYearData || null),
+        () => mRenderIngresosSection(ingresosYearsList || [], ingresosYearData || null),
+        () => mRenderComparativa(ingresosYearData || null, gastosYearData || null),
+        () => mRenderSaldoMes(ingresosYearsList || [], ingresosYearData || null, gastosYearData || null),
+        () => mRenderTopTable(summaries),
+        () => mRenderTrading(tradingRows || []),
+        () => mRenderConcentracion(summaries),
+        () =>
+            mRenderRentabilidadAnual(
+                snapshotHistory || [],
+                liveValue,
+                liveInvested,
+                payload.rentabilidad?.cobertura || {}
+            ),
+        () => mRenderRiesgo(payload.rentabilidad),
+        () =>
+            mRenderAhorro(
+                ingresosYearData || null,
+                gastosYearData || null,
+                payload.ahorroConfig || { objetivoAhorro: 30, presupuesto: {} }
+            ),
+        () => mRenderAnual(payload.anualData || [], payload.ahorroConfig)
+    ]
+
+    const token = ++_mRenderToken
+    let inicioTarea = performance.now()
+    for (const paso of pasos) {
+        paso()
+        if (performance.now() - inicioTarea < M_PRESUPUESTO_TAREA_MS) continue
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        if (token !== _mRenderToken) return false
+        inicioTarea = performance.now()
+    }
 
     const gastosEmpty = !gastosYearsList?.length || !gastosYearData
     const ingresosEmpty = !ingresosYearsList?.length || !ingresosYearData
@@ -235,6 +271,7 @@ function mRenderAll(payload) {
     if (!snapshotHistory?.length) {
         _M_SECCIONES_DE_SNAPSHOTS.forEach((id) => document.getElementById(id)?.classList.add("hidden"))
     }
+    return true
 }
 
 // ── Trading metrics ────────────────────────────────────────────────────────
@@ -562,6 +599,13 @@ async function initMetricasLogic(options = {}) {
     const soloDinero = options.soloDinero === true
     Object.values(_metricasCharts).forEach((c) => c?.destroy())
     _metricasCharts = {}
+    // Al salir de la página se destruyen las 42 gráficas: si no, quedaban vivas
+    // con sus canvas descartados hasta la siguiente visita a Métricas.
+    window._metricasCleanup = () => {
+        mCancelarRender()
+        Object.values(_metricasCharts).forEach((c) => c?.destroy())
+        _metricasCharts = {}
+    }
     _metricasDisplayType = window._metricasDisplayType ?? "doughnut"
     _metricasDistMetric = window._metricasDistMetric ?? "netoActualEur"
     // Selecciones del usuario: se recuperan de las preferencias guardadas. Cada
@@ -597,7 +641,7 @@ async function initMetricasLogic(options = {}) {
         if (loading) loading.classList.add("hidden")
 
         mUpdateKpis(_metricasPayload)
-        mRenderAll(_metricasPayload)
+        if (!(await mRenderAll(_metricasPayload))) return
         mBindTableSort(_metricasPayload.summaries)
         mOcultarApartadosSinDatos()
         mInitEvolucion()
@@ -606,6 +650,19 @@ async function initMetricasLogic(options = {}) {
         const _allTypes = ["cripto", "acciones", "etfs", "comoditis", "indices", "rentaFija", "privateMarket"]
         const _todosBtn = document.querySelector(".mActivosFilterBtn[data-atype='todos']")
         const _specificBtns = [...document.querySelectorAll(".mActivosFilterBtn[data-atype]:not([data-atype='todos'])")]
+
+        // Un tipo sin ningún activo no ofrece botón: filtrarlo dejaría el gráfico vacío.
+        // Se mantiene dentro del filtro para que "Todos" siga marcándose bien.
+        const _tiposConDatos = new Set([
+            ...(_metricasPayload.summaries || []).map((a) => a.type),
+            ...((_metricasPayload.bonos || []).length || (_metricasPayload.rentaFija || []).length ? ["rentaFija"] : []),
+            ...((_metricasPayload.privateMarket || []).length ? ["privateMarket"] : [])
+        ])
+        _specificBtns.forEach((b) => {
+            const hayDatos = _tiposConDatos.has(b.dataset.atype)
+            if (!hayDatos) _metricasActivosFilter.add(b.dataset.atype)
+            b.style.display = hayDatos ? "" : "none"
+        })
 
         function _mIsTodosMode() {
             return _allTypes.every((t) => _metricasActivosFilter.has(t))

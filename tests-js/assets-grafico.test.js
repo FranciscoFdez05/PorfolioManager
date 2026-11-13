@@ -263,3 +263,63 @@ describe("nota al pie", () => {
         expect(texto).toContain("no descuenta comisiones")
     })
 })
+
+describe("búsqueda por fecha", () => {
+    const ts = (iso) => new Date(`${iso}T12:00:00`).getTime() / 1000
+    const puntos = [punto(ts("2026-01-10"), 1, 1, 10), punto(ts("2026-02-10"), 2, 1, 11), punto(ts("2026-03-10"), 3, 1, 12)]
+    const operaciones = [operacion("compra", 0), operacion("venta", 2)]
+
+    it("sin fechas devuelve los datos tal cual", () => {
+        const original = datos(puntos, operaciones)
+        expect(window.assetGraficoRecortar(original, { desde: "", hasta: "" })).toBe(original)
+    })
+
+    it("recorta por los dos extremos, incluyendo el día de cada uno", () => {
+        const recortado = window.assetGraficoRecortar(datos(puntos, operaciones), {
+            desde: "2026-02-10",
+            hasta: "2026-03-10"
+        })
+        expect(recortado.puntos).toHaveLength(2)
+    })
+
+    it("admite una sola fecha", () => {
+        expect(window.assetGraficoRecortar(datos(puntos), { desde: "2026-02-01", hasta: "" }).puntos).toHaveLength(2)
+        expect(window.assetGraficoRecortar(datos(puntos), { desde: "", hasta: "2026-02-01" }).puntos).toHaveLength(1)
+    })
+
+    it("reajusta el índice de las operaciones y descarta las de fuera", () => {
+        const recortado = window.assetGraficoRecortar(datos(puntos, operaciones), {
+            desde: "2026-02-01",
+            hasta: ""
+        })
+        expect(recortado.operaciones).toHaveLength(1)
+        expect(recortado.operaciones[0]).toMatchObject({ tipo: "venta", indice: 1 })
+    })
+
+    it("con las fechas cruzadas no queda nada", () => {
+        const recortado = window.assetGraficoRecortar(datos(puntos, operaciones), {
+            desde: "2026-03-01",
+            hasta: "2026-01-01"
+        })
+        expect(recortado.puntos).toEqual([])
+        expect(recortado.operaciones).toEqual([])
+    })
+})
+
+describe("días con operaciones para el calendario", () => {
+    it("agrupa los tipos por día en formato ISO", () => {
+        const dias = window.assetGraficoDiasConOperaciones([
+            operacion("compra", 0, { fecha: "05-03-2026" }),
+            operacion("venta", 1, { fecha: "05-03-2026" }),
+            operacion("compra", 2, { fecha: "07-03-2026" })
+        ])
+        expect([...dias.get("2026-03-05")].sort()).toEqual(["compra", "venta"])
+        expect([...dias.get("2026-03-07")]).toEqual(["compra"])
+        expect(dias.size).toBe(2)
+    })
+
+    it("ignora fechas ilegibles y listas vacías", () => {
+        expect(window.assetGraficoDiasConOperaciones([operacion("compra", 0, { fecha: "" })]).size).toBe(0)
+        expect(window.assetGraficoDiasConOperaciones(undefined).size).toBe(0)
+    })
+})

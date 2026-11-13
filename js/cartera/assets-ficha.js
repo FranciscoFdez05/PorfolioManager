@@ -1540,7 +1540,17 @@ function initAssetTypeCustomSelect() {
         }
     })
 
-    document.addEventListener("click", closeMenu)
+    // El listener es del documento y el menú cuelga de body: ambos sobreviven al
+    // popup, así que se retiran solos cuando el desplegable ya no está en pantalla.
+    const alClicarFuera = () => {
+        if (!trigger.isConnected) {
+            document.removeEventListener("click", alClicarFuera)
+            menu.remove()
+            return
+        }
+        closeMenu()
+    }
+    document.addEventListener("click", alClicarFuera)
 
     select.addEventListener("change", () => {
         syncLabel()

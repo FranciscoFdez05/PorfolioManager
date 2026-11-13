@@ -315,7 +315,16 @@ function _buildInlineSelect(sel) {
         if (!isOpen) open()
     })
 
-    document.addEventListener("click", close)
+    // El listener es del documento, que sobrevive a la página: se retira solo
+    // en cuanto el desplegable ya no está en pantalla.
+    const alClicarFuera = () => {
+        if (!trigger.isConnected) {
+            document.removeEventListener("click", alClicarFuera)
+            return
+        }
+        close()
+    }
+    document.addEventListener("click", alClicarFuera)
 
     sel.addEventListener("change", syncLabel)
 
@@ -377,6 +386,7 @@ async function initAjustesLogic() {
     _initAjustes2fa()
     _initAjustesApariencia(settings)
     _initAjustesActualizacion()
+    _initAjustesRegistro()
     _initAjustesDatos()
 
     // --- Formato de números ---
@@ -741,7 +751,15 @@ const _MODULOS_PRESENTACION = {
 
 function _modulosDelMenu() {
     const selector = ".navButtons .navBtn[data-module], .navButtons .navDropdown[data-module]"
-    return [...document.querySelectorAll(selector)].map((el) => {
+    // Un módulo puede tener varias entradas sueltas dentro de un grupo (Alertas):
+    // en Ajustes se enciende y apaga una sola vez.
+    const vistos = new Set()
+    const elementos = [...document.querySelectorAll(selector)].filter((el) => {
+        if (vistos.has(el.dataset.module)) return false
+        vistos.add(el.dataset.module)
+        return true
+    })
+    return elementos.map((el) => {
         const boton = el.querySelector(".navDropdownBtn") ?? el
         const secciones = [...el.querySelectorAll(".navDropdownItem")].map((item) => item.textContent.trim())
         const { icono, descripcion } = _MODULOS_PRESENTACION[el.dataset.module] ?? {}

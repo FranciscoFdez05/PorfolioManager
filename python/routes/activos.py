@@ -48,7 +48,7 @@ def getActivos():
 
 
 def _descomponerPorDivisa(rows, participacionesVivas, currentPrice, fxActual, operaciones=(), esCripto=False,
-                          ventas=(), transacciones=(), conversiones=()):
+                          ventas=(), transacciones=(), conversiones=(), conn=None, assetId=None):
     """Separa el resultado del activo entre efecto activo y efecto divisa.
 
     Cada compra aporta su lote con **su** tipo de cambio: aplicar un tipo medio
@@ -61,9 +61,17 @@ def _descomponerPorDivisa(rows, participacionesVivas, currentPrice, fxActual, op
     # Solo cuenta el coste de lo que sigue en cartera: lo vendido ya no está en
     # el valor actual, y dejarlo en el invertido falseaba los dos efectos.
     compras = []
-    for lote in rendimiento_activo.lotesVivos(
-        rows, operaciones, esCripto, ventas, None, transacciones, conversiones
-    ):
+    # Con la conexión y el id, los lotes salen de la caché por activo (mientras la
+    # base no cambie); sin ellos se calculan aquí, como antes.
+    if conn is not None and assetId is not None:
+        vivos = rendimiento_activo.lotesVivosCacheados(
+            conn, assetId, rows, operaciones, esCripto, ventas, transacciones, conversiones
+        )
+    else:
+        vivos = rendimiento_activo.lotesVivos(
+            rows, operaciones, esCripto, ventas, None, transacciones, conversiones
+        )
+    for lote in vivos:
         if lote["coste"] <= 0:
             continue
         compras.append({
@@ -108,18 +116,24 @@ def getRendimientoBatch():
         rows = datos.get("filas", [])
         opsDelActivo = datos.get("operaciones", [])
         currentPrice = rendimiento_activo.numero(asset["price"])
+        esCriptoActivo = str(asset["type"] or "").strip().lower() == "cripto"
+        monedaActivo = str(asset["currency"] or "EUR").strip().upper() or "EUR"
         # El cálculo es el de stores/rendimiento_activo, el mismo que usa la
         # lista de activos: antes había una copia aquí y otra allí.
         totales = rendimiento_activo.calcular(
             rows,
             opsDelActivo,
-            str(asset["type"] or "").strip().lower() == "cripto",
+            esCriptoActivo,
             asset["price"],
             datos.get("ventas", []),
             datos.get("transacciones", []),
             datos.get("conversiones", []),
-            str(asset["currency"] or "EUR").strip().upper() or "EUR",
+            monedaActivo,
             tipoDeCambio,
+            vivos=rendimiento_activo.lotesVivosCacheados(
+                conn, assetId, rows, opsDelActivo, esCriptoActivo, datos.get("ventas", []),
+                datos.get("transacciones", []), datos.get("conversiones", []), monedaActivo, tipoDeCambio,
+            ),
         )
         result[assetId] = totales.paraJson()
         totalParticipaciones = totales.participaciones
@@ -136,6 +150,8 @@ def getRendimientoBatch():
             ventas=posiciones.get(assetId, {}).get("ventas", []),
             transacciones=posiciones.get(assetId, {}).get("transacciones", []),
             conversiones=posiciones.get(assetId, {}).get("conversiones", []),
+            conn=conn,
+            assetId=assetId,
         )
         result[assetId]["divisa"] = {
             "moneda": moneda,

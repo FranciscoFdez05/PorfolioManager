@@ -15,7 +15,7 @@ from flask import Flask, abort, g, make_response, request, send_from_directory
 from admin import avisos_scheduler, snapshot_scheduler, telegram_listener
 from admin.backup_manager import startScheduler as startBackupScheduler
 from admin.portfolios_manager import initPortfolios
-from core import atajo_acceso, csp, estaticos, paths, seguridad_app, settings, telegram_notifier, tls
+from core import atajo_acceso, csp, estaticos, paths, registro_interno, seguridad_app, settings, telegram_notifier, tls
 from core.errors import registerErrorHandlers
 from core.paths import API_DIR, BASE_DIR, INDEX_FILE
 from core.version import __version__, insertarVersion
@@ -42,6 +42,7 @@ from routes.operaciones import operacionesBp
 from routes.planes import planesBp
 from routes.planes_cartera import planesCarteraBp
 from routes.portfolios import portfoliosBp
+from routes.registro_interno import registroInternoBp
 from routes.registros import registrosBp
 from routes.salud import saludBp
 from routes.satoshi import satoshiBp
@@ -50,6 +51,7 @@ from routes.tls import tlsBp
 from routes.trading import tradingBp
 from routes.ventas import ventasBp
 from routes.wallets import walletsBp
+from stores import historico_tipos
 from stores.app_data import ensureDataFile
 
 # .env antes que nada: los ajustes admiten override por variable de entorno, y
@@ -62,6 +64,7 @@ descartarTzIanaEnWindows()
 # integridad de la BD, puede repararla o restaurarla desde un backup, y todos
 # esos mensajes se perdían porque el logging aún no estaba inicializado.
 logging.basicConfig(level=settings.nivelLog(), format=settings.formatoLog())
+registro_interno.configurar("web")
 
 # Deja constancia en el log de con qué configuración arranca el proceso y avisa
 # de los valores dudosos (fuera de rango, mal escritos, combinaciones que no
@@ -175,6 +178,7 @@ app.register_blueprint(planesCarteraBp)
 app.register_blueprint(portfoliosBp)
 app.register_blueprint(tradingBp)
 app.register_blueprint(registrosBp)
+app.register_blueprint(registroInternoBp)
 app.register_blueprint(saludBp)
 app.register_blueprint(snapshotsBp)
 app.register_blueprint(tlsBp)
@@ -319,6 +323,9 @@ if settings.tareasEnWeb():
     avisos_scheduler.iniciar()
 else:
     logging.info("[procesos] Copias, snapshots, Telegram y avisos los lleva el servicio worker")
+# El agregado del histórico por tipo (Métricas, Ventas) es lo más caro de la
+# primera visita: se calcula ya, en un hilo aparte, para que no lo pague ella.
+historico_tipos.precalentar()
 # Los dos workers llegan aquí; el aviso de arranque lo manda solo el primero.
 telegram_notifier.notificarArranque(__version__)
 

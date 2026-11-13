@@ -1047,6 +1047,23 @@ function openGastoDetailModal(rowElement) {
     const nota = String(rowElement.dataset.nota || "").trim()
     const cantidad = rowElement.dataset.cantidad ? formatCellEuroValue(rowElement.dataset.cantidad) : ""
 
+    // Un gasto fraccionado enseña además el total pagado y quién devolvió qué.
+    // La «parte de otros» se localiza por contenido, como en la edición.
+    const monthRows = currentGastosData?.months?.[currentGastosMonth]?.rows || []
+    const filaPropia = {
+        fecha: rowElement.dataset.fecha || "",
+        nombre: rowElement.dataset.nombre || "",
+        cuenta: rowElement.dataset.cuenta || ""
+    }
+    const indiceOtros = buscarFilaParteOtros(monthRows, filaPropia)
+    const otros = indiceOtros >= 0 ? monthRows[indiceOtros] : null
+    const fraccionadoHtml = otros
+        ? `
+            <div class="movDetailItem"><dt>Total pagado</dt><dd>${escapeGastosHtml(formatEuro((importeEnCentimos(cantidad) + importeEnCentimos(otros.cantidad)) / 100))}</dd></div>
+            <div class="movDetailItem"><dt>Te devuelven</dt><dd class="movDetailAmountPos">${escapeGastosHtml(formatCellEuroValue(otros.cantidad))}</dd></div>
+        `
+        : ""
+
     const overlay = document.createElement("div")
     overlay.id = "gastosDetailModalOverlay"
     overlay.className = "modalOverlay"
@@ -1063,8 +1080,10 @@ function openGastoDetailModal(rowElement) {
             <div class="movDetailItem"><dt>Concepto</dt><dd>${escapeGastosHtml(rowElement.dataset.nombre || "—")}</dd></div>
             <div class="movDetailItem"><dt>Tipo</dt><dd>${escapeGastosHtml(rowElement.dataset.tipo || "—")}</dd></div>
             <div class="movDetailItem"><dt>Pagado con</dt><dd>${escapeGastosHtml(nombreDeCuenta(rowElement.dataset.cuenta || ""))}</dd></div>
-            <div class="movDetailItem"><dt>Cantidad</dt><dd class="movDetailAmount">${escapeGastosHtml(cantidad || "—")}</dd></div>
+            ${fraccionadoHtml}
+            <div class="movDetailItem"><dt>${otros ? "Tu parte" : "Cantidad"}</dt><dd class="movDetailAmount">${escapeGastosHtml(cantidad || "—")}</dd></div>
         </dl>
+        ${otros ? '<div class="movDetailCharges" id="gastosDetailDevoluciones"><span class="movDetailNoteLabel">Devoluciones</span><p class="movDetailChargesEmpty">Cargando…</p></div>' : ""}
         <div class="movDetailNote${nota ? "" : " movDetailNoteEmpty"}">
             <span class="movDetailNoteLabel">Nota</span>
             <p class="movDetailNoteText">${nota ? escapeGastosHtml(nota) : "Sin nota"}</p>
@@ -1091,6 +1110,54 @@ function openGastoDetailModal(rowElement) {
     }
     document.addEventListener("keydown", gastosDetailKeyHandler)
     modal.querySelector("#gastosDetailCloseBtn")?.focus()
+
+    if (otros) {
+        rellenarDevolucionesDelDetalle(modal, filaPropia)
+    }
+}
+
+/** Lista «quién devolvió qué, y a qué cuenta» de un gasto fraccionado. */
+function htmlDevolucionesDetalle(devoluciones) {
+    if (!devoluciones.length) {
+        return '<span class="movDetailNoteLabel">Devoluciones</span><p class="movDetailChargesEmpty">Sin ingresos de devoluciones registrados.</p>'
+    }
+
+    const items = devoluciones
+        .map(
+            (devolucion) => `
+            <li class="movDetailCharge">
+                <span>${escapeGastosHtml(devolucion.nombre || "Sin nombre")}</span>
+                <span class="movDetailChargeAccount">${escapeGastosHtml(nombreDeCuenta(devolucion.cuenta))}</span>
+                <span class="movDetailChargeAmount">${escapeGastosHtml(formatCellEuroValue(devolucion.cantidad))}</span>
+            </li>`
+        )
+        .join("")
+    return `
+        <span class="movDetailNoteLabel">Devoluciones (${devoluciones.length})</span>
+        <ul class="movDetailChargesList">${items}</ul>
+    `
+}
+
+async function rellenarDevolucionesDelDetalle(modal, filaPropia) {
+    const bloque = modal.querySelector("#gastosDetailDevoluciones")
+    if (!bloque) return
+
+    try {
+        const devoluciones = await leerDevolucionesGuardadas(
+            currentGastosYear,
+            currentGastosMonth,
+            filaPropia.fecha,
+            conceptoFraccionado(filaPropia.nombre)
+        )
+        // El usuario pudo cerrar el detalle mientras llegaba la respuesta.
+        if (bloque.isConnected) bloque.innerHTML = htmlDevolucionesDetalle(devoluciones)
+    } catch (error) {
+        console.error("No se pudieron leer las devoluciones:", error)
+        if (bloque.isConnected) {
+            bloque.innerHTML =
+                '<span class="movDetailNoteLabel">Devoluciones</span><p class="movDetailChargesEmpty">No se pudieron cargar.</p>'
+        }
+    }
 }
 
 /**
@@ -1222,6 +1289,13 @@ function openGastoMovementModal(rowIndex = -1) {
     const currentRows = currentGastosData?.months?.[currentGastosMonth]?.rows || []
     const isEdit = rowIndex >= 0
     const rowData = isEdit ? { ...currentRows[rowIndex] } : {}
+
+    // Un gasto fraccionado se edita con su propio formulario (total y devoluciones).
+    if (isEdit && buscarFilaParteOtros(currentRows, rowData) >= 0) {
+        openGastoFraccionadoModal(rowIndex)
+        return
+    }
+
     const availableTypes = getAvailableGastosTypes()
     const typeOptions = availableTypes
         .map((type) => {
@@ -1311,6 +1385,517 @@ function openGastoMovementModal(rowIndex = -1) {
 
             renderCurrentGastosView()
             await persistCurrentGastosData()
+            return true
+        }
+    })
+}
+
+// --- Gasto fraccionado ---
+//
+// Un pago compartido (90 € entre tres) cuesta 90 € a la cuenta con la que se paga,
+// pero solo 30 € a la categoría. Una fila de gasto tiene una única cantidad, que
+// sirve a la vez para el saldo y para la categoría, así que se registra en dos:
+// tu parte en su categoría y lo adelantado en un tipo aparte. Lo que te devuelven
+// entra como un ingreso por persona, en la cuenta donde llegó.
+
+const TIPO_GASTO_FRACCIONADO = "Pagos fraccionados"
+
+const SUFIJO_PARTE_OTROS = " (parte de otros)"
+const CONCEPTO_FRACCIONADO_POR_DEFECTO = "Gasto fraccionado"
+
+function conceptoFraccionado(nombre) {
+    return String(nombre || "").trim() || CONCEPTO_FRACCIONADO_POR_DEFECTO
+}
+
+function mismoTipoGasto(a, b) {
+    return normalizeComparableGastoText(a || "") === normalizeComparableGastoText(b || "")
+}
+
+/** Si la fila es la que guarda lo adelantado a los demás (la que no se enseña). */
+function esFilaParteOtros(row) {
+    return mismoTipoGasto(row?.tipo, TIPO_GASTO_FRACCIONADO) && String(row?.nombre || "").endsWith(SUFIJO_PARTE_OTROS)
+}
+
+/**
+ * Índice de la fila «parte de otros» que acompaña a la fila propia `row`.
+ *
+ * No hay un id que las una (el esquema no lo tiene): se emparejan por concepto,
+ * fecha y cuenta, que es como las crea construirFilasFraccionado.
+ *
+ * @param {object[]} rows Filas del mes.
+ * @param {object} row Fila propia.
+ * @returns {number} Índice en `rows`, o -1 si la fila no es de un gasto fraccionado.
+ */
+function buscarFilaParteOtros(rows, row) {
+    if (!row || esFilaParteOtros(row)) return -1
+    const nombre = conceptoFraccionado(row.nombre) + SUFIJO_PARTE_OTROS
+    return rows.findIndex(
+        (r) =>
+            esFilaParteOtros(r) &&
+            r.nombre === nombre &&
+            (r.fecha || "") === (row.fecha || "") &&
+            (r.cuenta || "") === (row.cuenta || "")
+    )
+}
+
+/** Índices de las filas «parte de otros» que tienen fila propia: son las que se ocultan. */
+function indicesParteOtrosOcultas(rows) {
+    const ocultas = new Set()
+    rows.forEach((row) => {
+        const indice = buscarFilaParteOtros(rows, row)
+        if (indice >= 0) ocultas.add(indice)
+    })
+    return ocultas
+}
+
+function mismaFilaGasto(a, b) {
+    return ["fecha", "nombre", "tipo", "cantidad", "nota", "cuenta"].every((campo) => (a[campo] || "") === (b[campo] || ""))
+}
+
+/** Sin paréntesis: el nombre de quien devuelve va entre ellos y se lee de vuelta al editar. */
+function limpiarNombrePersona(persona) {
+    return String(persona || "").replace(/[()]/g, "").trim().slice(0, 40)
+}
+
+/** Concepto del ingreso de una devolución: «Devolución: Cena (Parte Antonio)». */
+function nombreDevolucion(concepto, persona) {
+    const nombre = limpiarNombrePersona(persona)
+    return nombre ? `Devolución: ${concepto} (${nombre})` : `Devolución: ${concepto}`
+}
+
+/** Quién devolvió, leído del concepto de un ingreso de devolución ("" si no lleva nombre). */
+function personaDeDevolucion(ingreso, concepto) {
+    const base = `Devolución: ${concepto}`
+    const resto = String(ingreso?.nombre || "").slice(base.length)
+    return resto.startsWith(" (") && resto.endsWith(")") ? resto.slice(2, -1) : ""
+}
+
+function esDevolucionDe(ingreso, fecha, concepto) {
+    const base = `Devolución: ${concepto}`
+    const nombre = String(ingreso?.nombre || "")
+    return (
+        mismoTipoGasto(ingreso?.tipo, TIPO_GASTO_FRACCIONADO) &&
+        (ingreso.fecha || "") === (fecha || "") &&
+        (nombre === base || (nombre.startsWith(`${base} (`) && nombre.endsWith(")")))
+    )
+}
+
+/**
+ * Junta en un solo movimiento los dos gastos de un pago fraccionado.
+ *
+ * En el historial de una cuenta salían como dos pagos (tu parte y «parte de
+ * otros») cuando en el banco fue uno solo. Se deja uno con la categoría de tu
+ * parte y el total que salió de la cuenta, marcado con `fraccionado`. Una fila
+ * «parte de otros» sin fila propia se deja como está.
+ *
+ * @param {object[]} movimientos Movimientos de una cuenta (`origen`, `nombre`, `fecha`, `contraparte`, `cantidad`).
+ * @returns {object[]} Copia sin las filas «parte de otros» que se han absorbido.
+ */
+function unirGastosFraccionados(movimientos) {
+    const gastos = movimientos.filter((m) => m.origen === "gasto")
+    const absorbidos = new Set()
+    const unidos = new Map()
+
+    gastos
+        .filter((m) => !esFilaParteOtros({ tipo: m.contraparte, nombre: m.nombre }))
+        .forEach((propio) => {
+            const nombre = conceptoFraccionado(propio.nombre) + SUFIJO_PARTE_OTROS
+            const otro = gastos.find(
+                (m) =>
+                    !absorbidos.has(m) &&
+                    esFilaParteOtros({ tipo: m.contraparte, nombre: m.nombre }) &&
+                    m.nombre === nombre &&
+                    m.fecha === propio.fecha
+            )
+            if (!otro) return
+            absorbidos.add(otro)
+            const total = (importeEnCentimos(propio.cantidad) + importeEnCentimos(otro.cantidad)) / 100
+            unidos.set(propio, { ...propio, cantidad: formatEuro(total), fraccionado: true })
+        })
+
+    return movimientos.filter((m) => !absorbidos.has(m)).map((m) => unidos.get(m) || m)
+}
+
+function importeEnCentimos(valor) {
+    return Math.round(parseEuroNumber(valor) * 100)
+}
+
+/**
+ * Reparte un pago compartido entre lo que te toca a ti y lo que te devuelven.
+ *
+ * Trabaja en céntimos para que 100 - 33,33 - 33,33 no arrastre error de coma
+ * flotante.
+ *
+ * @param {string} total Importe pagado, tal como lo escribió el usuario.
+ * @param {string[]} devoluciones Importe de cada devolución.
+ * @returns {{error: string}|{parte: number, devuelto: number, total: number}} Céntimos.
+ */
+function calcularRepartoFraccionado(total, devoluciones) {
+    const totalCentimos = importeEnCentimos(total)
+    const importes = devoluciones.map(importeEnCentimos).filter((importe) => importe > 0)
+
+    if (totalCentimos <= 0) {
+        return { error: "Introduce el total pagado." }
+    }
+    if (importes.length === 0) {
+        return { error: "Añade al menos una devolución con su importe." }
+    }
+
+    const devuelto = importes.reduce((suma, importe) => suma + importe, 0)
+    if (devuelto > totalCentimos) {
+        return { error: "Lo devuelto no puede superar el total pagado." }
+    }
+
+    return { parte: totalCentimos - devuelto, devuelto, total: totalCentimos }
+}
+
+/**
+ * Filas de gasto e ingreso que genera un pago fraccionado.
+ *
+ * @param {{fecha: string, nombre: string, tipo: string, cuenta: string, nota: string,
+ *          total: string, devoluciones: {cantidad: string, cuenta: string}[]}} datos
+ * @returns {{error: string}|{gastos: object[], ingresos: object[]}}
+ */
+function construirFilasFraccionado(datos) {
+    const reparto = calcularRepartoFraccionado(
+        datos.total,
+        datos.devoluciones.map((devolucion) => devolucion.cantidad)
+    )
+    if (reparto.error) {
+        return reparto
+    }
+
+    const concepto = conceptoFraccionado(datos.nombre)
+
+    // La fila propia se crea siempre, aunque te lo devuelvan todo (0 €): es la
+    // única que se ve en la tabla y desde la que se edita o elimina el conjunto.
+    const gastos = [
+        {
+            fecha: datos.fecha,
+            nombre: concepto,
+            tipo: datos.tipo,
+            cantidad: formatEuro(reparto.parte / 100),
+            nota: datos.nota,
+            cuenta: datos.cuenta
+        }
+    ]
+    gastos.push({
+        fecha: datos.fecha,
+        nombre: concepto + SUFIJO_PARTE_OTROS,
+        tipo: TIPO_GASTO_FRACCIONADO,
+        cantidad: formatEuro(reparto.devuelto / 100),
+        nota: datos.nota,
+        cuenta: datos.cuenta
+    })
+
+    const ingresos = datos.devoluciones
+        .filter((devolucion) => importeEnCentimos(devolucion.cantidad) > 0)
+        .map((devolucion) => ({
+            fecha: datos.fecha,
+            nombre: nombreDevolucion(concepto, devolucion.nombre),
+            tipo: TIPO_GASTO_FRACCIONADO,
+            cantidad: formatEuro(importeEnCentimos(devolucion.cantidad) / 100),
+            nota: "",
+            cuenta: devolucion.cuenta
+        }))
+
+    return { gastos, ingresos }
+}
+
+/**
+ * Cambia las filas de ingreso de un mes sin pasar por la pantalla de Ingresos.
+ *
+ * Lee el año, aplica `transformar` y guarda con la revisión leída: si otra
+ * pestaña lo cambió entre medias el servidor responde 409 y el error sube, en
+ * vez de pisar nada.
+ *
+ * @param {string} year Año del ingreso.
+ * @param {string} month Clave del mes ("enero"...).
+ * @param {(filas: object[]) => object[]} transformar Recibe las filas del mes y devuelve las nuevas.
+ * @throws {ApiError} Si falla la lectura o el guardado.
+ */
+async function modificarIngresosDelMes(year, month, transformar) {
+    const ruta = `/api/ingresos/${encodeURIComponent(year)}`
+    let datos
+    try {
+        datos = await Api.get(ruta)
+    } catch (error) {
+        if (error?.status !== 404) throw error
+        // Año de ingresos sin crear: se crea vacío y se vuelve a leer para tener su revisión.
+        await Api.post("/api/ingresos", { year })
+        datos = await Api.get(ruta)
+    }
+
+    const meses = datos.months || {}
+    const filasDelMes = Array.isArray(meses[month]?.rows) ? meses[month].rows : []
+    meses[month] = { rows: transformar(filasDelMes) }
+    await Api.post(ruta, { ...datos, months: meses })
+}
+
+async function anadirIngresosAlMes(year, month, filas) {
+    await modificarIngresosDelMes(year, month, (existentes) => [...existentes, ...filas])
+}
+
+/**
+ * Ingresos de las devoluciones de un gasto fraccionado, tal como se guardaron.
+ *
+ * Lectura pura: un año de ingresos que no existe es «sin devoluciones», no se crea.
+ *
+ * @returns {Promise<{cantidad: string, cuenta: string}[]>}
+ * @throws {ApiError} Si la lectura falla por otra causa que un año inexistente.
+ */
+async function leerDevolucionesGuardadas(year, month, fecha, concepto) {
+    let datos
+    try {
+        datos = await Api.get(`/api/ingresos/${encodeURIComponent(year)}`)
+    } catch (error) {
+        if (error?.status === 404) return []
+        throw error
+    }
+    const filas = Array.isArray(datos?.months?.[month]?.rows) ? datos.months[month].rows : []
+    return filas
+        .filter((ingreso) => esDevolucionDe(ingreso, fecha, concepto))
+        .map((ingreso) => ({
+            nombre: personaDeDevolucion(ingreso, concepto),
+            cantidad: ingreso.cantidad || "",
+            cuenta: ingreso.cuenta || ""
+        }))
+}
+
+async function quitarDevolucionesGuardadas(year, month, fecha, concepto) {
+    await modificarIngresosDelMes(year, month, (existentes) =>
+        existentes.filter((ingreso) => !esDevolucionDe(ingreso, fecha, concepto))
+    )
+}
+
+// Primer paso de «Añadir gasto»: elegir entre un gasto normal y uno fraccionado.
+// Usa el id del popup de gastos para que abrir el siguiente lo cierre solo.
+function openGastoElegirTipoModal() {
+    closeGastosCreateModal()
+
+    const overlay = document.createElement("div")
+    overlay.id = "gastosCreateModalOverlay"
+    overlay.className = "modalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal gastosCreateModal"
+    modal.setAttribute("role", "dialog")
+    modal.setAttribute("aria-modal", "true")
+    modal.setAttribute("aria-labelledby", "gastosElegirTipoTitle")
+    modal.innerHTML = `
+        <h3 class="assetModalTitle" id="gastosElegirTipoTitle">Añadir gasto</h3>
+        <div class="segAddOpciones">
+            <button type="button" class="segAddOpcion" id="gastosElegirNormalBtn" data-no-autohide="true">
+                <strong>Gasto normal</strong>
+                <span>Un pago que asumes entero, con su tipo y su cuenta.</span>
+            </button>
+            <button type="button" class="segAddOpcion" id="gastosElegirFraccionadoBtn" data-no-autohide="true">
+                <strong>Gasto fraccionado</strong>
+                <span>Pagas el total y otros te devuelven su parte a las cuentas que elijas.</span>
+            </button>
+        </div>
+        <div class="assetModalActions">
+            <button type="button" class="cancelButton" id="gastosElegirCancelarBtn">Cancelar</button>
+        </div>
+    `
+
+    modal.querySelector("#gastosElegirNormalBtn").addEventListener("click", () => openGastoMovementModal())
+    modal.querySelector("#gastosElegirFraccionadoBtn").addEventListener("click", () => openGastoFraccionadoModal())
+    modal.querySelector("#gastosElegirCancelarBtn").addEventListener("click", closeGastosCreateModal)
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+
+    gastosModalKeyHandler = (event) => {
+        if (event.key === "Escape") {
+            closeGastosCreateModal()
+        }
+    }
+    document.addEventListener("keydown", gastosModalKeyHandler)
+    modal.querySelector("#gastosElegirNormalBtn").focus()
+}
+
+function htmlDevolucionFraccionado(indice, devolucion = {}) {
+    return `
+        <div class="fraccionadoDevolucion">
+            <input class="assetModalInput fraccionadoNombre" type="text" maxlength="40"
+                   placeholder="Nombre (ej: Parte Antonio)" aria-label="Nombre de quien devuelve" value="${escapeGastosHtml(devolucion.nombre || "")}">
+            <input class="assetModalInput fraccionadoImporte" type="text" inputmode="decimal"
+                   placeholder="0,00" aria-label="Importe devuelto" value="${escapeGastosHtml(devolucion.cantidad || "")}">
+            ${construirSelectorCuenta(`gastosFraccionadoCuenta${indice}`, devolucion.cuenta || "")}
+            <button type="button" class="cancelButton fraccionadoQuitar" aria-label="Quitar devolución">Quitar</button>
+        </div>
+    `
+}
+
+function leerDevolucionesFraccionado(modal) {
+    return [...modal.querySelectorAll(".fraccionadoDevolucion")].map((fila) => ({
+        nombre: fila.querySelector(".fraccionadoNombre")?.value ?? "",
+        cantidad: fila.querySelector(".fraccionadoImporte")?.value ?? "",
+        cuenta: fila.querySelector("select")?.value ?? ""
+    }))
+}
+
+/**
+ * Formulario del gasto fraccionado, para crearlo o para editar uno existente.
+ *
+ * Al editar se parte de la fila propia (`rowIndex`): su «parte de otros» y los
+ * ingresos de las devoluciones se localizan y, al guardar, se sustituyen por los
+ * nuevos. Si los ingresos no se pueden leer se aborta: guardar sin ellos
+ * dejaría los antiguos duplicados.
+ *
+ * @param {number} rowIndex Índice de la fila propia en los datos del mes, o -1 para crear.
+ */
+async function openGastoFraccionadoModal(rowIndex = -1) {
+    const isEdit = rowIndex >= 0
+    const filasMes = currentGastosData?.months?.[currentGastosMonth]?.rows || []
+    const propia = isEdit ? { ...filasMes[rowIndex] } : {}
+    const indiceOtros = isEdit ? buscarFilaParteOtros(filasMes, propia) : -1
+    const otros = indiceOtros >= 0 ? { ...filasMes[indiceOtros] } : null
+    let devolucionesIniciales = []
+
+    if (isEdit && otros) {
+        try {
+            devolucionesIniciales = await leerDevolucionesGuardadas(
+                currentGastosYear,
+                currentGastosMonth,
+                propia.fecha,
+                conceptoFraccionado(propia.nombre)
+            )
+        } catch (error) {
+            showError("No se pudieron leer las devoluciones de este gasto", error)
+            return
+        }
+    }
+
+    const totalInicial = otros
+        ? formatEuro((importeEnCentimos(propia.cantidad) + importeEnCentimos(otros.cantidad)) / 100)
+        : ""
+    const tipoOpciones = getAvailableGastosTypes()
+        .filter((tipo) => !mismoTipoGasto(tipo, TIPO_GASTO_FRACCIONADO))
+        .map(
+            (tipo) =>
+                `<option value="${escapeGastosHtml(tipo)}"${mismoTipoGasto(tipo, propia.tipo) ? " selected" : ""}>${escapeGastosHtml(tipo)}</option>`
+        )
+        .join("")
+    let contadorDevoluciones = 0
+
+    openGastosCreateModal({
+        title: isEdit ? "Editar gasto fraccionado" : "Añadir gasto fraccionado",
+        bodyHtml: `
+            <label class="assetModalLabel" for="gastosFraccionadoFecha">Fecha</label>
+            <input id="gastosFraccionadoFecha" class="assetModalInput" type="text" placeholder="dd-mm-aaaa" value="${escapeGastosHtml(propia.fecha || "")}">
+
+            <label class="assetModalLabel" for="gastosFraccionadoNombre">Concepto</label>
+            <input id="gastosFraccionadoNombre" class="assetModalInput" type="text" placeholder="Ej: Cena de cumpleaños" value="${escapeGastosHtml(propia.nombre || "")}">
+
+            <label class="assetModalLabel" for="gastosFraccionadoTipo">Tipo (para tu parte)</label>
+            <select id="gastosFraccionadoTipo" class="assetModalSelect">
+                <option value=""></option>
+                ${tipoOpciones}
+            </select>
+
+            <label class="assetModalLabel" for="gastosFraccionadoCuenta">Pagado con</label>
+            ${construirSelectorCuenta("gastosFraccionadoCuenta", propia.cuenta || "")}
+
+            <label class="assetModalLabel" for="gastosFraccionadoTotal">Total pagado</label>
+            <input id="gastosFraccionadoTotal" class="assetModalInput" type="text" inputmode="decimal" placeholder="0,00" value="${escapeGastosHtml(totalInicial)}">
+
+            <span class="assetModalLabel">Lo que te devuelven</span>
+            <div id="gastosFraccionadoDevoluciones" class="fraccionadoDevoluciones"></div>
+            <button type="button" class="cancelButton" id="gastosFraccionadoAnadir">+ Añadir devolución</button>
+            <p class="assetModalLabelHint" id="gastosFraccionadoResumen"></p>
+
+            <label class="assetModalLabel" for="gastosFraccionadoNota">Nota <span class="assetModalLabelHint">opcional</span></label>
+            <textarea id="gastosFraccionadoNota" class="assetModalInput movNotaInput" rows="2" maxlength="300">${escapeGastosHtml(propia.nota || "")}</textarea>
+        `,
+        submitLabel: "Guardar",
+        modalClass: "gastosCreateModalWide",
+        onReady: (modal) => {
+            const lista = modal.querySelector("#gastosFraccionadoDevoluciones")
+            const resumen = modal.querySelector("#gastosFraccionadoResumen")
+
+            const actualizarResumen = () => {
+                const reparto = calcularRepartoFraccionado(
+                    modal.querySelector("#gastosFraccionadoTotal").value,
+                    leerDevolucionesFraccionado(modal).map((devolucion) => devolucion.cantidad)
+                )
+                resumen.textContent = reparto.error
+                    ? ""
+                    : `Tu parte: ${formatEuro(reparto.parte / 100)} · Te devuelven: ${formatEuro(reparto.devuelto / 100)}`
+            }
+
+            const anadirDevolucion = (devolucion = {}) => {
+                contadorDevoluciones += 1
+                lista.insertAdjacentHTML("beforeend", htmlDevolucionFraccionado(contadorDevoluciones, devolucion))
+            }
+
+            modal.querySelector("#gastosFraccionadoAnadir").addEventListener("click", () => anadirDevolucion())
+            lista.addEventListener("click", (event) => {
+                const quitar = event.target.closest(".fraccionadoQuitar")
+                if (!quitar) return
+                quitar.closest(".fraccionadoDevolucion")?.remove()
+                actualizarResumen()
+            })
+            modal.addEventListener("input", actualizarResumen)
+            if (devolucionesIniciales.length) {
+                devolucionesIniciales.forEach(anadirDevolucion)
+            } else {
+                anadirDevolucion()
+            }
+            actualizarResumen()
+        },
+        onSubmit: async ({ getValue, setFeedback, modal }) => {
+            const filas = construirFilasFraccionado({
+                fecha: String(getValue("gastosFraccionadoFecha")).trim(),
+                nombre: String(getValue("gastosFraccionadoNombre")).trim(),
+                tipo: normalizeGastoTipo(getValue("gastosFraccionadoTipo")),
+                cuenta: String(getValue("gastosFraccionadoCuenta") || ""),
+                nota: String(getValue("gastosFraccionadoNota")).trim().slice(0, 300),
+                total: String(getValue("gastosFraccionadoTotal")).trim(),
+                devoluciones: leerDevolucionesFraccionado(modal)
+            })
+
+            if (filas.error) {
+                setFeedback(filas.error, true)
+                return false
+            }
+
+            syncGastosDataFromTables()
+            if (!currentGastosData.months[currentGastosMonth]) {
+                currentGastosData.months[currentGastosMonth] = { rows: [] }
+            }
+            const rowsNow = currentGastosData.months[currentGastosMonth].rows
+
+            // Al editar, las filas antiguas se localizan por contenido (la sincronización
+            // reordena y reconstruye las filas) y las nuevas ocupan el sitio de la propia.
+            let posicion = rowsNow.length
+            if (isEdit) {
+                const indices = [propia, otros]
+                    .filter(Boolean)
+                    .map((vieja) => rowsNow.findIndex((r) => mismaFilaGasto(r, vieja)))
+                    .filter((indice) => indice >= 0)
+                    .sort((a, b) => b - a)
+                posicion = indices.length ? indices[indices.length - 1] : rowsNow.length
+                indices.forEach((indice) => rowsNow.splice(indice, 1))
+            }
+            rowsNow.splice(posicion, 0, ...filas.gastos)
+            sharedGastosTypes = dedupeGastosTypes([...sharedGastosTypes, TIPO_GASTO_FRACCIONADO])
+
+            renderCurrentGastosView()
+            await persistCurrentGastosData()
+
+            // Los gastos ya están guardados: si los ingresos fallan, se avisa en vez
+            // de deshacer, y el usuario puede corregirlos a mano en Ingresos.
+            try {
+                const conceptoViejo = conceptoFraccionado(propia.nombre)
+                await modificarIngresosDelMes(currentGastosYear, currentGastosMonth, (existentes) => [
+                    ...(isEdit ? existentes.filter((i) => !esDevolucionDe(i, propia.fecha, conceptoViejo)) : existentes),
+                    ...filas.ingresos
+                ])
+            } catch (error) {
+                showError("El gasto se guardó, pero no se pudieron añadir los ingresos de las devoluciones", error)
+            }
             return true
         }
     })
@@ -1586,7 +2171,16 @@ function bindGastosEvents() {
             e.stopPropagation()
             menuDropdown.classList.toggle("open")
         })
-        document.addEventListener("click", () => menuDropdown.classList.remove("open"))
+        // El listener es del documento, que sobrevive a la página: se retira solo
+        // en cuanto el menú ya no está en pantalla.
+        const cerrarMenu = () => {
+            if (!menuDropdown.isConnected) {
+                document.removeEventListener("click", cerrarMenu)
+                return
+            }
+            menuDropdown.classList.remove("open")
+        }
+        document.addEventListener("click", cerrarMenu)
         menuDropdown.addEventListener("click", () => menuDropdown.classList.remove("open"))
     }
 
@@ -1634,9 +2228,7 @@ function bindGastosEvents() {
 
     if (addRowButton && !addRowButton.dataset.bound) {
         addRowButton.dataset.bound = "true"
-        addRowButton.addEventListener("click", () => {
-            openGastoMovementModal()
-        })
+        addRowButton.addEventListener("click", openGastoElegirTipoModal)
     }
 
     if (addMensualidadRowButton && !addMensualidadRowButton.dataset.bound) {
@@ -2875,10 +3467,15 @@ function renderGastosMonthTable() {
 
     // El índice de cada fila es el de los datos sin ordenar: Editar y Eliminar
     // lo usan sobre currentGastosData, no sobre el orden en que se pinta.
-    const indexed = (currentGastosData.months?.[currentGastosMonth]?.rows || [])
+    const monthRows = currentGastosData.months?.[currentGastosMonth]?.rows || []
+    // La «parte de otros» de un gasto fraccionado no se enseña ni suma aquí (solo
+    // se ve tu parte), pero sigue en la tabla oculta: el guardado reconstruye las
+    // filas desde el DOM y, si no estuviera, se perdería.
+    const ocultas = indicesParteOtrosOcultas(monthRows)
+    const indexed = monthRows
         .map((row, index) => ({ row, index }))
         .sort((a, b) => gastoParseDate(a.row.fecha) - gastoParseDate(b.row.fecha))
-    const rows = indexed.map(({ row }) => row)
+    const rows = indexed.filter(({ index }) => !ocultas.has(index)).map(({ row }) => row)
 
     // Los cargos de las mensualidades se intercalan por fecha, solo para verlos:
     // no son filas del mes (no se guardan) y no entran en el total ni en los
@@ -2889,9 +3486,14 @@ function renderGastosMonthTable() {
     ].sort((a, b) => a.dia - b.dia)
 
     lineas.forEach((linea) => {
-        body.appendChild(
-            linea.cargo ? buildMensualidadCargoRow(linea.cargo) : buildGastoMovementRow(linea.row, linea.index)
-        )
+        if (linea.cargo) {
+            body.appendChild(buildMensualidadCargoRow(linea.cargo))
+            return
+        }
+        const tr = buildGastoMovementRow(linea.row, linea.index)
+        // Estilo en línea: ni el filtro de búsqueda ni las hojas de estilo lo vuelven a mostrar.
+        if (ocultas.has(linea.index)) tr.style.display = "none"
+        body.appendChild(tr)
     })
 
     const total = rows.reduce((sum, row) => sum + parseEuroNumber(row.cantidad || ""), 0)
@@ -3039,10 +3641,29 @@ function handleGastosMovementActionClick(event) {
     const row = monthRows[rowIndex]
     const isEmpty = !row || (!row.fecha && !row.nombre && !row.tipo && parseEuroNumber(row.cantidad || "") === 0)
 
+    // En un gasto fraccionado se va todo el conjunto: su «parte de otros», que no
+    // se ve en la tabla, y los ingresos de las devoluciones.
+    const indiceOtros = buscarFilaParteOtros(monthRows, row)
+    const esFraccionado = indiceOtros >= 0
+
     const removeRow = () => {
-        monthRows.splice(rowIndex, 1)
+        const year = currentGastosYear
+        const month = currentGastosMonth
+        const fecha = row?.fecha
+        const concepto = conceptoFraccionado(row?.nombre)
+
+        ;[rowIndex, indiceOtros]
+            .filter((indice) => indice >= 0)
+            .sort((a, b) => b - a)
+            .forEach((indice) => monthRows.splice(indice, 1))
         renderCurrentGastosView()
         scheduleGastosAutosave()
+
+        if (esFraccionado) {
+            quitarDevolucionesGuardadas(year, month, fecha, concepto).catch((error) =>
+                showError("Se eliminó el gasto, pero no se pudieron quitar los ingresos de las devoluciones", error)
+            )
+        }
     }
 
     if (isEmpty) {
@@ -3052,7 +3673,9 @@ function handleGastosMovementActionClick(event) {
 
     openConfirmModal({
         title: "Eliminar fila",
-        message: "Esta fila tiene contenido. ¿Quieres eliminarla?",
+        message: esFraccionado
+            ? "Es un gasto fraccionado: se eliminará también la parte de otros y los ingresos de las devoluciones. ¿Quieres eliminarlo?"
+            : "Esta fila tiene contenido. ¿Quieres eliminarla?",
         confirmLabel: "Eliminar",
         onConfirm: async () => {
             removeRow()

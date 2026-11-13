@@ -1525,7 +1525,16 @@ function bindIngresosEvents() {
             e.stopPropagation()
             menuDropdown.classList.toggle("open")
         })
-        document.addEventListener("click", () => menuDropdown.classList.remove("open"))
+        // El listener es del documento, que sobrevive a la página: se retira solo
+        // en cuanto el menú ya no está en pantalla.
+        const cerrarMenu = () => {
+            if (!menuDropdown.isConnected) {
+                document.removeEventListener("click", cerrarMenu)
+                return
+            }
+            menuDropdown.classList.remove("open")
+        }
+        document.addEventListener("click", cerrarMenu)
         menuDropdown.addEventListener("click", () => menuDropdown.classList.remove("open"))
     }
 

@@ -9,6 +9,9 @@
                 <input type="text" class="overviewSearchInput" id="seguimientoSearch" aria-label="Buscar activo" placeholder="Buscar activo..." autocomplete="off" spellcheck="false" hidden>
             </div>
             <div class="overviewDivider"></div>
+            <!-- Solo los botones de filtro hacen scroll lateral si no caben: la
+                 búsqueda, el contador y las acciones de la derecha se quedan fijos. -->
+            <div class="segFiltrosScroll">
             <div class="activosFilters" id="seguimientoFilters">
                 <label class="activosFilterBtn" data-type="all"><input type="checkbox" checked><span>Todos</span></label>
                 <label class="activosFilterBtn" data-type="cripto"><input type="checkbox" checked><span>Cripto</span></label>
@@ -21,9 +24,10 @@
             <div class="activosFilters" id="seguimientoSourceFilters">
                 <label class="activosFilterBtn" data-source="portfolio"><input type="checkbox" checked><span>Portfolio</span></label>
                 <label class="activosFilterBtn" data-source="operaciones"><input type="checkbox"><span>Operaciones</span></label>
-                <label class="activosFilterBtn" data-source="nuevos"><input type="checkbox"><span>Nuevos</span></label>
-                <label class="activosFilterBtn" data-source="seguimiento" title="Los activos que has elegido seguir: del portfolio o nuevos"><input type="checkbox"><span>Seguimiento</span></label>
                 <label class="activosFilterBtn" data-source="wallets" title="La cripto de tus wallets (Cripto › Seguimiento)"><input type="checkbox"><span>Wallets</span></label>
+            </div>
+            <div class="filtersDivider"></div>
+            <button id="seguimientoListaFiltro" class="activosFilterBtn segListaChip" type="button" aria-haspopup="menu" title="Listas de seguimiento: filtrar por una, crear o editar. Con una lista elegida se muestran sus activos de Seguimiento, sea cual sea la fuente">Listas ▾</button>
             </div>
             <span class="activosCount" id="seguimientoCount"></span>
         </div>
@@ -142,6 +146,42 @@
             <div id="segHiddenList" style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto"></div>
             <div class="assetModalActions" style="margin-top:20px">
                 <button id="segHiddenCloseBtn" class="cancelButton" type="button">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modalOverlay hidden" id="segListasModalOverlay">
+        <div class="assetModal segListasModal" role="dialog" aria-modal="true" aria-labelledby="segListasTitulo">
+            <h3 class="assetModalTitle" id="segListasTitulo">Listas de seguimiento</h3>
+            <p class="segListasAyuda">Cada lista es una selección de tus activos de Seguimiento. Los mapas de Activos › Paneles y el menú lateral pueden enseñar la que elijas.</p>
+
+            <div id="segListasTabs" class="segListasTabs hidden" role="tablist" aria-label="Listas"></div>
+
+            <div id="segListasVacio" class="segListasVacio">
+                <strong>Aún no tienes listas</strong>
+                <span>Se creará con los activos que ya sigues, y podrás cambiarle el nombre y quitarle los que no quieras.</span>
+                <button id="segListaNuevaVaciaBtn" class="primaryButton" type="button">Crear la primera lista</button>
+            </div>
+
+            <div id="segListasEditor" class="segListasEditor hidden">
+                <label class="assetModalLabel" for="segListaNombre">Nombre de la lista</label>
+                <div class="segListaNombreFila">
+                    <input id="segListaNombre" class="assetModalInput" type="text" maxlength="60" autocomplete="off" placeholder="Ej: Cripto, Dividendos, Vigilar...">
+                    <button id="segListaBorrarBtn" class="cancelButton segListaBorrar" type="button">Borrar lista</button>
+                </div>
+
+                <div class="segListaCabecera">
+                    <label class="assetModalLabel" for="segListaBuscar">Activos de la lista</label>
+                    <span id="segListaContador" class="segListaContador"></span>
+                    <button id="segListaTodosBtn" class="segListaLink" type="button" title="Marcar los activos que se ven">Todos</button>
+                    <button id="segListaNingunoBtn" class="segListaLink" type="button" title="Desmarcar los activos que se ven">Ninguno</button>
+                </div>
+                <input id="segListaBuscar" class="assetModalInput" type="text" placeholder="Buscar por nombre o ticker..." autocomplete="off">
+                <div id="segListaActivos" class="segAddLista segListaActivos"></div>
+            </div>
+
+            <div class="assetModalActions">
+                <button id="segListasCerrarBtn" class="cancelButton" type="button">Cerrar</button>
             </div>
         </div>
     </div>

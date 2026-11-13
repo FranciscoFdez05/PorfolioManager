@@ -47,6 +47,9 @@ log = logging.getLogger(__name__)
 
 movimientosBp = Blueprint("movimientos", __name__)
 
+# Debe coincidir con TIPO_GASTO_FRACCIONADO de js/finanzas/gastos.js, en minúsculas.
+TIPO_FRACCIONADO = "pagos fraccionados"
+
 # Se avisa una vez por proceso y no en cada alta: con el Atajo en uso diario
 # serían cientos de líneas idénticas al mes y el log dejaría de servir para lo
 # que está. Una vez basta para que quede constancia de con qué política arrancó
@@ -291,6 +294,13 @@ def getCategorias():
         with openDbAt(rutaPortfolio) as conn:
             categorias = leerCategorias(conn=conn)
             cuentas = etiquetasDeCuentas(conn)
+
+    # El gasto fraccionado de la app crea este tipo para cuadrar saldos: no es
+    # una categoría que se elija desde el móvil, así que el Atajo no la ve.
+    categorias = {
+        tipo: [etiqueta for etiqueta in lista if etiqueta.strip().lower() != TIPO_FRACCIONADO]
+        for tipo, lista in categorias.items()
+    }
 
     todas = sorted(
         {etiqueta for lista in categorias.values() for etiqueta in lista},

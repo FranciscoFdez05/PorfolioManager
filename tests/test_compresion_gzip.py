@@ -185,3 +185,68 @@ def testLasRespuestasDinamicasNoSeCachean(clienteEstaticos):
     segunda = json.loads(gzip.decompress(client.get("/prueba/dinamico", headers=cabeceras).get_data()))
 
     assert (primera["n"], segunda["n"]) == (1, 2)
+
+
+# ── Tope de tamaño ────────────────────────────────────────────────────────────
+# /api/history/by-type de una cartera con años de snapshots ronda los 4,4 MB de
+# JSON: con el tope anterior (3 MiB) viajaba sin comprimir.
+
+@pytest.fixture
+def clienteTope(clienteAutenticado):
+    from core import seguridad_app
+
+    bp = Blueprint("tope_gzip", __name__)
+
+    @bp.route("/prueba/json-4mb")
+    def json4Mb():
+        return Response('{"p":[' + "1.5," * (1_100_000) + "0]}", mimetype="application/json")
+
+    @bp.route("/prueba/json-sobre-tope")
+    def jsonSobreTope():
+        return Response("[" + "1," * (seguridad_app._COMPRESION_MAX_BYTES // 2) + "0]", mimetype="application/json")
+
+    client, cabeceras, _app = clienteAutenticado(bp)
+    return client, {**cabeceras, "Accept-Encoding": "gzip"}
+
+
+def testUnaRespuestaDeCuatroMegasSeComprime(clienteTope):
+    client, cabeceras = clienteTope
+
+    respuesta = client.get("/prueba/json-4mb", headers=cabeceras)
+
+    assert respuesta.headers.get("Content-Encoding") == "gzip"
+    assert len(respuesta.get_data()) < 1024 * 1024
+    assert gzip.decompress(respuesta.get_data()).startswith(b'{"p":[1.5,')
+
+
+def testUnaRespuestaSobreElTopeNoSeComprime(clienteTope):
+    from core import seguridad_app
+
+    client, cabeceras = clienteTope
+
+    respuesta = client.get("/prueba/json-sobre-tope", headers=cabeceras)
+
+    assert "Content-Encoding" not in respuesta.headers
+    assert len(respuesta.get_data()) > seguridad_app._COMPRESION_MAX_BYTES
+
+
+def testElNivelDeGzipSaleDeLaConstanteDeConfiguracion(clienteTope, monkeypatch):
+    from core import seguridad_app
+
+    # Se espía el nivel real con el que se llama a zlib: así el test falla si
+    # alguien vuelve a poner un número suelto en lugar de la constante.
+    niveles = []
+    original = seguridad_app.gzip.compress
+
+    def espia(datos, compresslevel=9, **kwargs):
+        niveles.append(compresslevel)
+        return original(datos, compresslevel=compresslevel, **kwargs)
+
+    monkeypatch.setattr(seguridad_app.gzip, "compress", espia)
+    client, cabeceras = clienteTope
+
+    respuesta = client.get("/prueba/json-4mb", headers=cabeceras)
+
+    assert respuesta.headers.get("Content-Encoding") == "gzip"
+    assert niveles == [seguridad_app._COMPRESION_NIVEL]
+    assert 1 <= seguridad_app._COMPRESION_NIVEL <= 4

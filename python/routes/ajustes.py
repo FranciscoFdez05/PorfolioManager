@@ -240,6 +240,7 @@ def _seguimientoDe(prefs: dict) -> dict:
         seguimiento_prefs.CLAVE_OCULTOS: seguimiento_prefs.normalizarOcultos(prefs.get(seguimiento_prefs.CLAVE_OCULTOS)),
         seguimiento_prefs.CLAVE_OVERRIDES: seguimiento_prefs.normalizarOverrides(prefs.get(seguimiento_prefs.CLAVE_OVERRIDES)),
         seguimiento_prefs.CLAVE_ORDEN: seguimiento_prefs.normalizarOrden(prefs.get(seguimiento_prefs.CLAVE_ORDEN)),
+        seguimiento_prefs.CLAVE_LISTAS: seguimiento_prefs.normalizarListas(prefs.get(seguimiento_prefs.CLAVE_LISTAS)),
     }
 
 
@@ -805,6 +806,10 @@ def _seguimientoOrden(valor, _cfg):
     return seguimiento_prefs.normalizarOrden(valor) if isinstance(valor, list) else _SIN_CAMBIO
 
 
+def _seguimientoListas(valor, _cfg):
+    return seguimiento_prefs.normalizarListas(valor) if isinstance(valor, dict) else _SIN_CAMBIO
+
+
 _NORMALIZADORES_GLOBALES = {
     "autoBackupDays": _acotado(0, 365, 0),
     "backupIncluirClaves": lambda valor, _cfg: valor is True,
@@ -849,6 +854,7 @@ _NORMALIZADORES_PORTFOLIO = {
     seguimiento_prefs.CLAVE_OCULTOS: _seguimientoOcultos,
     seguimiento_prefs.CLAVE_OVERRIDES: _seguimientoOverrides,
     seguimiento_prefs.CLAVE_ORDEN: _seguimientoOrden,
+    seguimiento_prefs.CLAVE_LISTAS: _seguimientoListas,
 }
 
 

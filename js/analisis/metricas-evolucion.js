@@ -134,15 +134,27 @@ async function mRenderEvolucion(range, mode) {
     const crosshairPlugin = {
         id: "evolucionCrosshair",
         afterInit(chart) {
-            chart.canvas.addEventListener("mousemove", (e) => {
+            // Los listeners se quitan al destruir el gráfico: el canvas se reutiliza al
+            // repintar y los del gráfico anterior seguían llamando a draw() con
+            // chart.canvas ya a null (TypeError en cada movimiento del ratón).
+            const alMover = (e) => {
                 const rect = chart.canvas.getBoundingClientRect()
                 _evolucionMouseY = e.clientY - rect.top
                 chart.draw()
-            })
-            chart.canvas.addEventListener("mouseleave", () => {
+            }
+            const alSalir = () => {
                 _evolucionMouseY = null
                 chart.draw()
-            })
+            }
+            chart.canvas.addEventListener("mousemove", alMover)
+            chart.canvas.addEventListener("mouseleave", alSalir)
+            chart.$quitarCruceta = () => {
+                chart.canvas.removeEventListener("mousemove", alMover)
+                chart.canvas.removeEventListener("mouseleave", alSalir)
+            }
+        },
+        beforeDestroy(chart) {
+            chart.$quitarCruceta?.()
         },
         afterDraw(chart) {
             const { ctx, chartArea, tooltip } = chart
@@ -891,15 +903,27 @@ async function mRenderEvolucionTipos(range, mode) {
     const crosshairPlugin = {
         id: "tiposCrosshair",
         afterInit(chart) {
-            chart.canvas.addEventListener("mousemove", (e) => {
+            // Los listeners se quitan al destruir el gráfico: el canvas se reutiliza al
+            // repintar y los del gráfico anterior seguían llamando a draw() con
+            // chart.canvas ya a null (TypeError en cada movimiento del ratón).
+            const alMover = (e) => {
                 const rect = chart.canvas.getBoundingClientRect()
                 _tiposMouseY = e.clientY - rect.top
                 chart.draw()
-            })
-            chart.canvas.addEventListener("mouseleave", () => {
+            }
+            const alSalir = () => {
                 _tiposMouseY = null
                 chart.draw()
-            })
+            }
+            chart.canvas.addEventListener("mousemove", alMover)
+            chart.canvas.addEventListener("mouseleave", alSalir)
+            chart.$quitarCruceta = () => {
+                chart.canvas.removeEventListener("mousemove", alMover)
+                chart.canvas.removeEventListener("mouseleave", alSalir)
+            }
+        },
+        beforeDestroy(chart) {
+            chart.$quitarCruceta?.()
         },
         afterDraw(chart) {
             const { ctx, chartArea, tooltip } = chart

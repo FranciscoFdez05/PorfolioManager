@@ -40,7 +40,9 @@ function mRenderDistTipos(
     metric = "netoActualEur",
     privateMarket = []
 ) {
-    const types = ["cripto", "acciones", "etfs", "comoditis", "indices"]
+    const types = ["cripto", "acciones", "etfs", "comoditis", "indices"].filter((t) =>
+        summaries.some((a) => a.type === t)
+    )
     const rfTotal =
         bonos.reduce((s, r) => s + mDistBonoVal(r, metric), 0) +
         rentaFija.reduce((s, r) => s + mDistBonoVal(r, metric), 0)
@@ -70,6 +72,7 @@ function mRenderDistTipos(
                     }
                 ]
             },
+            plugins: [mDonutTotalPlugin()],
             options: {
                 ...M_CHART_DEFAULTS,
                 cutout: "62%",
@@ -170,6 +173,7 @@ function mRenderDistActivos(
                     }
                 ]
             },
+            plugins: [mDonutTotalPlugin()],
             options: {
                 ...M_CHART_DEFAULTS,
                 cutout: "55%",
@@ -323,6 +327,7 @@ function mRenderDonutLeyenda(chartId, labels, colors, values, total) {
 function mRenderRendTipos(summaries) {
     const types = ["cripto", "acciones", "etfs", "comoditis", "indices"]
     const pairs = types
+        .filter((t) => summaries.some((a) => a.type === t))
         .map((t) => ({
             label: M_TYPE_LABELS[t],
             value: summaries.filter((a) => a.type === t).reduce((s, a) => s + a.rendimientoEur, 0)
@@ -375,9 +380,41 @@ function mAjustarAltoConScroll(wrapId, filas, altoFila, altoMinimo) {
     const wrap = document.getElementById(wrapId)
     if (!wrap) return
     const completo = Math.max(altoMinimo, filas * altoFila + 40)
-    wrap.style.height = Math.min(completo, M_FILAS_VISIBLES * altoFila + 40) + "px"
+    const prefKey = "metricasExpandido_" + wrapId
+    const expandido = filas > M_FILAS_VISIBLES && getChartPref(prefKey, false) === true
+    wrap.style.height = (expandido ? completo : Math.min(completo, M_FILAS_VISIBLES * altoFila + 40)) + "px"
     const inner = wrap.querySelector(".mChartScrollInner")
     if (inner) inner.style.height = completo + "px"
+    mBotonExpandir(wrap, filas > M_FILAS_VISIBLES, expandido, () => {
+        setChartPref(prefKey, !expandido)
+        mAjustarAltoConScroll(wrapId, filas, altoFila, altoMinimo)
+        const canvasId = wrap.querySelector("canvas")?.id
+        if (canvasId) _metricasCharts[canvasId]?.resize()
+    })
+}
+
+/**
+ * Coloca (o quita) en la esquina de la tarjeta el botón que alterna entre el
+ * gráfico con scroll y el gráfico desplegado entero.
+ *
+ * @param {HTMLElement} wrap Contenedor del gráfico dentro de la tarjeta.
+ * @param {boolean} visible Si hay filas de sobra; si no, no se muestra botón.
+ * @param {boolean} expandido Estado actual, solo para el texto del botón.
+ * @param {() => void} alPulsar Acción al pulsar el botón.
+ * @returns {void}
+ */
+function mBotonExpandir(wrap, visible, expandido, alPulsar) {
+    const card = wrap.closest(".metricasChartCard")
+    if (!card) return
+    card.querySelector(".mExpandirBtn")?.remove()
+    if (!visible) return
+    const boton = document.createElement("button")
+    boton.type = "button"
+    boton.className = "mExpandirBtn"
+    boton.textContent = expandido ? "Contraer" : "Ver todo"
+    boton.title = expandido ? "Volver al gráfico con scroll" : "Mostrar todas las filas sin scroll"
+    boton.addEventListener("click", alPulsar)
+    card.appendChild(boton)
 }
 
 function mRenderRendActivos(summaries) {
@@ -488,7 +525,9 @@ function mDrawDividendosCharts(dividendos, colorMap, getYear) {
     const MAX_ROWS = 9
     const AXIS_H = 30
     const fullH = Math.max(MAX_ROWS * ROW_H, sorted.length * ROW_H)
-    const wrapH = Math.min(fullH, MAX_ROWS * ROW_H) + AXIS_H
+    const divPrefKey = "metricasExpandido_mChartDivWrap"
+    const divExpandido = sorted.length > MAX_ROWS && getChartPref(divPrefKey, false) === true
+    const wrapH = (divExpandido ? fullH : Math.min(fullH, MAX_ROWS * ROW_H)) + AXIS_H
     const maxVal = values.length ? Math.max(...values) : 1
 
     const wrap = document.getElementById("mChartDivWrap")
@@ -499,6 +538,12 @@ function mDrawDividendosCharts(dividendos, colorMap, getYear) {
     if (inner) inner.style.height = fullH + "px"
     if (axisWrap) axisWrap.style.height = AXIS_H + "px"
     if (donutWrap) donutWrap.style.height = wrapH + "px"
+    if (wrap) {
+        mBotonExpandir(wrap, sorted.length > MAX_ROWS, divExpandido, () => {
+            setChartPref(divPrefKey, !divExpandido)
+            mRenderDividendos(dividendos, colorMap)
+        })
+    }
 
     mDestroyChart("mChartDividendosAxis")
 
@@ -586,6 +631,7 @@ function mDrawDividendosCharts(dividendos, colorMap, getYear) {
                 { data: values, backgroundColor: colors, borderColor: "#0b1120", borderWidth: 2, hoverOffset: 10 }
             ]
         },
+        plugins: [mDonutTotalPlugin()],
         options: {
             ...M_CHART_DEFAULTS,
             cutout: "55%",
@@ -1066,6 +1112,7 @@ function mRenderBonosTipos(bonos) {
                 }
             ]
         },
+        plugins: [mDonutTotalPlugin()],
         options: {
             ...M_CHART_DEFAULTS,
             cutout: "60%",
@@ -1157,6 +1204,7 @@ function mRenderRentaFijaTipos(rentaFija) {
                 }
             ]
         },
+        plugins: [mDonutTotalPlugin()],
         options: {
             ...M_CHART_DEFAULTS,
             cutout: "60%",

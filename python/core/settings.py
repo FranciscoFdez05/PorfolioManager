@@ -173,6 +173,9 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("registros", "formato", TEXTO, "%(asctime)s [%(levelname)s] %(name)s - %(message)s",
            env="LOG_FORMATO",
            descripcion="Formato de cada línea de log (estilo %% de logging)."),
+    Ajuste("registros", "archivo", BOOLEANO, True, env="LOG_ARCHIVO",
+           descripcion="Copia el log de cada proceso (web, worker) en logs/<proceso>.log para verlo "
+                       "desde Ajustes. Con rotación; no sustituye a la salida estándar."),
 
     # [seguridad]
     Ajuste("seguridad", "max_intentos_login", ENTERO, 8, env="MAX_INTENTOS_LOGIN", minimo=1, maximo=1000,

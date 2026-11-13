@@ -22,6 +22,93 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.4.0] — 2026-11-13
+
+**Esquema de base de datos:** no lo toca (sigue en el **31**). Basta con volver a
+la imagen anterior para deshacer la actualización. Ajuste nuevo opcional:
+`[registros] archivo` (env `LOG_ARCHIVO`, por defecto `true`). Las listas de
+Seguimiento se guardan en los ajustes del portfolio, no en una tabla nueva.
+
+### Añadido
+
+- **Gasto fraccionado**: un pago compartido (90 € entre tres) cuesta 90 € a la
+  cuenta con la que se paga y solo 30 € a la categoría. Se registra tu parte en
+  su categoría, lo adelantado a los demás en un tipo aparte («Pagos
+  fraccionados») y lo que te devuelve cada persona como un ingreso en la cuenta
+  donde llegó. El detalle del gasto enseña el total pagado y quién devolvió qué,
+  y se edita con su propio formulario. En el historial de las cuentas los dos
+  gastos salen como un solo movimiento, con el total que salió del banco y la
+  categoría de tu parte. El Atajo no ofrece ese tipo entre las
+  categorías.
+- **Listas de Seguimiento**: selecciones con nombre de los activos que sigues
+  (hasta 50 por portfolio), que se crean, renombran y editan desde un
+  desplegable en Seguimiento. Sustituyen a las pestañas «Seguimiento» y
+  «Nuevos», que pasan a verse con una lista. Los mapas de Activos › Paneles
+  tienen un desplegable «Lista» (Portfolio o una de tus listas) y la barra
+  lateral puede enseñar la lista elegida en vez de Portfolio. Si una lista se
+  borra, el mapa y la barra vuelven a lo anterior.
+- **Ajustes › Registro**: lee desde la aplicación el log de la web y del worker
+  (últimas líneas, filtro por nivel, recargar y copiar), con indicación de si el
+  registro en archivo está activo y de si el proceso corre en Docker. Cada
+  proceso escribe además su salida en `logs/<proceso>.log`, con rotación (2 MiB
+  y 3 copias), que web y worker comparten como volumen: no hace falta montar el
+  socket de Docker. La salida estándar no cambia. Los errores no capturados del
+  navegador llegan al log de la web, con un tope de 30 por minuto y un único
+  envío por minuto de cada error repetido. Rutas nuevas: `GET /api/registro/estado`,
+  `GET /api/registro/<proceso>` y `POST /api/registro/cliente`.
+- **Ficha del activo › Gráfico**: ventana de fechas «Desde» y «Hasta» con
+  calendario que señala los días con compras (verde) y ventas (rojo). Con
+  ventana puesta manda sobre el rango y se vacía al cambiar de activo.
+- **Métricas**: las tarjetas con muchas filas se pueden desplegar enteras con un
+  botón en la esquina, en vez de recorrerlas con scroll.
+- **Menú**: Planes y Alertas se reúnen en un grupo «Planificación». Siguen
+  siendo módulos independientes y el grupo se oculta si se apagan los dos.
+
+### Cambiado
+
+- **Seguimiento**: la barra de filtros va siempre en una sola línea y solo los
+  botones de fuente hacen scroll lateral, que también se recorre arrastrando
+  con el ratón. Las cotizaciones se piden en paralelo, con un máximo de 4 a la
+  vez, y las peticiones de entrada salen a la vez en vez de una tras otra.
+- **Compresión gzip**: las respuestas dinámicas usan el nivel 3 y el tope sube
+  de 3 a 12 MiB, de modo que `/api/history/by-type` de una cartera con años de
+  snapshots viaja comprimido (de 4,4 MB a unos 300 KB).
+
+### Rendimiento
+
+Cifras medidas entre copias aisladas de la aplicación, con un ruido de ±30 %.
+
+- **Navegar entre páginas ya no acumula listeners ni nodos DOM**: tras 40 ciclos
+  de navegación se pasa de 1.005.768 nodos y 55.066 listeners a 8.409 nodos y
+  400 listeners, y 20 clics de 363 ms a 1,2 ms. Los menús desplegables, el
+  arrastre horizontal, el redimensionado de las tiras de tarjetas y los
+  gráficos de Métricas retiran sus listeners al dejar de estar en pantalla.
+- **Métricas**: las 42 gráficas se montan por trozos, cediendo el hilo entre
+  ellos, y el montaje se cancela al salir de la página. La tarea más larga baja
+  de unos 309 ms a 76-93 ms.
+- **`GET /api/activos-serie-dia`**: una sola pasada FIFO para todos los días y
+  lectura de snapshots con búsquedas por el índice existente en vez de agrupar
+  cientos de miles de filas. En la cartera activa, periodo día de 671 a unos
+  70 ms y periodo año de 1.218 a unos 105 ms.
+- **Caché por foto de la base de datos** (`core/cache_foto.py`): el resultado se
+  reutiliza mientras la base no cambie y se descarta con cualquier escritura.
+  Se aplica a los lotes vivos de rendimiento, `/api/activos`,
+  `/api/activos/rendimiento-batch`, `/api/gastos/todos` (de 77 a 2 ms) y
+  `/api/cuentas/historico` (de 157 a 3 ms; se invalida también si cambia el tipo
+  de cambio usado para los dividendos en otra divisa).
+- **`/api/history/by-type` con todo el histórico**: el agregado se calcula en
+  segundo plano al arrancar y al cambiar de cartera, y la primera llamada pasa
+  de 1,1-1,7 s a unos 80-150 ms.
+
+### Corregido
+
+- **Menús desplegables**: dejaban un listener en el documento por cada visita a
+  la página, con toda la página descartada retenida. Ahora se retiran solos.
+- **Métricas › Evolución**: los listeners del gráfico anterior seguían
+  disparándose tras repintar y daban un error en cada movimiento del ratón.
+
+---
+
 ## [5.3.2] — 2026-11-12
 
 **Esquema de base de datos:** no lo toca (sigue en el **31**). Basta con volver a

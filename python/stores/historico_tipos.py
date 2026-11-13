@@ -22,9 +22,13 @@ Comprobarlo cuesta dos consultas sobre índices (~6 ms) por petición.
 """
 
 import bisect
+import logging
 import threading
+import time
 
 from core import db
+
+log = logging.getLogger(__name__)
 
 _SQL_AGREGADO = """SELECT s.ts, a.type, SUM(s.price_eur) AS v, SUM(s.cost_eur) AS cost
                    FROM asset_snapshots s
@@ -35,6 +39,9 @@ _SQL_AGREGADO = """SELECT s.ts, a.type, SUM(s.price_eur) AS v, SUM(s.cost_eur) A
 _lock = threading.Lock()
 _cache = {}  # ruta de la BD -> estado del agregado
 _MAX_BDS = 4
+# Hilos de precalentado en curso, por ruta de BD (ver `precalentar`).
+_lockPrecalentado = threading.Lock()
+_precalentando = {}
 _MAX_CUERPOS = 32  # cuerpos serializados por estado del agregado
 
 
@@ -156,3 +163,50 @@ def invalidar():
     """Vacía la caché (lo usan los tests)."""
     with _lock:
         _cache.clear()
+
+
+def precalentar() -> threading.Thread:
+    """Calcula el agregado de la cartera activa en segundo plano.
+
+    La primera petición tras arrancar pagaba el agrupado completo de
+    asset_snapshots (1 s con ~850 k filas; 1,3 s dentro de la página Ventas).
+    Hecho aquí, al arrancar, esa petición ya encuentra la caché caliente. Si
+    llega una petición mientras se calcula, espera al mismo cálculo en vez de
+    repetirlo (`_agregado` toma el cerrojo).
+
+    También se llama al cambiar de cartera. Si ya hay un cálculo en curso para
+    la misma BD (cambios seguidos A -> B -> A -> B) se devuelve ese hilo en vez
+    de lanzar otro que esperaría al cerrojo para no hacer nada.
+
+    Returns:
+        El hilo, ya arrancado y daemon, para que los tests puedan esperarlo.
+    """
+    clave = str(db.getActiveDbPath())
+
+    with _lockPrecalentado:
+        enCurso = _precalentando.get(clave)
+        if enCurso is not None and enCurso.is_alive():
+            log.debug("[historico] Ya se está precalentando %s", clave)
+            return enCurso
+
+        def trabajo() -> None:
+            inicio = time.perf_counter()
+            try:
+                _agregado(db.getDb())
+                log.info(
+                    "[historico] Caché por tipo precalentada (%s) en %.0f ms",
+                    clave, (time.perf_counter() - inicio) * 1000,
+                )
+            except Exception as error:
+                # Precalentar es una optimización: si falla, la primera petición
+                # calculará el agregado como antes.
+                log.warning("[historico] No se pudo precalentar la caché por tipo: %s", error)
+            finally:
+                with _lockPrecalentado:
+                    if _precalentando.get(clave) is threading.current_thread():
+                        del _precalentando[clave]
+
+        hilo = threading.Thread(target=trabajo, name="precalentar-historico", daemon=True)
+        _precalentando[clave] = hilo
+        hilo.start()
+        return hilo

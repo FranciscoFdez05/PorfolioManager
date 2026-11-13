@@ -105,6 +105,7 @@ _PORTFOLIO_DEFAULTS = {
     seguimiento_prefs.CLAVE_OCULTOS: [],
     seguimiento_prefs.CLAVE_OVERRIDES: {},
     seguimiento_prefs.CLAVE_ORDEN: [],
+    seguimiento_prefs.CLAVE_LISTAS: {},
 }
 
 _GLOBAL_KEYS    = set(_GLOBAL_DEFAULTS)
@@ -151,6 +152,8 @@ def _sanear(guardado, defaults: dict) -> dict:
         elif clave == seguimiento_prefs.CLAVE_LISTA:
             # La única lista de objetos: el filtro de abajo la dejaría vacía.
             valor = seguimiento_prefs.normalizarLista(valor)
+        elif clave == seguimiento_prefs.CLAVE_LISTAS:
+            valor = seguimiento_prefs.normalizarListas(valor)
         elif isinstance(valor, list):
             # Todas las demás listas de ajustes son de cadenas (ids, tipos,
             # categorías); un número o un objeto ahí rompía un `in {…}`.

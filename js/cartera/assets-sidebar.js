@@ -14,6 +14,19 @@ function isAssetHiddenInSidebar(asset, hiddenIds = getSidebarHiddenIds()) {
     return Boolean(asset.hidden) || hiddenIds.has(asset.id)
 }
 
+/**
+ * Las entradas de Seguimiento de la lista elegida en la barra lateral: activos del
+ * portfolio (con `assetId`) y activos nuevos (sin él), que se pintan aparte.
+ *
+ * @returns {Array<object>|null} Las entradas, o null si no hay lista elegida o ya no existe.
+ */
+function getSidebarListaEntradas() {
+    const segIds = _sidebarLista && typeof segListaIds === "function" ? segListaIds(_sidebarLista) : null
+    if (!segIds) return null
+    const entradas = typeof segLoadCustomItems === "function" ? segLoadCustomItems() : []
+    return (Array.isArray(entradas) ? entradas : []).filter((e) => segIds.has(e?._segId))
+}
+
 // Los mismos activos que acaban pintados como botones en el sidebar: ocultos
 // fuera y, además, el filtro Portfolio/Watchlist activo. La ficha de abajo se
 // alimenta de esta lista, así que nunca puede mostrar algo que no esté arriba.
@@ -21,7 +34,16 @@ function getSidebarVisibleAssets(assets) {
     const hiddenIds = getSidebarHiddenIds()
     let visible = (Array.isArray(assets) ? assets : []).filter((a) => !isAssetHiddenInSidebar(a, hiddenIds))
 
-    if (_sidebarFilter === "portfolio") {
+    if (_sidebarFilter === "lista") {
+        const entradas = getSidebarListaEntradas()
+        if (entradas) {
+            const idsActivos = new Set(entradas.filter((e) => e.assetId).map((e) => String(e.assetId)))
+            visible = visible.filter((a) => idsActivos.has(String(a.id)))
+        } else {
+            // La lista ya no existe (se borró o es de otro portfolio): se vuelve a Portfolio.
+            visible = visible.filter((a) => a.hasRows)
+        }
+    } else if (_sidebarFilter === "portfolio") {
         visible = visible.filter((a) => a.hasRows)
     } else if (_sidebarFilter === "watchlist") {
         visible = visible.filter((a) => !a.hasRows)
@@ -195,8 +217,14 @@ async function renderAssetsList(assets) {
         )
     }
 
-    if (_sidebarFilter === "watchlist" && !window._viewAllPortfolios) {
-        const customSeg = typeof segLoadCustomItems === "function" ? segLoadCustomItems() : []
+    const verNuevos = _sidebarFilter === "watchlist" || (_sidebarFilter === "lista" && getSidebarListaEntradas())
+    if (verNuevos && !window._viewAllPortfolios) {
+        const customSeg =
+            _sidebarFilter === "lista"
+                ? getSidebarListaEntradas()
+                : typeof segLoadCustomItems === "function"
+                  ? segLoadCustomItems()
+                  : []
         const dbIds = new Set(visible.map((a) => a.id))
         const dbNames = new Set(visible.map((a) => (a.name || "").toLowerCase()))
         for (const item of customSeg) {

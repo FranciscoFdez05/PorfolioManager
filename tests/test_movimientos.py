@@ -70,6 +70,22 @@ def testIpExternaRechazada(movimientosApp, ip):
     assert respuesta.status_code == 403
 
 
+def testElAtajoNoVeElTipoDelGastoFraccionado(movimientosApp):
+    """«Pagos fraccionados» lo crea la app para cuadrar saldos; no se elige desde el móvil."""
+    from stores.gastos_store import writeGastosTypes
+    from stores.ingresos_store import writeIngresosTypes
+
+    writeGastosTypes(["Comida", "Pagos fraccionados"])
+    writeIngresosTypes(["Nómina", "pagos fraccionados"])
+    client = movimientosApp.test_client()
+
+    datos = client.get("/api/categorias", environ_base={"REMOTE_ADDR": "192.168.1.50"}).get_json()
+
+    assert datos["categorias"]["gasto"] == ["Comida"]
+    assert datos["categorias"]["ingreso"] == ["Nómina"]
+    assert "Pagos fraccionados" not in datos["todas"]
+
+
 def testEl403DiceConQueIpTeVeElServidor(movimientosApp):
     """Permite configurar redes_permitidas desde el móvil, sin leer logs."""
     client = movimientosApp.test_client()

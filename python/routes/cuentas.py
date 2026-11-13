@@ -2,9 +2,12 @@
 
 import datetime
 import logging
+from decimal import Decimal
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 
+from core.cache_foto import CachePorFoto
+from core.db import getDb
 from core.dinero import aTexto
 from core.validation import jsonBody
 from routes.cuenta_ahorro import pasarVinculosAntiguos
@@ -17,6 +20,7 @@ from stores.cuentas_store import (
     TIPOS,
     CuentaEnUso,
     CuentaInvalida,
+    _cambioAEuros,
     crearCuenta,
     crearTransferencia,
     eliminarCuenta,
@@ -36,6 +40,8 @@ from stores.cuentas_store import (
 log = logging.getLogger(__name__)
 
 cuentasBp = Blueprint("cuentas", __name__)
+
+_cacheHistorico = CachePorFoto(maxEntradas=2)
 
 
 def _error(error, codigo=400):
@@ -89,21 +95,42 @@ def getCuentas():
 @cuentasBp.route("/api/cuentas/historico", methods=["GET"])
 def getHistorico():
     """Saldo día a día de cada cuenta, para las gráficas de la ventana Cuentas."""
-    series = historicoSaldos()
-    return jsonify({
-        "cuentas": {
-            cuentaId: [
-                {
-                    "fecha": punto["fecha"].isoformat(),
-                    "entradas": aTexto(punto["entradas"], decimales=2),
-                    "salidas": aTexto(punto["salidas"], decimales=2),
-                    "saldo": aTexto(punto["saldo"], decimales=2),
-                }
-                for punto in puntos
-            ]
-            for cuentaId, puntos in series.items()
-        }
-    })
+    conn = getDb()
+    hoy = datetime.date.today()
+    convertir = _cambioAEuros()
+    # Los dividendos en otra divisa se convierten con el cambio de hoy, que no
+    # está en la base: se anota cada par consultado y la entrada solo vale si el
+    # cambio sigue siendo el mismo (ver core/cache_foto.py).
+    cambiosUsados: dict[str, Decimal] = {}
+
+    def aEurosRegistrado(importe, moneda):
+        divisa = str(moneda or "EUR").strip().upper() or "EUR"
+        cambiosUsados[divisa] = convertir(Decimal(1), divisa)
+        return convertir(importe, moneda)
+
+    def construir():
+        series = historicoSaldos(conn, hoy, aEurosRegistrado)
+        cuerpo = jsonify({
+            "cuentas": {
+                cuentaId: [
+                    {
+                        "fecha": punto["fecha"].isoformat(),
+                        "entradas": aTexto(punto["entradas"], decimales=2),
+                        "salidas": aTexto(punto["salidas"], decimales=2),
+                        "saldo": aTexto(punto["saldo"], decimales=2),
+                    }
+                    for punto in puntos
+                ]
+                for cuentaId, puntos in series.items()
+            }
+        }).get_data()
+        return cuerpo, cambiosUsados
+
+    cuerpo = _cacheHistorico.obtener(
+        conn, ("historico", hoy), construir,
+        lambda usados: all(convertir(Decimal(1), divisa) == cambio for divisa, cambio in usados.items()),
+    )
+    return current_app.response_class(cuerpo, mimetype="application/json")
 
 
 @cuentasBp.route("/api/cuentas/gastos-categorias", methods=["GET"])

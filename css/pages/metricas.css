@@ -701,6 +701,32 @@
     background: var(--text-muted);
 }
 
+/* Barra vertical visible solo en Métricas: base.css la oculta en todo el
+   documento (scrollbar-width: none), así que se reactiva únicamente en el
+   contenedor que scrollea cuando contiene esta página. */
+.mainContent:has(.metricasPage) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+}
+
+.mainContent:has(.metricasPage)::-webkit-scrollbar {
+    display: block;
+    width: 8px;
+}
+
+.mainContent:has(.metricasPage)::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.mainContent:has(.metricasPage)::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 4px;
+}
+
+.mainContent:has(.metricasPage)::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
 .mToggleBtn,
 .mDistMetricBtn {
     background: transparent;
@@ -1557,4 +1583,27 @@
 
 .mFinTabla tr.mFinFilaApagada td {
     opacity: 0.55;
+}
+
+/* Botón de la esquina de las tarjetas con scroll: despliega el gráfico entero
+   o lo devuelve a su alto con scroll. */
+.metricasChartCard:has(.mExpandirBtn) {
+    position: relative;
+}
+.mExpandirBtn {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    z-index: 3;
+    padding: 3px 10px;
+    font-size: 0.72rem;
+    color: #7a8fb0;
+    background: transparent;
+    border: 1px solid var(--border-mid);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.mExpandirBtn:hover {
+    color: #ccd6f6;
+    border-color: #4a6fa5;
 }

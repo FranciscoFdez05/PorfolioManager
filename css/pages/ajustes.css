@@ -2549,3 +2549,33 @@
     height: 1px;
     background: var(--border-soft);
 }
+
+.ajustesRegistroEstado {
+    padding: 8px 24px 0;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    white-space: pre-line;
+}
+
+.ajustesRegistroLog {
+    margin: 12px 24px 16px;
+    padding: 10px 12px;
+    min-height: 240px;
+    max-height: calc(100 * var(--vh) - 420px);
+    overflow: auto;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.74rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-dim);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-soft) transparent;
+}
+
+/* Una sola sección: una columna a todo el ancho en vez de quedar en la mitad derecha. */
+#sttPage-registro.active {
+    grid-template-columns: minmax(0, 1fr);
+}

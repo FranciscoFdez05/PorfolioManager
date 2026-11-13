@@ -1,7 +1,9 @@
 from datetime import date
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, current_app, jsonify
 
+from core.cache_foto import CachePorFoto
+from core.db import getDb
 from core.validation import jsonBody
 from stores import revisiones
 from stores.gastos_store import (
@@ -18,6 +20,8 @@ from stores.gastos_store import (
 )
 
 gastosBp = Blueprint("gastos", __name__)
+
+_cacheTodos = CachePorFoto(maxEntradas=1)
 
 
 @gastosBp.route("/api/gastos", methods=["GET"])
@@ -66,13 +70,18 @@ def getGastosTodos():
     `/api/gastos/<año>` una vez por año. Cada valor es idéntico a lo que
     devuelve `GET /api/gastos/<año>`.
     """
-    years = {}
-    for year in listGastosYears():
-        data = readGastosYear(year)
-        if data is not None:
-            years[year] = data
+    def construir():
+        years = {}
+        for year in listGastosYears():
+            data = readGastosYear(year)
+            if data is not None:
+                years[year] = data
+        return jsonify({"years": years}).get_data(), None
 
-    return jsonify({"years": years})
+    # Son ~200 lecturas por año: el cuerpo ya serializado se guarda mientras la
+    # base no cambie (core/cache_foto.py) y se invalida con cualquier escritura.
+    cuerpo = _cacheTodos.obtener(getDb(), "todos", construir)
+    return current_app.response_class(cuerpo, mimetype="application/json")
 
 
 @gastosBp.route("/api/gastos/<year>", methods=["GET"])

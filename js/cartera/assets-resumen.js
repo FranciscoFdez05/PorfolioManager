@@ -210,7 +210,16 @@ async function initVistaGeneralLogic() {
             e.stopPropagation()
             menuDropdown.classList.toggle("open")
         })
-        document.addEventListener("click", () => menuDropdown.classList.remove("open"))
+        // El listener es del documento, que sobrevive a la página: se retira solo
+        // en cuanto el menú ya no está en pantalla.
+        const cerrarMenu = () => {
+            if (!menuDropdown.isConnected) {
+                document.removeEventListener("click", cerrarMenu)
+                return
+            }
+            menuDropdown.classList.remove("open")
+        }
+        document.addEventListener("click", cerrarMenu)
         menuDropdown.addEventListener("click", () => menuDropdown.classList.remove("open"))
     }
 
@@ -239,6 +248,22 @@ async function initVistaGeneralLogic() {
         let startScroll = 0
         let pressed = false
         let moved = false
+        // Los de window solo existen mientras dura el arrastre: esta función corre
+        // en cada visita y dejarlos puestos acumulaba dos por cada una.
+        const alMover = (e) => {
+            if (!pressed) return
+            const dx = e.clientX - startX
+            if (!moved && Math.abs(dx) < 5) return
+            moved = true
+            scroller.classList.add("dragging")
+            scroller.scrollLeft = startScroll - dx
+        }
+        const alSoltar = () => {
+            pressed = false
+            scroller.classList.remove("dragging")
+            window.removeEventListener("pointermove", alMover)
+            window.removeEventListener("pointerup", alSoltar)
+        }
         scroller.addEventListener("pointerdown", (e) => {
             if (e.button !== 0 || e.target.closest("input[type='text']")) return
             // Agarrar la barra de desplazamiento ya la mueve el navegador; si además
@@ -248,18 +273,8 @@ async function initVistaGeneralLogic() {
             moved = false
             startX = e.clientX
             startScroll = scroller.scrollLeft
-        })
-        window.addEventListener("pointermove", (e) => {
-            if (!pressed) return
-            const dx = e.clientX - startX
-            if (!moved && Math.abs(dx) < 5) return
-            moved = true
-            scroller.classList.add("dragging")
-            scroller.scrollLeft = startScroll - dx
-        })
-        window.addEventListener("pointerup", () => {
-            pressed = false
-            scroller.classList.remove("dragging")
+            window.addEventListener("pointermove", alMover)
+            window.addEventListener("pointerup", alSoltar)
         })
         // Tras arrastrar, el soltar no debe contar como clic en un filtro.
         scroller.addEventListener(
@@ -476,18 +491,71 @@ function resumenActualizacionCotizaciones({ actualizados, fallidos, sinTicker })
     return { mensaje: partes.join(" "), tipo }
 }
 
+// Valor del menú de la barra lateral para «Portfolio»; no choca con un id de lista (`l…`).
+const SIDEBAR_VALOR_PORTFOLIO = "__portfolio"
+
+/**
+ * Pone al día el desplegable de la barra lateral: enseña «Portfolio» o el nombre
+ * de la lista de Seguimiento elegida y, si esa lista ya no existe (se borró o es
+ * de otro portfolio), la barra vuelve a Portfolio.
+ *
+ * @returns {boolean} Si la barra cambió de filtro y hay que repintar la lista.
+ */
+function sidebarActualizarListas() {
+    const btn = document.getElementById("sidebarListaBtn")
+    if (!btn) return false
+    const listas = typeof segListasLeer === "function" ? segListasLeer() : []
+    const actual = listas.find((l) => l.id === _sidebarLista)
+    let cambio = false
+    if (_sidebarFilter === "lista" && !actual) {
+        _sidebarFilter = "portfolio"
+        cambio = true
+    }
+    const nombre = _sidebarFilter === "lista" && actual ? actual.nombre : "Portfolio"
+    btn.textContent = `${nombre} ▾`
+    btn.title = _sidebarFilter === "lista" ? `Lista de Seguimiento: ${nombre}` : "Elegir qué activos se muestran"
+    return cambio
+}
+
 function initSidebarFilterBar() {
     const bar = document.getElementById("sidebarFilterBar")
     if (!bar || bar.dataset.bound) return
     bar.dataset.bound = "true"
-    bar.addEventListener("click", async (e) => {
-        const btn = e.target.closest(".sidebarFilterBtn")
-        if (!btn) return
-        _sidebarFilter = btn.dataset.filter
-        bar.querySelectorAll(".sidebarFilterBtn").forEach((b) => b.classList.toggle("active", b === btn))
+    const repintar = async () => {
         const assets = await loadAssetsList()
         await renderAssetsList(assets)
+    }
+    document.getElementById("sidebarListaBtn")?.addEventListener("click", (e) => {
+        if (typeof pnMenu !== "function") return
+        const listas = typeof segListasLeer === "function" ? segListasLeer() : []
+        const items = [{ valor: SIDEBAR_VALOR_PORTFOLIO, texto: "Portfolio", activo: _sidebarFilter !== "lista" }]
+        if (listas.length) {
+            items.push(
+                { cabecera: "Listas de seguimiento" },
+                ...listas.map((l) => ({
+                    valor: l.id,
+                    texto: l.nombre,
+                    activo: _sidebarFilter === "lista" && l.id === _sidebarLista
+                }))
+            )
+        }
+        pnMenu(e.currentTarget, items, async (valor) => {
+            if (valor === SIDEBAR_VALOR_PORTFOLIO) {
+                _sidebarFilter = "portfolio"
+            } else {
+                _sidebarLista = valor
+                _sidebarFilter = "lista"
+            }
+            sidebarActualizarListas()
+            await repintar()
+        })
     })
+    // Crear, renombrar o borrar listas, o cambiar sus activos, desde Seguimiento.
+    window.addEventListener("seguimiento:listas", async () => {
+        const volvioAPortfolio = sidebarActualizarListas()
+        if (volvioAPortfolio || _sidebarFilter === "lista") await repintar()
+    })
+    sidebarActualizarListas()
     bar.style.display = window._viewAllPortfolios ? "none" : ""
 }
 

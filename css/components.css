@@ -28,6 +28,16 @@
     white-space: nowrap;
 }
 
+/* Desplegable de la barra lateral (Portfolio o una lista de Seguimiento): un solo
+   botón. Con un nombre largo se recorta en vez de ensanchar la barra. */
+.sidebarFilterBtn.sidebarListaBtn {
+    min-width: 0;
+    padding: 6px 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .sidebarFilterBtn:hover {
     color: var(--text-primary);
     background: var(--bg-surface);
@@ -46,7 +56,10 @@
     grid-template-columns: minmax(60px, 2fr) minmax(70px, 1.6fr) minmax(44px, 0.9fr) minmax(44px, 0.8fr);
     gap: 0 6px;
     align-items: center;
-    padding: 10px 20px 10px 15px;
+    /* Altura fija: su borde inferior (toolbar 96px + 25.5px) cae en la misma
+       línea que el de la barra de pestañas de la izquierda (nav.tabs, 121.5px). */
+    height: 25.5px;
+    padding: 0 20px 0 15px;
     flex: 0 0 auto;
     background: var(--bg-inset);
     border-bottom: 1px solid var(--border-inset);
@@ -2851,6 +2864,7 @@ button.calPopupTitulo {
 }
 
 .calPopupDia {
+    position: relative;
     aspect-ratio: 1;
     padding: 0;
     border: 1px solid transparent;
@@ -2885,6 +2899,38 @@ button.calPopupTitulo:hover,
 
 .calPopupHoy {
     border-color: var(--accent);
+}
+
+/* Días con compra (verde) o venta (rojo), como los puntos del gráfico del activo.
+   Si hay las dos, los puntos van uno al lado del otro. El borde del color del fondo
+   los separa del número cuando el día está elegido. */
+.calPopupDiaCompra::before,
+.calPopupDiaVenta::after {
+    content: "";
+    position: absolute;
+    bottom: 3px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--bg-panel, transparent);
+}
+
+.calPopupDiaCompra::before {
+    left: calc(50% - 3px);
+    background: var(--graficoCompra, #16a34a);
+}
+
+.calPopupDiaVenta::after {
+    left: calc(50% - 3px);
+    background: var(--graficoVenta, #dc2626);
+}
+
+.calPopupDiaCompra.calPopupDiaVenta::before {
+    left: calc(50% - 7px);
+}
+
+.calPopupDiaCompra.calPopupDiaVenta::after {
+    left: calc(50% + 1px);
 }
 
 .calPopupDia.calPopupElegido,
@@ -3172,6 +3218,226 @@ button.calPopupTitulo:hover,
     font-size: 0.9em;
     color: var(--text-secondary);
     text-align: center;
+}
+
+/* Watchlist: la barra de filtros va siempre en una sola línea. Lo que no cabe
+   se recorre con scroll lateral solo en los botones de filtro; la búsqueda, el
+   contador y las acciones de la derecha no se mueven. */
+.seguimientoPage .activosToolbar,
+.seguimientoPage .activosToolbarLeft,
+.seguimientoPage .activosToolbarRight {
+    flex-wrap: nowrap;
+}
+
+.seguimientoPage .activosToolbarLeft {
+    flex: 1 1 0;
+}
+
+.seguimientoPage .activosToolbarRight {
+    flex: 0 0 auto;
+}
+
+.seguimientoPage .activosCount {
+    flex: none;
+    white-space: nowrap;
+}
+
+.segFiltrosScroll {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    /* Relleno para que overflow no recorte el borde de los botones. */
+    padding: 3px 2px 7px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+    cursor: grab;
+}
+
+.segFiltrosScroll::-webkit-scrollbar {
+    height: 6px;
+}
+
+.segFiltrosScroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.segFiltrosScroll::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.segFiltrosScroll::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+.segFiltrosScroll.dragging {
+    cursor: grabbing;
+    user-select: none;
+}
+
+.segFiltrosScroll > *,
+.segFiltrosScroll .activosFilterBtn {
+    flex: none;
+    white-space: nowrap;
+}
+
+.segFiltrosScroll .activosFilters {
+    flex-wrap: nowrap;
+}
+
+.segListaChip {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.segListasAyuda {
+    margin: 0 0 14px;
+    font-size: 0.88em;
+    color: var(--text-secondary);
+}
+
+.segListasModal {
+    width: min(560px, calc(100 * var(--vw) - 32px));
+}
+
+.segListasTabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.segListaTab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 100%;
+    padding: 6px 12px;
+    font: inherit;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    background: var(--bg-header);
+    border: 1px solid var(--border-soft);
+    border-radius: 20px;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease;
+}
+
+.segListaTab:hover {
+    color: var(--text-primary);
+    border-color: var(--border-mid);
+}
+
+.segListaTab.active {
+    color: var(--text-primary);
+    background: rgba(var(--accent-rgb), 0.16);
+    border-color: var(--accent);
+}
+
+.segListaTabNombre {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.segListaTab small {
+    padding: 1px 7px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    background: var(--bg-inset, rgba(255, 255, 255, 0.06));
+    border-radius: 10px;
+}
+
+.segListaTabNueva {
+    color: var(--accent);
+    background: transparent;
+    border-style: dashed;
+}
+
+.segListasVacio {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 26px 20px;
+    margin-bottom: 4px;
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    text-align: center;
+    border: 1px dashed var(--border-mid);
+    border-radius: 12px;
+}
+
+.segListasVacio strong {
+    font-size: 1.05em;
+    color: var(--text-primary);
+}
+
+.segListasVacio .primaryButton {
+    margin-top: 8px;
+}
+
+.segListaNombreFila {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.segListaNombreFila .assetModalInput {
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+.segListaBorrar {
+    flex-shrink: 0;
+}
+
+.segListaCabecera {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.segListaCabecera .assetModalLabel {
+    flex: 1;
+    margin: 0 0 6px;
+}
+
+.segListaContador {
+    font-size: 0.8em;
+    color: var(--text-secondary);
+}
+
+.segListaLink {
+    padding: 0;
+    font: inherit;
+    font-size: 0.82em;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.segListaLink:hover {
+    text-decoration: underline;
+}
+
+.segListaActivos {
+    max-height: min(300px, calc(40 * var(--vh)));
 }
 
 @media (max-width: 520px) {

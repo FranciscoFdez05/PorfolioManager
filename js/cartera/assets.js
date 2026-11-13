@@ -22,6 +22,9 @@ let _assetSortKey = null
 let _assetSortDir = "asc"
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
 let _sidebarFilter = "portfolio"
+// Lista de Seguimiento que enseña la barra lateral con el filtro "lista" ("" = ninguna).
+// eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
+let _sidebarLista = ""
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
 let _editingAsset = null
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo

@@ -13,10 +13,12 @@ const AV_SEG_TYPE_LABELS = {
     indices: "Índices"
 }
 
-// Orígenes de la watchlist: se ve uno cada vez, el primero por defecto.
-// «seguimiento» es la lista que elige el usuario (activos del portfolio y nuevos)
-// y «wallets», la cripto de sus wallets.
-const SEG_SOURCES = ["portfolio", "operaciones", "nuevos", "seguimiento", "wallets"]
+// Orígenes de la watchlist: se ve uno cada vez, el primero por defecto. «wallets»
+// es la cripto de sus wallets. Lo que el usuario elige seguir, y los activos nuevos
+// que dio de alta solo para seguirlos, ya no son pestañas: se ven desde el
+// desplegable de listas (seguimiento-listas.js), y con una elegida «Añadir activo»
+// actúa como la antigua pestaña «seguimiento».
+const SEG_SOURCES = ["portfolio", "operaciones", "wallets"]
 
 // «Añadir activo» da de alta lo que lista la pestaña abierta. Operaciones y
 // Wallets salen de otras pantallas: ahí el botón se desactiva y dice dónde ir.
@@ -39,15 +41,78 @@ function segAltaDeFuente(fuente) {
 }
 
 /**
+ * La pestaña que manda en la Watchlist: con una lista elegida, la de Seguimiento
+ * (la lista no depende de la fuente); si no, la fuente elegida.
+ *
+ * @returns {string} Un valor de `SEG_SOURCES` o "seguimiento".
+ */
+function segFuenteEfectiva() {
+    return _segFilterLista ? "seguimiento" : _segFilterSrc
+}
+
+/**
  * Activa o desactiva «Añadir activo» según la pestaña abierta.
  *
  * @param {HTMLButtonElement|null} boton El botón de la Watchlist.
  */
 function segSyncAddBtn(boton) {
     if (!boton) return
-    const { alta, aviso } = segAltaDeFuente(_segFilterSrc)
+    const { alta, aviso } = segAltaDeFuente(segFuenteEfectiva())
     boton.disabled = !alta
     boton.title = aviso
+}
+
+/**
+ * Deja recorrer un contenedor con scroll lateral arrastrando con el ratón, como
+ * la fila de tarjetas de Vista general. Un arrastre no cuenta como clic en lo
+ * que haya debajo (un filtro), y agarrar la barra de desplazamiento la sigue
+ * moviendo el navegador.
+ *
+ * Los oyentes de `window` solo viven mientras se arrastra, para no acumularlos
+ * cada vez que se vuelve a abrir la página.
+ *
+ * @param {HTMLElement|null} scroller Contenedor con `overflow-x`.
+ */
+function segArrastrarScroll(scroller) {
+    if (!scroller || scroller.dataset.arrastre === "true") return
+    scroller.dataset.arrastre = "true"
+    let moved = false
+
+    scroller.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return
+        if (e.clientY > scroller.getBoundingClientRect().top + scroller.clientHeight) return
+        const startX = e.clientX
+        const startScroll = scroller.scrollLeft
+        moved = false
+
+        const mover = (ev) => {
+            const dx = ev.clientX - startX
+            if (!moved && Math.abs(dx) < 5) return
+            moved = true
+            scroller.classList.add("dragging")
+            scroller.scrollLeft = startScroll - dx
+        }
+        const soltar = () => {
+            window.removeEventListener("pointermove", mover)
+            window.removeEventListener("pointerup", soltar)
+            window.removeEventListener("pointercancel", soltar)
+            scroller.classList.remove("dragging")
+        }
+        window.addEventListener("pointermove", mover)
+        window.addEventListener("pointerup", soltar)
+        window.addEventListener("pointercancel", soltar)
+    })
+
+    scroller.addEventListener(
+        "click",
+        (e) => {
+            if (!moved) return
+            moved = false
+            e.preventDefault()
+            e.stopPropagation()
+        },
+        true
+    )
 }
 
 // Un activo creado desde la pestaña Portfolio tiene que salir en ella sin recargar.
@@ -67,6 +132,22 @@ let _segAllItems = []
 let _segFilterType = "all"
 let _segFilterSrc = SEG_SOURCES[0]
 let _segSearch = ""
+// Lista con nombre por la que se filtra ("" = ninguna); ver seguimiento-listas.js.
+let _segFilterLista = ""
+function segElegirListaFiltro(idLista) {
+    _segFilterLista = idLista
+}
+
+/**
+ * Marca en los filtros de fuente el que manda. Con una lista elegida no manda
+ * ninguno (la lista y la fuente se excluyen), así que ninguno sale marcado.
+ */
+function segMarcarFuentes() {
+    document.querySelectorAll("#seguimientoSourceFilters .activosFilterBtn").forEach((label) => {
+        const casilla = label.querySelector("input")
+        if (casilla) casilla.checked = !_segFilterLista && label.dataset.source === _segFilterSrc
+    })
+}
 let _segViewMode = localStorage.getItem("whitelistViewMode") || "cards"
 
 function _segPid() {
@@ -77,7 +158,8 @@ function _segPid() {
 // preferencias del servidor, que es lo que entra en las copias de seguridad, y
 // aquí solo hay una copia en memoria que carga loadGlobalSettings.
 function _segDatos() {
-    if (!window._seguimientoDatos) window._seguimientoDatos = { lista: [], ocultos: [], overrides: {}, orden: [] }
+    if (!window._seguimientoDatos)
+        window._seguimientoDatos = { lista: [], ocultos: [], overrides: {}, orden: [], listas: {} }
     return window._seguimientoDatos
 }
 
@@ -160,7 +242,8 @@ async function segMigrarAlServidor(pidActivo) {
             lista: data.seguimientoLista,
             ocultos: data.seguimientoOcultos,
             overrides: data.seguimientoOverrides,
-            orden: data.seguimientoOrden ?? []
+            orden: data.seguimientoOrden ?? [],
+            listas: data.seguimientoListas ?? {}
         }
     } catch (error) {
         console.error("Error al migrar el seguimiento al servidor:", error)
@@ -180,7 +263,11 @@ function segSaveCustomItems(items) {
 function segFilteredItems() {
     return _segAllItems.filter((item) => {
         const matchType = _segFilterType === "all" || _segFilterType.includes(item.type)
+        // Con una lista elegida, la fuente no filtra: sus activos son de Seguimiento
+        // y los de «Portfolio» o «Nuevos» los dejarían fuera.
+        if (_segFilterLista && !(item._seguido && segEnListaFiltrada(item._segId))) return false
         const matchSrc =
+            Boolean(_segFilterLista) ||
             (_segFilterSrc === "portfolio" && item._fromPortfolio && !item._isWatchOnly) ||
             (_segFilterSrc === "operaciones" && item._fromOperaciones) ||
             (_segFilterSrc === "nuevos" &&
@@ -839,27 +926,41 @@ function segMergeAndRender(portfolioAssets) {
     segUpdateHiddenBtn()
 }
 
+// Aplica `tarea` a cada elemento con varias a la vez, con tope: pedir las
+// cotizaciones una tras otra sumaba la latencia de cada proveedor. Como en el
+// refresco de Vista general, el tope queda por debajo de las 6 conexiones por
+// servidor del navegador para no dejar sin turno al resto de la interfaz.
+async function segEnParalelo(elementos, tarea, enParalelo = 4) {
+    const cola = [...elementos]
+    const trabajador = async () => {
+        while (cola.length) await tarea(cola.shift())
+    }
+    await Promise.all(Array.from({ length: Math.min(enParalelo, cola.length) }, trabajador))
+}
+
 async function segRefreshCustomPrices() {
     const customs = segLoadCustomItems()
     let updated = false
-    for (const item of customs) {
-        if (!item.ticker) continue
-        try {
-            const params = new URLSearchParams({ symbol: item.ticker })
-            if (item.marketProvider) params.set("provider", item.marketProvider)
-            const resp = await fetch(`/api/market/quote?${params}`)
-            if (!resp.ok) continue
-            const data = await resp.json()
-            if (!data.ok || !data.price) continue
-            item.price = String(data.price)
-            item.change = String(data.change ?? "")
-            item.currency = data.currency || "EUR"
-            item.lastUpdated = data.lastUpdated || new Date().toISOString()
-            updated = true
-        } catch {
-            /* ignore individual failures */
+    await segEnParalelo(
+        customs.filter((item) => item.ticker),
+        async (item) => {
+            try {
+                const params = new URLSearchParams({ symbol: item.ticker })
+                if (item.marketProvider) params.set("provider", item.marketProvider)
+                const resp = await fetch(`/api/market/quote?${params}`)
+                if (!resp.ok) return
+                const data = await resp.json()
+                if (!data.ok || !data.price) return
+                item.price = String(data.price)
+                item.change = String(data.change ?? "")
+                item.currency = data.currency || "EUR"
+                item.lastUpdated = data.lastUpdated || new Date().toISOString()
+                updated = true
+            } catch {
+                /* ignore individual failures */
+            }
         }
-    }
+    )
     if (updated) {
         segSaveCustomItems(customs)
         segMergeAndRender(window._segPortfolioAssets || [])
@@ -869,16 +970,22 @@ async function segRefreshCustomPrices() {
 // Lista «Seguimiento»: la cripto de las wallets (python/core/wallets_watchlist.py).
 // Cada entrada se cotiza con el ticker puesto a mano en Cripto › Seguimiento o,
 // si no tiene, con el activo de Activos que le corresponde.
-async function segLoadWalletItems(portfolioAssets) {
+async function segPedirWatchlist() {
     try {
         const resp = await fetch("/api/wallets/watchlist")
         if (!resp.ok) return []
         const data = await resp.json()
-        return (data.entradas || []).map((entrada) => segWalletItem(entrada, portfolioAssets))
+        return data.entradas || []
     } catch {
         // Sin wallets legibles la lista sale vacía; el resto de la watchlist no se resiente.
         return []
     }
+}
+
+// `entradasPendientes` permite haber lanzado ya la petición, para que no espere a
+// las de activos y operaciones al abrir la página.
+async function segLoadWalletItems(portfolioAssets, entradasPendientes = segPedirWatchlist()) {
+    return (await entradasPendientes).map((entrada) => segWalletItem(entrada, portfolioAssets))
 }
 
 function segWalletItem(entrada, portfolioAssets) {
@@ -933,10 +1040,12 @@ function segWalletItem(entrada, portfolioAssets) {
 // En memoria, sin localStorage: se piden cada vez que se abre la watchlist.
 async function segRefreshWalletPrices() {
     let updated = false
-    for (const item of window._segWalletItems || []) {
-        if (!item._quoteTicker) continue
-        if (await segCotizarWalletItem(item)) updated = true
-    }
+    await segEnParalelo(
+        (window._segWalletItems || []).filter((item) => item._quoteTicker),
+        async (item) => {
+            if (await segCotizarWalletItem(item)) updated = true
+        }
+    )
     if (updated) segMergeAndRender(window._segPortfolioAssets || [])
 }
 
@@ -1141,11 +1250,19 @@ async function initSeguimientoLogic() {
     const segSearchFeedback = document.getElementById("segSearchFeedback")
     const segSearchResults = document.getElementById("segSearchResults")
 
+    // Las tres peticiones salen a la vez: la lista se construye cruzándolas, pero
+    // pedirlas una tras otra sumaba su latencia. El catch evita un rechazo sin
+    // atender mientras se espera a las anteriores; cada bloque de abajo decide
+    // qué hacer si la suya falló.
+    const activosPendiente = fetch("/api/activos").catch(() => null)
+    const operacionesPendiente = fetch("/api/operaciones").catch(() => null)
+    const watchlistPendiente = segPedirWatchlist()
+
     // cargar activos del portfolio
     let portfolioAssets = []
     try {
-        const resp = await fetch("/api/activos")
-        if (resp.ok) {
+        const resp = await activosPendiente
+        if (resp?.ok) {
             const data = await resp.json()
             portfolioAssets = data.assets || data || []
         }
@@ -1155,7 +1272,8 @@ async function initSeguimientoLogic() {
 
     // cargar operaciones y construir items únicos por activo
     try {
-        const opResp = await fetch("/api/operaciones")
+        const opResp = await operacionesPendiente
+        if (!opResp) throw new Error("sin conexión")
         if (opResp.ok) {
             const opData = await opResp.json()
             const opRows = opData.rows || []
@@ -1193,7 +1311,7 @@ async function initSeguimientoLogic() {
         window._segOperacionesItems = []
     }
 
-    window._segWalletItems = await segLoadWalletItems(portfolioAssets)
+    window._segWalletItems = await segLoadWalletItems(portfolioAssets, watchlistPendiente)
 
     // restaurar filtros guardados
     const _pid = _segPid()
@@ -1212,6 +1330,8 @@ async function initSeguimientoLogic() {
     })
 
     segMergeAndRender(portfolioAssets)
+    segListasIniciar()
+    segArrastrarScroll(document.querySelector(".segFiltrosScroll"))
     segRefreshCustomPrices()
     segRefreshWalletPrices()
 
@@ -1295,18 +1415,16 @@ async function initSeguimientoLogic() {
 
     // filtros de fuente (portfolio / operaciones / nuevos / seguimiento): uno cada vez
     if (srcFiltersEl) {
-        const getSrcInputs = () => [...srcFiltersEl.querySelectorAll(".activosFilterBtn input")]
-        const marcarSrc = () => {
-            getSrcInputs().forEach((cb) => {
-                cb.checked = cb.closest(".activosFilterBtn").dataset.source === _segFilterSrc
-            })
-        }
+        const marcarSrc = segMarcarFuentes
         marcarSrc()
         if (!srcFiltersEl.dataset.bound) {
             srcFiltersEl.dataset.bound = "true"
             srcFiltersEl.addEventListener("change", (e) => {
                 // Pulsar el que ya está elegido no lo apaga: siempre hay uno.
                 _segFilterSrc = e.target.closest(".activosFilterBtn")?.dataset.source || _segFilterSrc
+                // Elegir una fuente deja la lista: con una elegida, la fuente no filtraba.
+                segElegirListaFiltro("")
+                segListasPintarFiltro()
                 marcarSrc()
                 localStorage.setItem(`seguimientoFilterSrc_${_segPid()}`, JSON.stringify(_segFilterSrc))
                 updateSegFilterLabel()
@@ -1481,7 +1599,7 @@ async function initSeguimientoLogic() {
     }
 
     function abrirAlta() {
-        const { alta } = segAltaDeFuente(_segFilterSrc)
+        const { alta } = segAltaDeFuente(segFuenteEfectiva())
         if (alta === "activo") openAssetModal()
         else if (alta) openModal(alta)
     }
@@ -1525,15 +1643,16 @@ async function initSeguimientoLogic() {
             existenteBuscar?.focus()
             return
         }
-        segSaveCustomItems(segAnadirReferencias(segLoadCustomItems(), ids, portfolioAssets))
+        const antes = new Set(segLoadCustomItems().map((c) => c._segId))
+        const despues = segAnadirReferencias(segLoadCustomItems(), ids, portfolioAssets)
+        segSaveCustomItems(despues)
+        segListaAnadirALaElegida(despues.map((c) => c._segId).filter((segId) => !antes.has(segId)))
         closeModal()
         segMergeAndRender(portfolioAssets)
-        if (_segFilterSrc !== "seguimiento") {
-            window.showToast?.(
-                ids.length === 1 ? "Añadido a Seguimiento" : `${ids.length} activos añadidos a Seguimiento`,
-                { type: "success" }
-            )
-        }
+        window.showToast?.(
+            ids.length === 1 ? "Añadido a Seguimiento" : `${ids.length} activos añadidos a Seguimiento`,
+            { type: "success" }
+        )
     })
     function closeModal() {
         segHideSuggestions()
@@ -1649,7 +1768,7 @@ async function initSeguimientoLogic() {
             return
         }
         const customs = segLoadCustomItems()
-        customs.push({
+        const nuevo = {
             _segId: `custom_${Date.now()}`,
             nombre,
             ticker: tickerInput?.value.trim() || "",
@@ -1657,8 +1776,10 @@ async function initSeguimientoLogic() {
             tvSymbol: tvTickerInput?.value.trim() || "",
             tipo: typeSelect.value,
             notas: ""
-        })
+        }
+        customs.push(nuevo)
         segSaveCustomItems(customs)
+        segListaAnadirALaElegida([nuevo._segId])
         closeModal()
         segMergeAndRender(portfolioAssets)
         // Sin esto el activo nuevo no tiene precio hasta la próxima carga de la página.

@@ -1095,9 +1095,43 @@ scheduleNumericTableAlignment()
 
 // ── Custom select dropdown ──────────────────────────────────────────────────
 
+// Cierre de los menús abiertos al hacer clic fuera o al desplazarse: un único
+// par de listeners en document para todos los selects. Cada select añadía los
+// suyos y nunca los quitaba, de modo que cada visita a una página dejaba
+// handlers vivos que retenían todo el DOM ya descartado del select (nodos y
+// listeners crecían sin límite y cada clic o scroll costaba más).
+let _csCierreGlobalActivo = false
+
+function _csActivarCierreGlobal() {
+    if (_csCierreGlobalActivo) return
+    _csCierreGlobalActivo = true
+    document.addEventListener("click", () => {
+        document.querySelectorAll(".csBodyMenu.csOpen").forEach((m) => m._csClose?.())
+    })
+    document.addEventListener(
+        "scroll",
+        (e) => {
+            document.querySelectorAll(".csBodyMenu.csOpen").forEach((m) => {
+                if (!m.contains(e.target)) m._csClose?.()
+            })
+        },
+        true
+    )
+}
+
+// Los menús cuelgan de body, así que un popup que se cierra deja el suyo
+// huérfano. Se retiran los que ya no tienen su desplegable en la página.
+function _csLimpiarMenusHuerfanos() {
+    document.querySelectorAll(".csBodyMenu").forEach((m) => {
+        if (m._csTrigger && !m._csTrigger.isConnected) m.remove()
+    })
+}
+
 function _buildCustomSelect(select) {
     if (select._csInit) return
     select._csInit = true
+    _csLimpiarMenusHuerfanos()
+    _csActivarCierreGlobal()
 
     const wrapper = document.createElement("div")
     wrapper.className = "csWrapper"
@@ -1207,6 +1241,9 @@ function _buildCustomSelect(select) {
             m._csTrigger?.classList.remove("csOpen")
         })
         if (!isOpen) {
+            // Por si la limpieza de huérfanos lo quitó mientras el desplegable
+            // estaba fuera de la página.
+            if (!menu.isConnected) document.body.appendChild(menu)
             syncOptions()
             positionMenu()
             menu.classList.add("csOpen")
@@ -1266,14 +1303,7 @@ function _buildCustomSelect(select) {
         }
     })
 
-    document.addEventListener("click", closeMenu)
-    document.addEventListener(
-        "scroll",
-        (e) => {
-            if (!menu.contains(e.target)) closeMenu()
-        },
-        true
-    )
+    menu._csClose = closeMenu
 
     select.addEventListener("change", () => {
         syncLabel()
@@ -1327,6 +1357,25 @@ function activarArrastreHorizontal(contenedor, obtenerObjetivo = () => contenedo
     let movido = false
     let objetivo = null
 
+    // En window para no perder el arrastre si el puntero sale del contenedor;
+    // se ignora en cuanto el contenedor deja de estar en la página. Solo se
+    // escuchan mientras dura el arrastre: dejarlos puestos para siempre
+    // acumulaba dos listeners en window por cada visita a la página.
+    const alMover = (event) => {
+        if (!pulsado || !contenedor.isConnected) return
+        const desplazamiento = event.clientX - inicioX
+        if (!movido && Math.abs(desplazamiento) < 5) return
+        movido = true
+        contenedor.classList.add("dragging")
+        objetivo.scrollLeft = inicioScroll - desplazamiento
+    }
+    const alSoltar = () => {
+        pulsado = false
+        contenedor.classList.remove("dragging")
+        window.removeEventListener("pointermove", alMover)
+        window.removeEventListener("pointerup", alSoltar)
+    }
+
     contenedor.addEventListener("pointerdown", (event) => {
         if (event.button !== 0 || event.target.closest("input, select, textarea")) return
         objetivo = obtenerObjetivo()
@@ -1335,20 +1384,8 @@ function activarArrastreHorizontal(contenedor, obtenerObjetivo = () => contenedo
         movido = false
         inicioX = event.clientX
         inicioScroll = objetivo.scrollLeft
-    })
-    // En window para no perder el arrastre si el puntero sale del contenedor;
-    // se ignora en cuanto el contenedor deja de estar en la página.
-    window.addEventListener("pointermove", (event) => {
-        if (!pulsado || !contenedor.isConnected) return
-        const desplazamiento = event.clientX - inicioX
-        if (!movido && Math.abs(desplazamiento) < 5) return
-        movido = true
-        contenedor.classList.add("dragging")
-        objetivo.scrollLeft = inicioScroll - desplazamiento
-    })
-    window.addEventListener("pointerup", () => {
-        pulsado = false
-        contenedor.classList.remove("dragging")
+        window.addEventListener("pointermove", alMover)
+        window.addEventListener("pointerup", alSoltar)
     })
     contenedor.addEventListener(
         "click",
@@ -1625,6 +1662,9 @@ function _buildDateTodayButton(input) {
 // Inicio/Fin en los días, flechas en meses y años, Esc cierra.
 //
 // Uso: abrirCalendarioFecha(input, botonQueLoAbre)
+//
+// Opcional: `input.calendarioMarcas = (iso) => ["compra", "venta"]` señala los días
+// con esas operaciones (un punto verde y/o rojo bajo el número).
 
 const _CALENDARIO_DIAS_SEMANA = ["L", "M", "X", "J", "V", "S", "D"]
 const _CALENDARIO_MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
@@ -1760,18 +1800,25 @@ function _calendarioVistaDias(estado) {
     const celdas = Array.from({ length: 42 }, (_, i) => {
         const dia = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + i)
         const iso = _calendarioIso(dia)
+        const operaciones = input.calendarioMarcas?.(iso) || []
+        const nombresOperacion = { compra: "compra", venta: "venta" }
+        const textoOperaciones = operaciones.map((tipo) => nombresOperacion[tipo]).filter(Boolean).join(" y ")
         return _calendarioBotonHtml({
             clase: "calPopupDia",
             datos: `data-fecha="${iso}"`,
             texto: dia.getDate(),
-            etiqueta: dia.toLocaleDateString("es-ES", { dateStyle: "full" }),
+            etiqueta:
+                dia.toLocaleDateString("es-ES", { dateStyle: "full" }) +
+                (textoOperaciones ? `, con ${textoOperaciones}` : ""),
             enfocable: iso === focoIso,
             elegido: iso === input.value,
             permitido: _calendarioDiaPermitido(input, iso),
             marcas: [
                 dia.getMonth() !== mes.getMonth() ? "calPopupDiaFuera" : "",
                 iso === hoyIso ? "calPopupHoy" : "",
-                iso === input.value ? "calPopupElegido" : ""
+                iso === input.value ? "calPopupElegido" : "",
+                operaciones.includes("compra") ? "calPopupDiaCompra" : "",
+                operaciones.includes("venta") ? "calPopupDiaVenta" : ""
             ]
         })
     }).join("")

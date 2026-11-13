@@ -30,15 +30,36 @@
     let avisoSinConexion = null
     let esperandoServidor = false
 
+    // Un listener roto puede fallar en cada movimiento del ratón: el mismo error
+    // (mensaje y origen) se envía al registro una vez por minuto, no cientos.
+    const REPETICION_REGISTRO_MS = 60000
+    const enviadosAlRegistro = new Map()
+
+    function yaEnviado(clave) {
+        const ahora = Date.now()
+        for (const [otraClave, momento] of enviadosAlRegistro) {
+            if (ahora - momento > REPETICION_REGISTRO_MS) enviadosAlRegistro.delete(otraClave)
+        }
+        if (enviadosAlRegistro.has(clave)) return true
+        enviadosAlRegistro.set(clave, ahora)
+        return false
+    }
+
     function mensajeDe(motivo) {
         if (motivo == null) return ""
         if (typeof motivo === "string") return motivo
         return String(motivo.message || motivo)
     }
 
+    // Las extensiones del navegador (MetaMask y similares) inyectan scripts propios en
+    // la página y lanzan promesas rechazadas que no son de la aplicación: se
+    // reconocen por el origen del stack.
+    const ORIGEN_EXTENSION = /(?:chrome|moz|safari-web)-extension:\/\//i
+
     function esRuido(motivo) {
         // Una petición cancelada a propósito (cambio de página) no es un fallo.
         if (motivo && motivo.name === "AbortError") return true
+        if (motivo && typeof motivo.stack === "string" && ORIGEN_EXTENSION.test(motivo.stack)) return true
         const texto = mensajeDe(motivo)
         return MENSAJES_IGNORADOS.some((patron) => patron.test(texto))
     }
@@ -56,13 +77,42 @@
         window.showToast(mensaje, opciones)
     }
 
-    function alFallar(motivo) {
+    // Manda el error al registro interno del servidor (Ajustes > Registro): el
+    // aviso de pantalla no dice qué falló y la consola solo la ve quien la tenga
+    // abierta. Un fallo al enviar solo va a la consola, para no crear un bucle.
+    function enviarAlRegistro(motivo, origen) {
+        try {
+            if (yaEnviado(`${mensajeDe(motivo)}|${origen || ""}`)) return
+            const pagina = window._paginaActual || ""
+            const activo = typeof currentAssetId !== "undefined" ? currentAssetId : ""
+            const cuerpo = {
+                mensaje: mensajeDe(motivo),
+                stack: motivo && motivo.stack ? String(motivo.stack) : "",
+                origen: origen || "",
+                pagina: `${pagina} ${location.pathname}`.trim(),
+                contexto: `activo=${activo || "-"}`
+            }
+            window
+                .fetch("/api/registro/cliente", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(cuerpo),
+                    keepalive: true
+                })
+                .catch((error) => console.error("No se pudo enviar el error al registro:", error))
+        } catch (error) {
+            console.error("No se pudo preparar el error para el registro:", error)
+        }
+    }
+
+    function alFallar(motivo, origen) {
         if (esRuido(motivo)) return
         console.error("Error no capturado:", motivo)
         if (esFalloDeServidor(motivo)) {
             esperarServidor()
             return
         }
+        enviarAlRegistro(motivo, origen)
         avisar("Algo ha fallado en esta pantalla. Si deja de responder, vuelve a abrirla desde el menú.", {
             type: "error"
         })
@@ -140,8 +190,10 @@
         }
     }
 
-    window.addEventListener("error", (evento) => alFallar(evento.error || evento.message))
-    window.addEventListener("unhandledrejection", (evento) => alFallar(evento.reason))
+    window.addEventListener("error", (evento) =>
+        alFallar(evento.error || evento.message, `${evento.filename}:${evento.lineno}:${evento.colno}`)
+    )
+    window.addEventListener("unhandledrejection", (evento) => alFallar(evento.reason, "promesa rechazada"))
     window.addEventListener("offline", mostrarSinConexion)
     window.addEventListener("online", esperarServidor)
 
