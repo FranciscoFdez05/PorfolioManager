@@ -32,13 +32,19 @@ from routes.carteras_conocidas import carterasConocidasBp
 from routes.categorias import categoriasBp
 from routes.cuenta_ahorro import cuentaAhorroBp
 from routes.cuentas import cuentasBp
+from routes.financiaciones import financiacionesBp
+from routes.exportar import exportarBp
 from routes.gastos import gastosBp
 from routes.herramientas import herramientasBp
+from routes.hipotecas import hipotecasBp
+from routes.microcreditos import microcreditosBp
 from routes.ingresos import ingresosBp
+from routes.ingresos_pasivos import ingresosPasivosBp
 from routes.market import marketBp
 from routes.market_pulse import marketPulseBp
 from routes.movimientos import movimientosBp
 from routes.operaciones import operacionesBp
+from routes.patrimonio import patrimonioBp
 from routes.planes import planesBp
 from routes.planes_cartera import planesCarteraBp
 from routes.portfolios import portfoliosBp
@@ -166,13 +172,19 @@ app.register_blueprint(backupBp)
 app.register_blueprint(categoriasBp)
 app.register_blueprint(cuentaAhorroBp)
 app.register_blueprint(cuentasBp)
+app.register_blueprint(exportarBp)
+app.register_blueprint(financiacionesBp)
 app.register_blueprint(gastosBp)
 app.register_blueprint(herramientasBp)
+app.register_blueprint(hipotecasBp)
+app.register_blueprint(microcreditosBp)
 app.register_blueprint(ingresosBp)
+app.register_blueprint(ingresosPasivosBp)
 app.register_blueprint(marketBp)
 app.register_blueprint(marketPulseBp)
 app.register_blueprint(movimientosBp)
 app.register_blueprint(operacionesBp)
+app.register_blueprint(patrimonioBp)
 app.register_blueprint(planesBp)
 app.register_blueprint(planesCarteraBp)
 app.register_blueprint(portfoliosBp)
@@ -304,6 +316,12 @@ def _encryptApiKeysAtRest():
 # Inicialización al arrancar, tanto con Gunicorn como con el servidor de desarrollo
 ensureDataFile()
 _encryptApiKeysAtRest()
+# Las wallets de seguimiento eran de la instalación; ahora son de cada portfolio.
+# Las que había pasan al portfolio activo en este arranque.
+from core import wallets_carpeta  # noqa: E402
+from core.db import getActiveDbPath  # noqa: E402
+
+wallets_carpeta.migrarWalletsAlPortfolio(getActiveDbPath().stem)
 # Con el servicio worker de Docker, estos hilos corren allí (admin/worker.py) y
 # no ocupan los de gunicorn; sin él, los arranca la web como siempre.
 if settings.tareasEnWeb():

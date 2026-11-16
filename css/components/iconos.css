@@ -41,6 +41,10 @@
     -webkit-mask-image: url("../../img/icons/general/arrastrar.svg");
     mask-image: url("../../img/icons/general/arrastrar.svg");
 }
+.iconoArchivar {
+    -webkit-mask-image: url("../../img/icons/general/archivar.svg");
+    mask-image: url("../../img/icons/general/archivar.svg");
+}
 .iconoAviso {
     -webkit-mask-image: url("../../img/icons/general/aviso.svg");
     mask-image: url("../../img/icons/general/aviso.svg");
@@ -170,6 +174,10 @@
 .iconoGraficoLinea {
     -webkit-mask-image: url("../../img/icons/ajustes/grafico-linea.svg");
     mask-image: url("../../img/icons/ajustes/grafico-linea.svg");
+}
+.iconoTabla {
+    -webkit-mask-image: url("../../img/icons/ajustes/tabla.svg");
+    mask-image: url("../../img/icons/ajustes/tabla.svg");
 }
 .iconoHistorial {
     -webkit-mask-image: url("../../img/icons/ajustes/historial.svg");

@@ -16,11 +16,8 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    padding-right: 18px;
-    padding-bottom: 24px;
     flex: 1;
     min-width: 0;
-    margin-top: -6px;
 }
 
 .ahorroPage .hidden {
@@ -82,7 +79,7 @@
 .ahorroYearList {
     display: flex;
     gap: 4px;
-    max-width: calc(4 * 64px);
+    max-width: calc(4 * 72px);
     overflow-x: auto;
     scrollbar-width: none;
     scroll-behavior: smooth;
@@ -91,32 +88,32 @@
     display: none;
 }
 .ahorroYearBtn {
-    flex: 0 0 60px;
-    min-width: 60px;
-    height: 30px;
+    flex: 0 0 68px;
+    min-width: 68px;
+    height: 34px;
     padding: 0 12px;
-    border: 0;
-    border-radius: 7px;
-    background: transparent;
-    color: var(--text-muted);
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-bright);
     cursor: pointer;
     font-size: 13px;
-    font-weight: 700;
     transition:
         background 0.15s,
-        color 0.15s;
+        border-color 0.15s;
 }
 .ahorroYearBtn:hover {
-    background: var(--btn-bg-hover);
-    color: var(--text-primary);
+    background: var(--bg-elevated);
+    border-color: var(--accent);
 }
 .ahorroYearBtn.sinDatos {
     color: var(--text-dim);
-    font-weight: 600;
 }
 .ahorroYearBtn.active {
-    background: var(--btn-active-bg);
-    color: var(--btn-active-text);
+    background: var(--bg-elevated);
+    border-color: var(--accent);
+    color: var(--text-subtle);
+    box-shadow: inset 0 0 0 1px var(--accent-glow);
 }
 .ahorroConfigBtn {
     display: flex;
@@ -249,10 +246,12 @@
 }
 .ahorroEmpty {
     margin: 0;
-    padding: 24px 0;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 0.86rem;
+    padding: 16px 18px;
+    border: 1px dashed var(--btn-border);
+    border-radius: 8px;
+    background: var(--bg-surface);
+    color: #cbd5e1;
+    font-size: 14px;
 }
 
 /* ── Hero: ahorro del periodo + medidor ───────────────────── */
@@ -858,6 +857,31 @@
     font-weight: 700;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
+}
+
+/* ── Pagos de deudas ──────────────────────────────────────── */
+.ahorroDeudas {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.ahorroDeudas .ahorroDonutLegendRow {
+    padding: 5px 0;
+    font-size: 0.85rem;
+}
+.ahorroDeudasTotal {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-inset);
+    font-weight: 700;
+}
+.ahorroDeudasTotal .ahorroDonutLegendName {
+    color: var(--text-primary);
+}
+.ahorroDeudasVacio {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-dim);
 }
 
 /* ── Observaciones ────────────────────────────────────────── */

@@ -75,7 +75,17 @@
 #addIngresoRowBtn,
 #cuentasAddRowBtn,
 #cuentaAhorroAddRowBtn,
-#mvcAddRowBtn {
+#mvcAddRowBtn,
+#cuentasNuevaCuentaBtn,
+#hipotecasAddBtn,
+#financiadasAddBtn,
+#microcreditosAddBtn,
+#ahorroConfigBtn,
+#pinvCrearBtn,
+#mensAddBtn,
+#recAddBtn,
+#pinvArchivoBtn,
+.alPanelNueva {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -120,7 +130,17 @@
 #addIngresoRowBtn:hover,
 #cuentasAddRowBtn:hover,
 #cuentaAhorroAddRowBtn:hover,
-#mvcAddRowBtn:hover {
+#mvcAddRowBtn:hover,
+#cuentasNuevaCuentaBtn:hover,
+#hipotecasAddBtn:hover,
+#financiadasAddBtn:hover,
+#microcreditosAddBtn:hover,
+#ahorroConfigBtn:hover,
+#pinvCrearBtn:hover,
+#mensAddBtn:hover,
+#recAddBtn:hover,
+#pinvArchivoBtn:hover,
+.alPanelNueva:hover {
     background: linear-gradient(135deg, #1e3a5f 0%, #142640 100%) !important;
     border-color: #4f96f0 !important;
     border-left-color: #60a5fa !important;
@@ -491,6 +511,13 @@
     overscroll-behavior: contain;
     scrollbar-width: none;
     padding-top: 10px;
+}
+
+/* Sin tarjetas el grid (flex: 1) ocupa todo el alto y empuja el aviso de
+   "No hay activos" al fondo; oculto, el aviso queda justo bajo la barra. */
+.activosPage .activosGrid:empty,
+.seguimientoPage .activosGrid:empty {
+    display: none;
 }
 
 .activosPage .activosGrid::-webkit-scrollbar,
@@ -1079,4 +1106,287 @@
     .alertasPrecioAcciones .alertasPrecioBtn {
         flex: 1;
     }
+}
+
+/* ── Pestaña "Mercado" de la ficha ───────────────────────────────────────────
+   Solo variables de tema: sirve igual en claro y en oscuro. Los bloques de
+   rendimiento, rango y fundamentales reutilizan .fnDetail* (fundamentales.css). */
+.mkWrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+}
+
+.mkSectionTitle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 4px 0 0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+}
+
+.mkSectionTitle::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-soft);
+}
+
+.mkGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 6px;
+}
+
+.mkCard {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 8px;
+    row-gap: 1px;
+    padding: 7px 10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-mid);
+    border-radius: 8px;
+}
+
+.mkCardLabel {
+    flex: 0 0 100%;
+    overflow: hidden;
+    font-size: 0.66rem;
+    color: var(--text-dim);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mkCardValue {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.mkCardSub {
+    font-size: 0.66rem;
+    color: var(--text-dim);
+}
+
+.mkChips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.mkChip {
+    padding: 1px 8px;
+    font-size: 0.68rem;
+    color: var(--text-subtle);
+    border: 1px solid var(--border-mid);
+    border-radius: 999px;
+}
+
+.mkSection {
+    padding-top: 10px;
+    border-top: 1px solid var(--border-soft);
+}
+
+.mkMessage {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    background: var(--bg-surface);
+    border: 1px dashed var(--border-mid);
+    border-radius: 10px;
+}
+
+.mkRetryBtn {
+    padding: 4px 12px;
+    font: inherit;
+    color: var(--text-primary);
+    background: transparent;
+    border: 1px solid var(--border-mid);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.mkWrap .fnDetailGrid {
+    gap: 8px 24px;
+}
+
+.mkWrap .fnDetailLine,
+.mkWrap .fnDetailRow2 {
+    padding: 2px 0;
+    font-size: 0.76rem;
+}
+
+.mkWrap .fnDetailColHead {
+    min-height: 20px;
+    margin-bottom: 4px;
+}
+
+@media (max-width: 900px) {
+    .mkWrap .fnDetailGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Datos técnicos de la pestaña Mercado: medidor que abre el popup. */
+/* La columna del medidor se estira a la altura de la fila y el medidor llena el resto. */
+.mkTecGaugeCol {
+    display: flex;
+    flex-direction: column;
+}
+
+.mkTecMedidor {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+    padding: 6px 12px 4px;
+    font: inherit;
+    color: var(--text-primary);
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.mkTecMedidor:hover,
+.mkTecMedidor:focus-visible {
+    border-color: var(--accent);
+}
+
+.mkTecMedidor .detMkGaugeSvg {
+    width: 170px;
+}
+
+.mkTecAmpliar {
+    font-size: 0.66rem;
+    color: var(--accent);
+}
+
+.mkTecSinDatos {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.mkTecModal {
+    max-width: 1000px;
+}
+
+.mkTecCuerpo {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow-y: auto;
+}
+
+.mkTecMedidores {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.mkTecResumen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.mkTecResumen h4,
+.mkTecTabla h4 {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.mkTecRecuento {
+    display: flex;
+    gap: 14px;
+    padding: 4px 12px;
+    background: var(--bg-surface);
+    border-radius: 8px;
+}
+
+.mkTecRecuento span {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.mkTecRecuento small {
+    font-size: 0.66rem;
+    color: var(--text-dim);
+}
+
+.mkTecTablas {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+}
+
+.mkTecTabla table {
+    width: 100%;
+    margin-top: 6px;
+    border-collapse: collapse;
+    font-size: 0.74rem;
+}
+
+.mkTecTabla th,
+.mkTecTabla td {
+    padding: 5px 6px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.mkTecTabla th {
+    font-weight: 500;
+    color: var(--text-dim);
+}
+
+.mkTecTabla .mkTecNum {
+    text-align: right;
+}
+
+.mkTecTabla .mkTecAccion {
+    width: 64px;
+    text-align: right;
+}
+
+.mkTecNeutral {
+    color: var(--text-dim);
+}
+
+.mkTecNota {
+    margin: 0;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+}
+
+@media (max-width: 900px) {
+    .mkTecMedidores,
+    .mkTecTablas {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Llega hasta el final de la pantalla (cabecera y pestañas descontadas) y nunca baja
+   del alto de las tablas de las demás pestañas; si el contenido no cabe, el scroll
+   vertical queda dentro del panel y la página no crece. */
+.assetTabPanel[data-tab="mercado"] {
+    max-height: max(var(--todosTablaAltoMax, 563px), calc(100 * var(--vh) - 285px));
+    overflow-y: auto;
 }

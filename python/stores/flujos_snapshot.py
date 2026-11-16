@@ -33,6 +33,7 @@ import logging
 from decimal import Decimal
 
 from core import dinero
+from core.centimos import importeSql
 
 log = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ def _movimientos(conn):
     """
     for fila in conn.execute(
         "SELECT asset_id, tipo_operacion, participaciones, precio_participacion, "
-        "capital_invertido_bruto, currency, fx_rate FROM activo_rows"
+        f"{importeSql('capital_invertido_bruto')} AS capital_invertido_bruto, currency, fx_rate FROM activo_rows"
     ):
         tipoFila = str(fila["tipo_operacion"] or "").strip().lower()
         if "convertidos" in tipoFila:
@@ -88,7 +89,8 @@ def _movimientos(conn):
         yield [((-1 if tipoFila == "venta" else 1) * importe, fila["currency"], fila["fx_rate"])], ""
 
     for fila in conn.execute(
-        "SELECT asset_id, orden, cantidad, precio_orden, precio_currency, total, comisiones_fiat, currency, fx_rate "
+        "SELECT asset_id, orden, cantidad, precio_orden, precio_currency, "
+        f"{importeSql('total')} AS total, {importeSql('comisiones_fiat')} AS comisiones_fiat, currency, fx_rate "
         "FROM activo_operation_rows WHERE estado = 'Completado'"
     ):
         cantidad = _importe(fila["cantidad"])
@@ -115,7 +117,8 @@ def _movimientos(conn):
         yield [(signo * base[0], base[1], base[2]), (comision, "EUR", "")], ""
 
     for fila in conn.execute(
-        "SELECT id, year, asset_id, cantidad, valor_venta, comision_venta, currency, fx_rate FROM ventas"
+        f"SELECT id, year, asset_id, cantidad, {importeSql('valor_venta')} AS valor_venta, "
+        f"{importeSql('comision_venta')} AS comision_venta, currency, fx_rate FROM ventas"
     ):
         cantidad = _importe(fila["cantidad"])
         precio = _importe(fila["valor_venta"])

@@ -3,9 +3,10 @@ import os
 import re
 
 from core import paths
+from core.centimos import leerImporte, legadoYCentimos
 from core.db import getDb, initDb, transactional
 from core.secret_store import readSecretLines
-from stores import revisiones
+from stores import reinversion_dividendos, revisiones
 
 log = logging.getLogger(__name__)
 
@@ -112,7 +113,8 @@ def readInteresesFile():
     result = []
     for c in cuentas:
         filas = conn.execute(
-            "SELECT fecha, acumulado, impuestos FROM intereses_v2 WHERE cuenta_id = ? ORDER BY id",
+            "SELECT fecha, acumulado, acumulado_cent, impuestos, impuestos_cent FROM intereses_v2 "
+            "WHERE cuenta_id = ? ORDER BY id",
             (c["id"],)
         ).fetchall()
         cuentaId, cuentaNombre = vinculos.get(c["id"], ("", ""))
@@ -120,7 +122,11 @@ def readInteresesFile():
             "id": c["id"],
             "nombre": cuentaNombre or c["nombre"],
             "cuenta": cuentaId,
-            "rows": [{"fecha": r["fecha"], "acumulado": r["acumulado"], "impuestos": r["impuestos"]} for r in filas]
+            "rows": [
+                {"fecha": r["fecha"], "acumulado": leerImporte(r["acumulado_cent"], r["acumulado"]),
+                 "impuestos": leerImporte(r["impuestos_cent"], r["impuestos"])}
+                for r in filas
+            ]
         })
 
     return {"cuentas": result}
@@ -186,8 +192,10 @@ def writeInteresesFile(data):
         rows = cuenta.get("rows", [])
         if rows:
             conn.executemany(
-                "INSERT INTO intereses_v2 (cuenta_id, fecha, acumulado, impuestos) VALUES (?, ?, ?, ?)",
-                [(cid, r.get("fecha", ""), r.get("acumulado", ""), r.get("impuestos", "")) for r in rows]
+                "INSERT INTO intereses_v2 (cuenta_id, fecha, acumulado, acumulado_cent, impuestos, impuestos_cent) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                [(cid, r.get("fecha", ""), *legadoYCentimos(r.get("acumulado", "")),
+                  *legadoYCentimos(r.get("impuestos", ""))) for r in rows]
             )
 
     conn.commit()
@@ -198,7 +206,9 @@ def writeInteresesFile(data):
 def readDividendosFile():
     conn = getDb()
     rows = conn.execute(
-        "SELECT fecha, instrumento, acciones, dividendo_accion, impuestos, total, moneda_dividendo, moneda_total, cuenta FROM dividendos ORDER BY id"
+        "SELECT fecha, instrumento, acciones, dividendo_accion, impuestos, impuestos_cent, total, total_cent, "
+        "moneda_dividendo, moneda_total, cuenta, reinvertido, reinv_participaciones, reinv_precio "
+        "FROM dividendos ORDER BY id"
     ).fetchall()
     return {"rows": [
         {
@@ -206,14 +216,17 @@ def readDividendosFile():
             "instrumento": r["instrumento"],
             "acciones": r["acciones"],
             "dividendoAccion": r["dividendo_accion"],
-            "impuestos": r["impuestos"],
-            "total": r["total"],
+            "impuestos": leerImporte(r["impuestos_cent"], r["impuestos"]),
+            "total": leerImporte(r["total_cent"], r["total"]),
             # Ojo: `r` es un sqlite3.Row, no un dict. `"x" in r` busca entre los
             # VALORES de la fila, así que quitar .keys() cambiaría el significado
             # y devolvería el fallback casi siempre (de ahí el noqa: SIM118).
             "monedaDividendo": r["moneda_dividendo"] if "moneda_dividendo" in r.keys() else "USD",  # noqa: SIM118
             "monedaTotal": r["moneda_total"] if "moneda_total" in r.keys() else "EUR",  # noqa: SIM118
             "cuenta": r["cuenta"] or "",
+            "reinvertido": bool(r["reinvertido"]),
+            "reinvParticipaciones": r["reinv_participaciones"],
+            "reinvPrecio": r["reinv_precio"],
         }
         for r in rows
     ]}
@@ -224,14 +237,25 @@ def writeDividendosFile(data):
     conn = getDb()
     conn.execute("DELETE FROM dividendos")
     conn.executemany(
-        "INSERT INTO dividendos (fecha, instrumento, acciones, dividendo_accion, impuestos, total, moneda_dividendo, moneda_total, cuenta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO dividendos (fecha, instrumento, acciones, dividendo_accion, impuestos, impuestos_cent, "
+        "total, total_cent, moneda_dividendo, moneda_total, cuenta, "
+        "reinvertido, reinv_participaciones, reinv_precio) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("fecha", ""), r.get("instrumento", ""), r.get("acciones", ""),
-             r.get("dividendoAccion", ""), r.get("impuestos", ""), r.get("total", ""),
-             r.get("monedaDividendo", "USD"), r.get("monedaTotal", "EUR"), r.get("cuenta", ""))
+             r.get("dividendoAccion", ""),
+             *legadoYCentimos(r.get("impuestos", ""), r.get("monedaTotal", "EUR")),
+             *legadoYCentimos(r.get("total", ""), r.get("monedaTotal", "EUR")),
+             r.get("monedaDividendo", "USD"), r.get("monedaTotal", "EUR"), r.get("cuenta", ""),
+             1 if r.get("reinvertido") else 0,
+             r.get("reinvParticipaciones", "") if r.get("reinvertido") else "",
+             r.get("reinvPrecio", "") if r.get("reinvertido") else "")
             for r in data.get("rows", [])
         ]
     )
+    # En la misma transacción: si falla el volcado a las fichas, los dividendos
+    # no se quedan guardados con compras que no existen.
+    reinversion_dividendos.sincronizar(conn)
     conn.commit()
 
 
@@ -241,8 +265,8 @@ def readOperacionesFile():
     conn = getDb()
     rows = conn.execute(
         "SELECT id, asset_id, activo, fecha_apertura, par, stablecoin_symbol, orden, "
-        "precio_orden, precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre "
-        "FROM operaciones ORDER BY rowid"
+        "precio_orden, precio_currency, cantidad, comisiones_cripto, comisiones_fiat, comisiones_fiat_cent, "
+        "total, total_cent, currency, estado, fecha_cierre FROM operaciones ORDER BY rowid"
     ).fetchall()
     return {"rows": [
         {
@@ -257,8 +281,8 @@ def readOperacionesFile():
             "precioCurrency": r["precio_currency"],
             "cantidad": r["cantidad"],
             "comisionesCripto": r["comisiones_cripto"],
-            "comisionesFiat": r["comisiones_fiat"],
-            "total": r["total"],
+            "comisionesFiat": leerImporte(r["comisiones_fiat_cent"], r["comisiones_fiat"]),
+            "total": leerImporte(r["total_cent"], r["total"]),
             "currency": r["currency"],
             "estado": r["estado"],
             "fechaCierre": r["fecha_cierre"],
@@ -276,14 +300,16 @@ def writeOperacionesFile(data, revisionEsperada=None):
     conn.executemany(
         "INSERT INTO operaciones "
         "(id, asset_id, activo, fecha_apertura, par, stablecoin_symbol, orden, precio_orden, "
-        "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, comisiones_fiat_cent, total, "
+        "total_cent, currency, estado, fecha_cierre) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("id", ""), r.get("assetId", ""), r.get("activo", ""),
              r.get("fechaApertura", ""), r.get("par", ""), r.get("stablecoinSymbol", ""),
              r.get("orden", "Compra"), r.get("precioOrden", ""), r.get("precioCurrency", "EUR"),
-             r.get("cantidad", ""), r.get("comisionesCripto", ""), r.get("comisionesFiat", ""),
-             r.get("total", ""),
+             r.get("cantidad", ""), r.get("comisionesCripto", ""),
+             *legadoYCentimos(r.get("comisionesFiat", ""), r.get("currency", "EUR")),
+             *legadoYCentimos(r.get("total", ""), r.get("currency", "EUR")),
              r.get("currency", "EUR"), r.get("estado", "Activo"), r.get("fechaCierre", ""))
             for r in data.get("rows", [])
         ]
@@ -296,7 +322,8 @@ def writeOperacionesFile(data, revisionEsperada=None):
 def readTradingFile():
     conn = getDb()
     rows = conn.execute(
-        "SELECT id, fecha, tipo, moneda, direccion, resultado, capital, capital_currency, roi, ganancia, ganancia_neta FROM trading ORDER BY rowid"
+        "SELECT id, fecha, tipo, moneda, direccion, resultado, capital, capital_cent, capital_currency, roi, "
+        "ganancia, ganancia_cent, ganancia_neta, ganancia_neta_cent FROM trading ORDER BY rowid"
     ).fetchall()
     return {"rows": [
         {
@@ -306,11 +333,11 @@ def readTradingFile():
             "moneda": r["moneda"],
             "direccion": r["direccion"],
             "resultado": r["resultado"],
-            "capital": r["capital"],
+            "capital": leerImporte(r["capital_cent"], r["capital"]),
             "capital_currency": r["capital_currency"],
             "roi": r["roi"],
-            "ganancia": r["ganancia"],
-            "ganancia_neta": r["ganancia_neta"],
+            "ganancia": leerImporte(r["ganancia_cent"], r["ganancia"]),
+            "ganancia_neta": leerImporte(r["ganancia_neta_cent"], r["ganancia_neta"]),
         }
         for r in rows
     ]}
@@ -323,12 +350,16 @@ def writeTradingFile(data, revisionEsperada=None):
     _abrirEscritura(conn, "trading", revisionEsperada)
     conn.execute("DELETE FROM trading")
     conn.executemany(
-        "INSERT INTO trading (id, fecha, tipo, moneda, direccion, resultado, capital, capital_currency, roi, ganancia, ganancia_neta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO trading (id, fecha, tipo, moneda, direccion, resultado, capital, capital_cent, "
+        "capital_currency, roi, ganancia, ganancia_cent, ganancia_neta, ganancia_neta_cent) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("id", ""), r.get("fecha", ""), r.get("tipo", "SCALP"),
              r.get("moneda", ""), r.get("direccion", "LONG"), r.get("resultado", "PROFIT"),
-             r.get("capital", ""), r.get("capital_currency", "EUR"), r.get("roi", ""), r.get("ganancia", ""),
-             r.get("ganancia_neta", ""))
+             *legadoYCentimos(r.get("capital", ""), r.get("capital_currency", "EUR")),
+             r.get("capital_currency", "EUR"), r.get("roi", ""),
+             *legadoYCentimos(r.get("ganancia", ""), r.get("capital_currency", "EUR")),
+             *legadoYCentimos(r.get("ganancia_neta", ""), r.get("capital_currency", "EUR")))
             for r in data.get("rows", [])
         ]
     )
@@ -451,14 +482,14 @@ def readStablecoinsFile():
             "tipo": r["tipo"],
             "cantidad": r["cantidad"],
             "precio": r["precio"],
-            "total": r["total"],
-            "comisiones": r["comisiones"],
+            "total": leerImporte(r["total_cent"], r["total"]),
+            "comisiones": leerImporte(r["comisiones_cent"], r["comisiones"]),
             "currency": r["currency"],
             "nota": r["nota"],
         }
         for r in conn.execute(
-            "SELECT id, stablecoin_symbol, fecha, tipo, cantidad, precio, total, comisiones, currency, nota "
-            "FROM stablecoins_rows ORDER BY rowid"
+            "SELECT id, stablecoin_symbol, fecha, tipo, cantidad, precio, total, total_cent, comisiones, "
+            "comisiones_cent, currency, nota FROM stablecoins_rows ORDER BY rowid"
         ).fetchall()
     ]
     return {"catalog": catalog, "enabledSymbols": enabled, "rows": rows}
@@ -487,12 +518,14 @@ def writeStablecoinsFile(data, revisionEsperada=None):
     )
     conn.executemany(
         "INSERT INTO stablecoins_rows "
-        "(id, stablecoin_symbol, fecha, tipo, cantidad, precio, total, comisiones, currency, nota) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "(id, stablecoin_symbol, fecha, tipo, cantidad, precio, total, total_cent, comisiones, "
+        "comisiones_cent, currency, nota) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("id", ""), r.get("stablecoinSymbol", ""), r.get("fecha", ""),
              r.get("tipo", "Compra"), r.get("cantidad", ""), r.get("precio", ""),
-             r.get("total", ""), r.get("comisiones", ""), r.get("currency", "USD"), r.get("nota", ""))
+             *legadoYCentimos(r.get("total", ""), r.get("currency", "USD")),
+             *legadoYCentimos(r.get("comisiones", ""), r.get("currency", "USD")),
+             r.get("currency", "USD"), r.get("nota", ""))
             for r in data.get("rows", [])
         ]
     )
@@ -504,7 +537,8 @@ def writeStablecoinsFile(data, revisionEsperada=None):
 def readRentaFijaFile():
     conn = getDb()
     rows = conn.execute(
-        "SELECT fecha, tipo, currency, instrumento, rentabilidad, vencimiento, invertido, interes_acumulado, impuestos "
+        "SELECT fecha, tipo, currency, instrumento, rentabilidad, vencimiento, invertido, invertido_cent, "
+        "interes_acumulado, interes_acumulado_cent, impuestos, impuestos_cent "
         "FROM renta_fija ORDER BY id"
     ).fetchall()
     return {"rows": [
@@ -515,9 +549,9 @@ def readRentaFijaFile():
             "instrumento": r["instrumento"],
             "rentabilidad": r["rentabilidad"],
             "vencimiento": r["vencimiento"],
-            "invertido": r["invertido"],
-            "interesAcumulado": r["interes_acumulado"],
-            "impuestos": r["impuestos"],
+            "invertido": leerImporte(r["invertido_cent"], r["invertido"]),
+            "interesAcumulado": leerImporte(r["interes_acumulado_cent"], r["interes_acumulado"]),
+            "impuestos": leerImporte(r["impuestos_cent"], r["impuestos"]),
         }
         for r in rows
     ]}
@@ -528,12 +562,15 @@ def writeRentaFijaFile(data):
     conn = getDb()
     conn.execute("DELETE FROM renta_fija")
     conn.executemany(
-        "INSERT INTO renta_fija (fecha, tipo, currency, instrumento, rentabilidad, vencimiento, invertido, interes_acumulado, impuestos) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO renta_fija (fecha, tipo, currency, instrumento, rentabilidad, vencimiento, invertido, "
+        "invertido_cent, interes_acumulado, interes_acumulado_cent, impuestos, impuestos_cent) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("fecha", ""), r.get("tipo", "bancario"), r.get("currency", "EUR"),
              r.get("instrumento", ""), r.get("rentabilidad", ""), r.get("vencimiento", ""),
-             r.get("invertido", ""), r.get("interesAcumulado", ""), r.get("impuestos", ""))
+             *legadoYCentimos(r.get("invertido", ""), r.get("currency", "EUR")),
+             *legadoYCentimos(r.get("interesAcumulado", ""), r.get("currency", "EUR")),
+             *legadoYCentimos(r.get("impuestos", ""), r.get("currency", "EUR")))
             for r in data.get("rows", [])
         ]
     )
@@ -545,7 +582,8 @@ def writeRentaFijaFile(data):
 def readBonosFile():
     conn = getDb()
     rows = conn.execute(
-        "SELECT fecha, tipo, currency, instrumento, cupon, vencimiento, invertido, interes_acumulado, impuestos, nota "
+        "SELECT fecha, tipo, currency, instrumento, cupon, vencimiento, invertido, invertido_cent, "
+        "interes_acumulado, interes_acumulado_cent, impuestos, impuestos_cent, nota "
         "FROM bonos ORDER BY id"
     ).fetchall()
     return {"rows": [
@@ -556,9 +594,9 @@ def readBonosFile():
             "instrumento": r["instrumento"],
             "cupon": r["cupon"],
             "vencimiento": r["vencimiento"],
-            "invertido": r["invertido"],
-            "interesAcumulado": r["interes_acumulado"],
-            "impuestos": r["impuestos"],
+            "invertido": leerImporte(r["invertido_cent"], r["invertido"]),
+            "interesAcumulado": leerImporte(r["interes_acumulado_cent"], r["interes_acumulado"]),
+            "impuestos": leerImporte(r["impuestos_cent"], r["impuestos"]),
             "nota": r["nota"],
         }
         for r in rows
@@ -570,12 +608,15 @@ def writeBonosFile(data):
     conn = getDb()
     conn.execute("DELETE FROM bonos")
     conn.executemany(
-        "INSERT INTO bonos (fecha, tipo, currency, instrumento, cupon, vencimiento, invertido, interes_acumulado, impuestos, nota) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO bonos (fecha, tipo, currency, instrumento, cupon, vencimiento, invertido, invertido_cent, "
+        "interes_acumulado, interes_acumulado_cent, impuestos, impuestos_cent, nota) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("fecha", ""), r.get("tipo", "gubernamental"), r.get("currency", "EUR"),
              r.get("instrumento", ""), r.get("cupon", ""), r.get("vencimiento", ""),
-             r.get("invertido", ""), r.get("interesAcumulado", ""), r.get("impuestos", ""), r.get("nota", ""))
+             *legadoYCentimos(r.get("invertido", ""), r.get("currency", "EUR")),
+             *legadoYCentimos(r.get("interesAcumulado", ""), r.get("currency", "EUR")),
+             *legadoYCentimos(r.get("impuestos", ""), r.get("currency", "EUR")), r.get("nota", ""))
             for r in data.get("rows", [])
         ]
     )
@@ -683,7 +724,8 @@ def writeEarnFile(data):
 def readPrivateMarketFile():
     conn = getDb()
     rows = conn.execute(
-        "SELECT fecha, tipo, nombre, gestor, vintage, currency, comprometido, llamado, distribuido, valor_actual, nota "
+        "SELECT fecha, tipo, nombre, gestor, vintage, currency, comprometido, comprometido_cent, llamado, "
+        "llamado_cent, distribuido, distribuido_cent, valor_actual, valor_actual_cent, nota "
         "FROM private_market ORDER BY id"
     ).fetchall()
     return {"rows": [
@@ -694,10 +736,10 @@ def readPrivateMarketFile():
             "gestor":       r["gestor"],
             "vintage":      r["vintage"],
             "currency":     r["currency"],
-            "comprometido": r["comprometido"],
-            "llamado":      r["llamado"],
-            "distribuido":  r["distribuido"],
-            "valorActual":  r["valor_actual"],
+            "comprometido": leerImporte(r["comprometido_cent"], r["comprometido"]),
+            "llamado":      leerImporte(r["llamado_cent"], r["llamado"]),
+            "distribuido":  leerImporte(r["distribuido_cent"], r["distribuido"]),
+            "valorActual":  leerImporte(r["valor_actual_cent"], r["valor_actual"]),
             "nota":         r["nota"],
         }
         for r in rows
@@ -709,13 +751,16 @@ def writePrivateMarketFile(data):
     conn = getDb()
     conn.execute("DELETE FROM private_market")
     conn.executemany(
-        "INSERT INTO private_market (fecha, tipo, nombre, gestor, vintage, currency, comprometido, llamado, distribuido, valor_actual, nota) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO private_market (fecha, tipo, nombre, gestor, vintage, currency, comprometido, "
+        "comprometido_cent, llamado, llamado_cent, distribuido, distribuido_cent, valor_actual, "
+        "valor_actual_cent, nota) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("fecha", ""), r.get("tipo", "pe"), r.get("nombre", ""),
              r.get("gestor", ""), r.get("vintage", ""), r.get("currency", "EUR"),
-             r.get("comprometido", ""), r.get("llamado", ""), r.get("distribuido", ""),
-             r.get("valorActual", ""), r.get("nota", ""))
+             *legadoYCentimos(r.get("comprometido", ""), r.get("currency", "EUR")),
+             *legadoYCentimos(r.get("llamado", ""), r.get("currency", "EUR")),
+             *legadoYCentimos(r.get("distribuido", ""), r.get("currency", "EUR")),
+             *legadoYCentimos(r.get("valorActual", ""), r.get("currency", "EUR")), r.get("nota", ""))
             for r in data.get("rows", [])
         ]
     )

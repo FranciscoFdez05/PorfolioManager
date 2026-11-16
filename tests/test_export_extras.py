@@ -240,6 +240,59 @@ def testUnaContraseñaVacíaEsNoPonerContraseña(clienteAutenticado, bpAjustes, 
     assert exportables.FICHERO_CLAVES in _nombres(res.data)
 
 
+# ── Wallets de Seguimiento ────────────────────────────────────────────────────
+
+_WALLETS = {"walletsSeguimiento": {"porPortfolio": {"main": {"wallets": {"version": 1, "wallets": ["w"]}}}}}
+
+
+@pytest.fixture
+def walletsFalsas(monkeypatch):
+    monkeypatch.setattr(exportables, "clavesEnClaro", lambda: {"finnhub": ["clave-de-verdad"]})
+    monkeypatch.setattr(exportables, "soloWallets", lambda: json.loads(json.dumps(_WALLETS)))
+
+
+def testSinLaCasillaDeWalletsNoVanLasWallets(clienteAutenticado, bpAjustes, walletsFalsas):
+    client, cab, _app = clienteAutenticado(bpAjustes)
+
+    res = client.post("/api/export/zip", headers=cab, json={"incluirClaves": True})
+
+    with zipfile.ZipFile(io.BytesIO(res.data)) as zf:
+        claves = json.loads(zf.read(exportables.FICHERO_CLAVES))
+    assert "walletsSeguimiento" not in claves
+
+
+def testLasWalletsSolasVanEnClaroSinContraseña(clienteAutenticado, bpAjustes, walletsFalsas):
+    client, cab, _app = clienteAutenticado(bpAjustes)
+
+    res = client.post("/api/export/zip", headers=cab, json={"incluirWallets": True})
+
+    with zipfile.ZipFile(io.BytesIO(res.data)) as zf:
+        claves = json.loads(zf.read(exportables.FICHERO_CLAVES))
+    # Sin la casilla de las APIs no sale ninguna clave de proveedor.
+    assert claves == _WALLETS
+
+
+def testWalletsYClavesVanJuntasYCifradasConContraseña(clienteAutenticado, bpAjustes, walletsFalsas):
+    client, cab, _app = clienteAutenticado(bpAjustes)
+
+    res = client.post("/api/export/zip", headers=cab,
+                      json={"incluirClaves": True, "incluirWallets": True, "contrasena": "secreta"})
+
+    with zipfile.ZipFile(io.BytesIO(res.data)) as zf:
+        assert exportables.FICHERO_CLAVES not in zf.namelist()
+        paquete = json.loads(zf.read(exportables.FICHERO_CLAVES_CIFRADAS))
+    assert exportables.descifrarClaves(paquete, "secreta") == {"finnhub": ["clave-de-verdad"], **_WALLETS}
+
+
+def testSinWalletsQueCopiarNoSeMeteUnFicheroVacío(clienteAutenticado, bpAjustes, monkeypatch):
+    monkeypatch.setattr(exportables, "soloWallets", lambda: {})
+    client, cab, _app = clienteAutenticado(bpAjustes)
+
+    res = client.post("/api/export/zip", headers=cab, json={"incluirWallets": True})
+
+    assert exportables.FICHERO_CLAVES not in _nombres(res.data)
+
+
 def _zipConClavesCifradas(contrasena="secreta"):
     """Un ZIP de export mínimo: ajustes.json (para que valga) y las claves."""
     buf = io.BytesIO()

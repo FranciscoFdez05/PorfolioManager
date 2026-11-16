@@ -143,7 +143,9 @@ describe("pintado", () => {
     }
 
     it("rellena la tarjeta y las dos gráficas del año elegido", () => {
-        cargarCuenta([fila("01-01-2025", "1,00", "0,20"), fila("01-02-2025", "3,00", "0,60")])
+        // La cuenta se abre en el año en curso: los registros tienen que ser de ese año.
+        const anio = new Date().getFullYear()
+        cargarCuenta([fila(`01-01-${anio}`, "1,00", "0,20"), fila(`01-02-${anio}`, "3,00", "0,60")])
 
         expect(document.getElementById("interesesGraficas").classList.contains("hidden")).toBe(false)
         expect(document.getElementById("interesesStatsCard").classList.contains("hidden")).toBe(false)

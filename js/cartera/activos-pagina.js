@@ -261,6 +261,8 @@ function avRender() {
     const tableWrap = document.getElementById("activosTableWrap")
     if (_activosViewMode === "table") {
         if (gridEl) gridEl.classList.add("hidden")
+        const activosGridEmpty = document.getElementById("activosGridEmpty")
+        if (activosGridEmpty) activosGridEmpty.classList.add("hidden")
         if (tableWrap) tableWrap.classList.remove("hidden")
         avRenderTable()
     } else {

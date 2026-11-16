@@ -26,6 +26,7 @@ const PN_METRICAS = [
     { clave: "kpi:2", titulo: "Ingresos pasivos (indicadores)", grupo: "Finanzas" },
     { clave: "mSectionDividendos", titulo: "Dividendos", grupo: "Finanzas" },
     { clave: "mSectionDivMensual", titulo: "Dividendos por mes", grupo: "Finanzas" },
+    { clave: "mSectionDivReinvertidos", titulo: "Dividendos reinvertidos", grupo: "Finanzas" },
     { clave: "mSectionIntereses", titulo: "Cuenta remunerada", grupo: "Finanzas" },
     { clave: "mSectionPasivosEvol", titulo: "Ingresos pasivos", grupo: "Finanzas" },
     { clave: "kpiRentaFija", titulo: "Renta fija (indicadores)", grupo: "Finanzas" },

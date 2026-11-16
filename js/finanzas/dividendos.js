@@ -268,7 +268,9 @@ function compareDividendosByDate(left, right) {
 }
 
 function getDividendosYears(rows) {
-    const years = new Set()
+    // El año en curso siempre está disponible: es el que se abre por defecto,
+    // aunque aún no tenga dividendos (o no haya ninguno).
+    const years = new Set([String(new Date().getFullYear())])
     rows.forEach((r) => {
         const y = parseDividendoYear(r.fecha)
         if (y) years.add(y)
@@ -334,12 +336,55 @@ function closeDividendosModal() {
     }
 }
 
-function openDividendosModal(globalIndex = -1, defaultFecha = "") {
+// Primer paso al añadir: se elige si es un ingreso normal o una reinversión,
+// y el formulario se abre ya con esa decisión tomada.
+function openDividendosTipoModal(defaultFecha = "") {
+    closeDividendosModal()
+
+    const overlay = document.createElement("div")
+    overlay.id = "dividendosModalOverlay"
+    overlay.className = "modalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal"
+    modal.setAttribute("role", "dialog")
+    modal.setAttribute("aria-modal", "true")
+    modal.innerHTML = `
+        <h3 class="assetModalTitle">Añadir dividendo</h3>
+        <p class="cuentasHint">¿Qué quieres añadir?</p>
+        <div class="assetModalActions dividendosModalActions">
+            <button type="button" class="cancelButton" id="dividendosTipoCancelBtn">Cancelar</button>
+            <button type="button" class="primaryButton" id="dividendosTipoIngresoBtn" data-no-autohide="true">Ingreso</button>
+            <button type="button" class="primaryButton" id="dividendosTipoReinversionBtn" data-no-autohide="true">Reinversión</button>
+        </div>
+    `
+
+    modal.querySelector("#dividendosTipoCancelBtn")?.addEventListener("click", closeDividendosModal)
+    modal
+        .querySelector("#dividendosTipoIngresoBtn")
+        ?.addEventListener("click", () => openDividendosModal(-1, defaultFecha, false))
+    modal
+        .querySelector("#dividendosTipoReinversionBtn")
+        ?.addEventListener("click", () => openDividendosModal(-1, defaultFecha, true))
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+
+    dividendosModalKeyHandler = (event) => {
+        if (event.key === "Escape") closeDividendosModal()
+    }
+    document.addEventListener("keydown", dividendosModalKeyHandler)
+
+    modal.querySelector("#dividendosTipoIngresoBtn")?.focus()
+}
+
+function openDividendosModal(globalIndex = -1, defaultFecha = "", esReinversion = false) {
     closeDividendosModal()
 
     const isEdit = globalIndex >= 0
     const rowData = isEdit ? { ..._allDividendosRows[globalIndex] } : {}
     if (!isEdit && defaultFecha) rowData.fecha = defaultFecha
+    if (!isEdit && esReinversion) rowData.reinvertido = true
 
     const overlay = document.createElement("div")
     overlay.id = "dividendosModalOverlay"
@@ -377,6 +422,13 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
         <input id="dividendoImpuestosInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.impuestos || "")}" placeholder="0,00">
         <label class="assetModalLabel" for="dividendoTotalInput">Total</label>
         <input id="dividendoTotalInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.total || "")}" placeholder="0,00">
+        <label class="assetModalLabel dividendoReinvLabel" for="dividendoReinvertidoInput">Reinvertir automáticamente</label>
+        <input id="dividendoReinvertidoInput" class="dividendoReinvCheck" type="checkbox"${rowData.reinvertido ? " checked" : ""}>
+        <label class="assetModalLabel dividendoReinvCampo" for="dividendoReinvParticipacionesInput">Participaciones compradas</label>
+        <input id="dividendoReinvParticipacionesInput" class="assetModalInput dividendoReinvCampo" type="text" inputmode="decimal" value="${escapeHtml(rowData.reinvParticipaciones ? formatShareQuantity(rowData.reinvParticipaciones) : "")}" placeholder="0">
+        <label class="assetModalLabel dividendoReinvCampo" for="dividendoReinvPrecioInput">Precio de compra</label>
+        <input id="dividendoReinvPrecioInput" class="assetModalInput dividendoReinvCampo" type="text" inputmode="decimal" value="${escapeHtml(rowData.reinvPrecio ? String(rowData.reinvPrecio).replace(".", ",") : "")}" placeholder="0,00">
+        <p class="cuentasHint dividendoReinvCampo">Se añade a la ficha del activo como compra «Reinvertido» y entra en el cálculo FIFO. El precio va en la divisa del activo.</p>
         <p class="gastosCreateModalFeedback hidden" id="dividendosModalFeedback"></p>
         <div class="assetModalActions dividendosModalActions">
             <button type="button" class="cancelButton" id="dividendosModalCancelBtn">Cancelar</button>
@@ -416,6 +468,32 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
 
         const cuenta = modal.querySelector("#dividendoCuentaInput")?.value || ""
 
+        // Lo tecleado se guarda en canónico: el servidor lo lee con dinero.aDecimal
+        // y la compra que genera entra en el FIFO, así que no admite a medias.
+        const reinvertido = Boolean(modal.querySelector("#dividendoReinvertidoInput")?.checked)
+        const reinvParticipaciones = reinvertido
+            ? toCanonicalNumber(modal.querySelector("#dividendoReinvParticipacionesInput")?.value.trim() || "")
+            : ""
+        const reinvPrecio = reinvertido
+            ? toCanonicalNumber(modal.querySelector("#dividendoReinvPrecioInput")?.value.trim() || "")
+            : ""
+
+        if (reinvertido) {
+            if (!instrumento) {
+                setFeedback("Elige el instrumento que se reinvierte.", true)
+                return
+            }
+            const partesFecha = splitDividendoFecha(fecha)
+            if (!partesFecha?.dia || !partesFecha.mes || !partesFecha.anio) {
+                setFeedback("La reinversión necesita la fecha completa (dd-mm-aaaa).", true)
+                return
+            }
+            if (!(Number(reinvParticipaciones) > 0) || !(Number(reinvPrecio) > 0)) {
+                setFeedback("Indica las participaciones compradas y el precio de compra.", true)
+                return
+            }
+        }
+
         const nextRow = {
             fecha,
             cuenta,
@@ -425,7 +503,10 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
             impuestos,
             total,
             monedaDividendo,
-            monedaTotal
+            monedaTotal,
+            reinvertido,
+            reinvParticipaciones,
+            reinvPrecio
         }
 
         if (isEdit) {
@@ -456,6 +537,19 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
     // Después de las dos columnas: el buscador envuelve el <select> y, si va
     // antes, la etiqueta deja de tener el campo al lado y queda fuera de la rejilla.
     initSearchableSelect(modal.querySelector("#dividendoInstrumentoInput"))
+
+    // Los campos de la reinversión solo se ven con la casilla marcada. Se oculta
+    // el contenedor de la rejilla, no el input: si no, la etiqueta se queda sola.
+    const reinvCheck = modal.querySelector("#dividendoReinvertidoInput")
+    const mostrarCamposReinversion = () => {
+        modal.querySelectorAll(".dividendoReinvCampo").forEach((el) => {
+            ;(el.closest(".modalCampo") || el).classList.toggle("hidden", !reinvCheck.checked)
+        })
+    }
+    reinvCheck?.addEventListener("change", mostrarCamposReinversion)
+    if (reinvCheck) mostrarCamposReinversion()
+    // Al añadir, el tipo ya se eligió en el paso anterior: la casilla sobra.
+    if (reinvCheck && !isEdit) (reinvCheck.closest(".modalCampo") || reinvCheck).classList.add("hidden")
     overlay.appendChild(modal)
     document.body.appendChild(overlay)
 
@@ -498,13 +592,14 @@ async function renderDividendosTable() {
     _dividendosAssets = assetsList.filter((a) => a.type === "acciones" || a.type === "etfs")
     bindDividendosCuentasActions()
     renderDividendosRowsFromData(dividendosData)
+    renderDividendosPasivos()
 }
 
 function renderDividendosRowsFromData(dividendosData) {
     _allDividendosRows = Array.isArray(dividendosData?.rows) ? dividendosData.rows : []
 
     const years = getDividendosYears(_allDividendosRows)
-    if (!currentDividendosYear && years.length) currentDividendosYear = years[years.length - 1]
+    if (!currentDividendosYear) currentDividendosYear = String(new Date().getFullYear())
     renderDividendosYearBar(years)
     renderFilteredDividendos()
 }
@@ -619,7 +714,11 @@ function buildDividendosRow(rowData, globalIndex) {
     rowElement.dataset.mes = parseDividendoMonth(rowData.fecha) || DIVIDENDOS_SIN_FECHA
     rowElement.innerHTML = `
         <td data-field="fecha">${escapeHtml(rowData.fecha || "")}</td>
-        <td data-field="instrumento">${escapeHtml(rowData.instrumento || "")}</td>
+        <td data-field="instrumento">${escapeHtml(rowData.instrumento || "")}${
+            rowData.reinvertido
+                ? ` <span class="dividendoReinvTag" title="Reinvertido: ${escapeHtml(formatShareQuantity(rowData.reinvParticipaciones))} participaciones a ${escapeHtml(String(rowData.reinvPrecio).replace(".", ","))}">Reinvertido</span>`
+                : ""
+        }</td>
         <td data-field="acciones">${formatShareQuantity(rowData.acciones)}</td>
         <td data-field="dividendoAccion">${formatCellMoneyValue(rowData.dividendoAccion, mdiv)}</td>
         <td data-field="impuestos">${formatCellMoneyValue(rowData.impuestos, mtot)}</td>
@@ -695,6 +794,53 @@ function collectDividendosDataFromTable() {
     return { rows: _allDividendosRows }
 }
 
+// Resumen de ingresos pasivos (últimos 12 meses). Lo calcula el servidor, que
+// conoce el coste de cada activo; aquí solo se pinta. Si falla, el resto de la
+// ventana sigue funcionando: es un complemento, no la tabla.
+const DIVIDENDOS_PASIVOS_MAX_ACTIVOS = 5
+
+function formatDividendosPorcentaje(valor) {
+    return valor === null || valor === undefined
+        ? "—"
+        : `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor)} %`
+}
+
+function renderDividendosPasivosDatos(resumen) {
+    const fijar = (id, texto) => {
+        const el = document.getElementById(id)
+        if (el) el.textContent = texto
+    }
+    fijar("pasivosTotal12m", formatEuro(resumen.ultimos12Meses))
+    fijar("pasivosMediaMensual", formatEuro(resumen.mediaMensual))
+    fijar("pasivosYieldOnCost", formatDividendosPorcentaje(resumen.yieldOnCostGlobal))
+
+    const lista = document.getElementById("dividendosPasivosLista")
+    if (lista) {
+        lista.innerHTML = (resumen.porActivo || [])
+            .slice(0, DIVIDENDOS_PASIVOS_MAX_ACTIVOS)
+            .map(
+                (a) =>
+                    `<li class="dividendosPasivosItem"><span title="${escapeHtml(a.instrumento)}">${escapeHtml(a.instrumento)}</span><span>${escapeHtml(formatEuro(a.cobrado12m))} · ${escapeHtml(formatDividendosPorcentaje(a.yieldOnCost))}</span></li>`
+            )
+            .join("")
+    }
+
+    const notas = ["Proyección a 12 meses: lo cobrado en el último año."]
+    if (resumen.sinFecha) {
+        notas.push(`${resumen.sinFecha} sin fecha completa, fuera del cálculo.`)
+    }
+    fijar("dividendosPasivosNota", notas.join(" "))
+}
+
+async function renderDividendosPasivos() {
+    if (!document.getElementById("dividendosPasivos")) return
+    try {
+        renderDividendosPasivosDatos(await Api.get("/api/dividendos/resumen"))
+    } catch (error) {
+        console.error("No se pudo cargar el resumen de ingresos pasivos:", error)
+    }
+}
+
 async function saveDividendosDataToServer() {
     const data = collectDividendosDataFromTable()
 
@@ -710,6 +856,7 @@ async function saveDividendosDataToServer() {
         const errorText = await response.text()
         throw new Error(`HTTP ${response.status}: ${errorText}`)
     }
+    renderDividendosPasivos()
 }
 
 const _divRateCache = new Map()
@@ -777,14 +924,14 @@ function addNewDividendosRow() {
     // la fila que se está apuntando sea de él.
     const fechaPorDefecto =
         currentDividendosMonth && currentDividendosYear ? `01-${currentDividendosMonth}-${currentDividendosYear}` : ""
-    openDividendosModal(-1, fechaPorDefecto)
+    openDividendosTipoModal(fechaPorDefecto)
 }
 
 function addDividendosYear() {
     openYearModal({
         title: "Añadir año",
         submitLabel: "Continuar",
-        onConfirm: (yearStr) => openDividendosModal(-1, `01-01-${yearStr}`)
+        onConfirm: (yearStr) => openDividendosTipoModal(`01-01-${yearStr}`)
     })
 }
 
@@ -949,7 +1096,7 @@ function buildCalendarioCell(month, names, assets) {
                     <option value="">Añadir acción...</option>
                     ${optionsHtml}
                 </select>
-                <button type="button" class="calAddBtn" data-month="${month}">+</button>
+                <button type="button" class="calAddBtn" data-month="${month}">Añadir</button>
             </div>
         </td>
     `

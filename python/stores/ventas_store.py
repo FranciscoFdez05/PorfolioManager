@@ -9,6 +9,7 @@ nunca la fuente de verdad. Antes el POST aceptaba esos importes tal cual venían
 del navegador y los escribía sin mirarlos.
 """
 
+from core.centimos import leerImporte, legadoYCentimos
 from core.db import getDb, transactional
 from core.errors import ValidationError
 from stores import revisiones, ventas_fifo
@@ -87,14 +88,15 @@ def _filaBase(r):
         "assetId": r["asset_id"],
         "activo": r["activo"],
         "cantidad": r["cantidad"],
-        "valorVenta": r["valor_venta"],
-        "comisionVenta": r["comision_venta"],
+        "valorVenta": leerImporte(r["valor_venta_cent"], r["valor_venta"]),
+        "comisionVenta": leerImporte(r["comision_venta_cent"], r["comision_venta"]),
         "currency": r["currency"],
     }
 
 
 _SELECT_BASE = (
-    "SELECT id, year, fecha, asset_id, activo, cantidad, valor_venta, comision_venta, currency "
+    "SELECT id, year, fecha, asset_id, activo, cantidad, valor_venta, valor_venta_cent, comision_venta, "
+    "comision_venta_cent, currency "
     "FROM ventas"
 )
 
@@ -191,20 +193,26 @@ def writeVentasYear(year, data, revisionEsperada=None):
 
     conn.execute("INSERT OR IGNORE INTO ventas_years (year) VALUES (?)", (normalized,))
     conn.execute("DELETE FROM ventas WHERE year = ?", (normalized,))
+    filasVentas = []
+    for r in data.get("rows", []):
+        moneda = (monedasPrevias.get((r.get("id", ""), r.get("assetId", "")))
+                  or monedasActivos.get(r.get("assetId", "")) or "EUR")
+        # Solo las ventas en euros van a céntimos: el importe se guarda en la
+        # divisa de su fila y `_cent` se lee siempre como euros.
+        filasVentas.append((
+            r.get("id", ""), normalized, r.get("fecha", ""), r.get("assetId", ""),
+            nombres.get(r.get("assetId", ""), r.get("activo", "")),
+            r.get("cantidad", ""),
+            *legadoYCentimos(r.get("valorVenta", ""), moneda),
+            *legadoYCentimos(r.get("comisionVenta", ""), moneda),
+            moneda,
+            *fxPrevios.get((r.get("fecha", ""), r.get("assetId", "")), ("", "", "")),
+        ))
     conn.executemany(
-        "INSERT INTO ventas (id, year, fecha, asset_id, activo, cantidad, valor_venta, comision_venta, "
-        "currency, fx_rate, fx_fecha, fx_origen) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [
-            (r.get("id", ""), normalized, r.get("fecha", ""), r.get("assetId", ""),
-             nombres.get(r.get("assetId", ""), r.get("activo", "")),
-             r.get("cantidad", ""), r.get("valorVenta", ""),
-             r.get("comisionVenta", ""),
-             monedasPrevias.get((r.get("id", ""), r.get("assetId", "")))
-             or monedasActivos.get(r.get("assetId", "")) or "EUR",
-             *fxPrevios.get((r.get("fecha", ""), r.get("assetId", "")), ("", "", "")))
-            for r in data.get("rows", [])
-        ]
+        "INSERT INTO ventas (id, year, fecha, asset_id, activo, cantidad, valor_venta, valor_venta_cent, "
+        "comision_venta, comision_venta_cent, currency, fx_rate, fx_fecha, fx_origen) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        filasVentas,
     )
     revisiones.avanzar(conn, "ventas", normalized)
     conn.commit()

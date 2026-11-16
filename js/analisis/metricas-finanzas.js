@@ -370,6 +370,177 @@ function mRenderDivPagadores(dividendos) {
         .join("")
 }
 
+// ── dividendos reinvertidos ────────────────────────────────────────────────
+
+const M_FIN_REINV_COLOR = "#a78bfa"
+
+/**
+ * Pinta la sección "Dividendos reinvertidos": KPIs, histórico por año con las
+ * participaciones acumuladas, resumen por instrumento y lista de reinversiones.
+ *
+ * Son un subconjunto de los dividendos de siempre (que siguen contando en el
+ * resto de Métricas): los que no llegaron a la cuenta porque se gastaron en
+ * comprar participaciones. Sin ninguno la sección se oculta.
+ *
+ * @param {Object[]} dividendos Filas de /api/dividendos.
+ */
+function mRenderDivReinvertidos(dividendos) {
+    const reinvertidos = dividendos
+        .filter((r) => r.reinvertido)
+        .map((r) => ({
+            fecha: r.fecha,
+            fechaDate: mFinFecha(r.fecha),
+            instrumento: r.instrumento || "Sin nombre",
+            participaciones: parseLooseNumber(r.reinvParticipaciones || "") ?? 0,
+            precio: r.reinvPrecio || "",
+            neto: parseEuroNumber(r.total || "")
+        }))
+        .sort((a, b) => (a.fechaDate?.getTime() ?? Infinity) - (b.fechaDate?.getTime() ?? Infinity))
+
+    mFinMostrarSeccion("mSectionDivReinvertidos", reinvertidos.length > 0)
+    if (!reinvertidos.length) return
+
+    const totalReinv = reinvertidos.reduce((s, r) => s + r.neto, 0)
+    const totalDiv = dividendos.reduce((s, r) => s + parseEuroNumber(r.total || ""), 0)
+    const totalParticipaciones = reinvertidos.reduce((s, r) => s + r.participaciones, 0)
+    mSetKpi("mkpiDivReinvTotal", formatEuro(totalReinv))
+    mSetKpi("mkpiDivReinvPart", formatShareQuantity(totalParticipaciones))
+    mSetKpi("mkpiDivReinvNum", String(reinvertidos.length))
+    mSetKpi("mkpiDivReinvPct", totalDiv > 0 ? mFinFmtPct((totalReinv / totalDiv) * 100) : "—")
+
+    mDrawDivReinvAnual(reinvertidos)
+    mRenderDivReinvInstrumentos(reinvertidos, dividendos)
+    mRenderDivReinvHistorico(reinvertidos)
+}
+
+function mDrawDivReinvAnual(reinvertidos) {
+    const porAnio = {}
+    reinvertidos.forEach((r) => {
+        const anio = intYear(r.fecha)
+        if (!anio) return
+        const actual = porAnio[anio] || { neto: 0, participaciones: 0 }
+        actual.neto += r.neto
+        actual.participaciones += r.participaciones
+        porAnio[anio] = actual
+    })
+    const anios = Object.keys(porAnio).sort((a, b) => Number(a) - Number(b))
+    const anioActual = String(new Date().getFullYear())
+    let acumulado = 0
+    const acumuladas = anios.map((a) => {
+        acumulado += porAnio[a].participaciones
+        return Number(acumulado.toFixed(6))
+    })
+
+    mCreateChart("mChartDivReinvAnual", {
+        type: "bar",
+        data: {
+            labels: anios.map((a) => (a === anioActual ? `${a} (YTD)` : a)),
+            datasets: [
+                {
+                    type: "bar",
+                    label: "Reinvertido (neto)",
+                    data: anios.map((a) => Number(porAnio[a].neto.toFixed(2))),
+                    backgroundColor: M_FIN_REINV_COLOR + "bb",
+                    borderColor: M_FIN_REINV_COLOR,
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    yAxisID: "y"
+                },
+                {
+                    type: "line",
+                    label: "Participaciones acumuladas",
+                    data: acumuladas,
+                    borderColor: "#f39c12",
+                    backgroundColor: "#f39c12",
+                    pointRadius: 3,
+                    tension: 0.3,
+                    yAxisID: "y1"
+                }
+            ]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                tooltip: {
+                    callbacks: {
+                        label: (c) =>
+                            c.dataset.yAxisID === "y1"
+                                ? ` ${formatShareQuantity(c.raw)} participaciones`
+                                : ` ${formatEuro(c.raw)}`
+                    }
+                }
+            },
+            scales: {
+                x: mAxisX(),
+                y: mFinEjeEuros(),
+                y1: {
+                    position: "right",
+                    grid: { display: false },
+                    ticks: { color: "#f39c12", callback: (v) => formatShareQuantity(v) }
+                }
+            }
+        }
+    })
+}
+
+function mRenderDivReinvInstrumentos(reinvertidos, dividendos) {
+    const body = document.getElementById("mDivReinvInstrumentoBody")
+    if (!body) return
+
+    const cobradoPorInstrumento = new Map()
+    dividendos.forEach((r) => {
+        const nombre = r.instrumento || "Sin nombre"
+        cobradoPorInstrumento.set(nombre, (cobradoPorInstrumento.get(nombre) || 0) + parseEuroNumber(r.total || ""))
+    })
+
+    const porInstrumento = new Map()
+    reinvertidos.forEach((r) => {
+        const actual = porInstrumento.get(r.instrumento) || { n: 0, participaciones: 0, neto: 0 }
+        actual.n += 1
+        actual.participaciones += r.participaciones
+        actual.neto += r.neto
+        porInstrumento.set(r.instrumento, actual)
+    })
+
+    body.innerHTML = [...porInstrumento.entries()]
+        .sort((a, b) => b[1].neto - a[1].neto)
+        .map(([nombre, v]) => {
+            const cobrado = cobradoPorInstrumento.get(nombre) || 0
+            const peso = cobrado > 0 ? (v.neto / cobrado) * 100 : 0
+            return `
+        <tr>
+            <td class="mTdName">${escapeHtml(nombre)}</td>
+            <td>${v.n}</td>
+            <td>${escapeHtml(formatShareQuantity(v.participaciones))}</td>
+            <td>${formatEuro(v.neto)}</td>
+            <td>${mFinBarra(peso, mFinFmtPct(peso), M_FIN_REINV_COLOR)}</td>
+        </tr>`
+        })
+        .join("")
+}
+
+function mRenderDivReinvHistorico(reinvertidos) {
+    const body = document.getElementById("mDivReinvHistoricoBody")
+    if (!body) return
+
+    // Lo más reciente arriba: es lo que se mira al revisar el último cobro.
+    body.innerHTML = [...reinvertidos]
+        .reverse()
+        .map(
+            (r) => `
+        <tr>
+            <td>${escapeHtml(r.fecha || "—")}</td>
+            <td class="mTdName">${escapeHtml(r.instrumento)}</td>
+            <td>${escapeHtml(formatShareQuantity(r.participaciones))}</td>
+            <td>${escapeHtml(String(r.precio).replace(".", ",") || "—")}</td>
+            <td class="mCellPos">${formatEuro(r.neto)}</td>
+        </tr>`
+        )
+        .join("")
+}
+
 function mFinBarra(porcentaje, texto, color = "#3a7bd5") {
     const ancho = Math.max(0, Math.min(100, porcentaje))
     return `<div class="mCartBar"><div class="mCartBarFill" style="width:${(ancho * 0.6).toFixed(1)}px;background:${color}"></div><span>${texto}</span></div>`

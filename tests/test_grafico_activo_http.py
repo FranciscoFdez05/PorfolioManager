@@ -680,14 +680,15 @@ class TestVelasDeTradingview:
 
         assert min(p["ts"] for p in puntos) >= AHORA - 7 * 86400
 
-    def testEnTodoPideDesdeElPrimerMovimiento(self):
+    def testEnTodoPideDesdeUnMesAntesDelPrimerMovimiento(self):
         diaCompra = HOY - timedelta(days=400)
         crearActivo([compra(diaCompra, 1, 10), compra(HOY - timedelta(days=10), 1, 10)])
         velas = VelasFalsas()
 
         graficoConVelas(velas, rango="TODO")
 
-        assert velas.llamadas[0]["desdeTs"] == int(datetime.combine(diaCompra, time.min).timestamp())
+        diaEsperado = diaCompra - timedelta(days=30)
+        assert velas.llamadas[0]["desdeTs"] == int(datetime.combine(diaEsperado, time.min).timestamp())
 
 
 class TestRuta:

@@ -36,13 +36,14 @@ function renderAssetTablePage(asset) {
                         <h1 class="assetPageTitle">${escapeHtml(asset.name || asset.symbol)}</h1>
                     </div>
                     <div class="assetPageSubtitle">${escapeHtml(asset.name)} · ${buildAssetTypeLabel(asset.type)}</div>
-                    <div class="assetValueRow">
-                        <span class="assetValueAmount" id="assetStatPrecioActual">—</span>
-                    </div>
                 </div>
                 <div class="assetStatsPanel${isEtf ? " assetStatsPanelEtf" : ""}" id="assetStatsPanel">
                     <div class="assetStatCard">
-                        <span class="assetStatLabel">Valor actual</span>
+                        <span class="assetStatLabel">Precio actual</span>
+                        <span class="assetStatValue" id="assetStatPrecioActual">—</span>
+                    </div>
+                    <div class="assetStatCard">
+                        <span class="assetStatLabel">Valor de mi posición</span>
                         <span class="assetStatValue" id="assetStatNetoActual">—</span>
                     </div>
                     <div class="assetStatCard">
@@ -121,9 +122,11 @@ function renderAssetTablePage(asset) {
                     <button class="assetTabBtn" id="ventasTabBtn" data-tab="ventas">Ventas</button>
                     <button class="assetTabBtn" id="planesTabBtn" data-tab="planes">Planes</button>
                     <button class="assetTabBtn" id="alertasTabBtn" data-tab="alertas">Alertas</button>
-                    <button class="assetTabBtn" id="graficoTabBtn" data-tab="grafico">Gráfico</button>
-                    <button class="assetTabsNavAction hidden" id="assetAddVentaNavBtn" type="button"><span class="assetBtnIcon">+</span> Añadir venta</button>
-                    <button class="assetTabsNavAction hidden" id="assetAddPlanNavBtn" type="button"><span class="assetBtnIcon">+</span> Nuevo plan</button>
+                    <div class="assetTabDropdown">
+                        <button class="assetTabBtn" id="graficoTabBtn" data-tab="grafico" aria-haspopup="menu" aria-expanded="false">Gráfico ▾</button>
+                        <div class="navDropdownMenu" id="assetGraficoModoMenu" role="menu" aria-label="Tipo de gráfico"></div>
+                    </div>
+                    <button class="assetTabBtn" id="mercadoTabBtn" data-tab="mercado">Mercado</button>
                 </div>
                 <div class="assetTabPanel" data-tab="todos">
                     <div id="assetTodosSection"></div>
@@ -131,8 +134,12 @@ function renderAssetTablePage(asset) {
                 <div class="assetTabPanel hidden" data-tab="grafico">
                     <div id="assetGraficoSection"></div>
                 </div>
+                <div class="assetTabPanel hidden" data-tab="mercado">
+                    <div id="assetMercadoSection"></div>
+                </div>
                 <div class="assetTabPanel hidden" data-tab="spot">
-                    <div class="assetTableWrapper">
+                    <div id="assetSpotEmptySection"></div>
+                    <div class="assetTableWrapper" id="assetSpotTableWrapper">
                         <table class="assetOperationsTable">
                             <thead>
                                 <tr>
@@ -169,12 +176,15 @@ function renderAssetTablePage(asset) {
             </div>
             </div>
             <aside class="todosChartsCol" id="assetTodosChartsCol"></aside>
+            <aside class="assetNoDataCol hidden" id="assetNoDataCol"><p class="assetNoDataText">No data</p></aside>
             </div>
-            <div class="assetAddRowBar">
-                <button id="addAssetRowBtn" class="primaryButton assetAddRowHeaderBtn"><span class="assetBtnIcon">+</span> Añadir compra</button>
+            <div class="assetAddRowBar hidden">
+                <button id="addAssetRowBtn" class="primaryButton assetAddRowHeaderBtn">Añadir compra spot</button>
             </div>
         </section>
     `
+
+    activarArrastreHorizontal(document.getElementById("assetStatsPanel"))
 
     fitAssetPageToViewport()
 
@@ -232,29 +242,77 @@ function setActiveAssetTab(tab) {
     document.querySelectorAll(".assetTabPanel[data-tab]").forEach((p) => {
         p.classList.toggle("hidden", p.dataset.tab !== tab)
     })
-    document.getElementById("assetAddVentaNavBtn")?.classList.toggle("hidden", tab !== "ventas")
-    document.getElementById("assetAddPlanNavBtn")?.classList.toggle("hidden", tab !== "planes")
+    syncAssetAddRowButton(tab)
     // Los gráficos son de "Todos". En las demás pestañas no solo se esconden:
     // el recuadro recupera el ancho completo, que si no queda un hueco de 340 px
     // reservado para una columna que no está.
-    document.getElementById("assetTodosChartsCol")?.classList.toggle("hidden", tab !== "todos")
-    document.getElementById("assetTodosLayout")?.classList.toggle("assetTodosLayoutFull", tab !== "todos")
-    document.querySelector(".assetPageHeader")?.classList.toggle("assetPageHeaderFull", tab !== "todos")
+    syncAssetSideColumn()
     if (tab === "grafico") renderAssetGraficoSection()
+    if (tab === "mercado") renderAssetMercadoSection()
+}
+
+// Texto del botón fijo de abajo según la pestaña. Las pestañas que no están
+// aquí (Todos, Gráfico, Transacciones, Alertas) no tienen nada que añadir
+// desde ese botón.
+const ASSET_ADD_BUTTON_LABEL_BY_TAB = {
+    spot: "Añadir compra spot",
+    completadas: "Añadir operación spot",
+    ventas: "Añadir venta",
+    planes: "Nuevo plan"
+}
+
+function syncAssetAddRowButton(tab) {
+    const label = ASSET_ADD_BUTTON_LABEL_BY_TAB[tab]
+    const button = document.getElementById("addAssetRowBtn")
+    document.querySelector(".assetAddRowBar")?.classList.toggle("hidden", !label)
+    if (button && label) button.textContent = label
+}
+
+// Secciones que, estando vacías, enseñan el recuadro de rayas con "No data" en
+// el sitio de los gráficos. Las demás pestañas no tienen columna lateral.
+const ASSET_EMPTY_SECTION_BY_TAB = {
+    todos: "assetTodosSection",
+    spot: "assetSpotEmptySection",
+    completadas: "assetCompletedOperationsSection",
+    ventas: "assetVentasSection"
+}
+
+// Se llama también al repintar cada sección: una venta recién añadida o borrada
+// cambia si la pestaña activa está vacía sin que el usuario cambie de pestaña.
+function syncAssetSideColumn() {
+    const tab = document.querySelector(".assetTabBtn.assetTabActive")?.dataset.tab
+    const sectionId = ASSET_EMPTY_SECTION_BY_TAB[tab]
+    const isEmpty = !!sectionId && !!document.querySelector(`#${sectionId} .assetVentasEmpty`)
+    const showCharts = tab === "todos" && !isEmpty
+    const showSide = showCharts || isEmpty
+
+    document.getElementById("assetTodosChartsCol")?.classList.toggle("hidden", !showCharts)
+    document.getElementById("assetNoDataCol")?.classList.toggle("hidden", !isEmpty)
+    document.getElementById("assetTodosLayout")?.classList.toggle("assetTodosLayoutFull", !showSide)
+    document.querySelector(".assetPageHeader")?.classList.toggle("assetPageHeaderFull", !showSide)
+    document.querySelector(".assetTabsContainer")?.classList.toggle("assetTabsContainerVacio", isEmpty)
 }
 
 function setupAssetTabs(asset) {
     const nav = document.querySelector(".assetTabsNav")
     if (!nav) return
 
+    assetMercadoRegistrar(asset)
+    activarArrastreHorizontal(nav)
+
     nav.addEventListener("click", (e) => {
         const btn = e.target.closest(".assetTabBtn")
         if (!btn || btn.classList.contains("hidden")) return
         setActiveAssetTab(btn.dataset.tab)
+        if (btn.id === "graficoTabBtn") {
+            // Sin esto el clic llega al document y el cierre global de
+            // .navDropdownMenu lo cerraría nada más abrirlo.
+            e.stopPropagation()
+            assetGraficoAlternarMenuModo(btn)
+        }
     })
+    assetGraficoRegistrarMenuModo()
 
-    nav.querySelector("#assetAddVentaNavBtn")?.addEventListener("click", () => openAssetAddVentaModal(asset))
-    nav.querySelector("#assetAddPlanNavBtn")?.addEventListener("click", () => planAbrirEditor())
 }
 
 // Una fila recién añadida está en blanco hasta que se rellena. No cuenta como
@@ -303,7 +361,11 @@ function renderAssetRows(rows) {
             formatCellMoneyValue(val, getAssetTableMoneyCurrency(assetType, field, assetCurrency, rowCurrency))
         rowElement.innerHTML = `
             <td data-field="fechaOperacion">${escapeHtml(rowData.fechaOperacion || "")}</td>
-            <td data-field="tipoOperacion">${escapeHtml(rowData.tipoOperacion || "Compra")}</td>
+            <td data-field="tipoOperacion">${escapeHtml(rowData.tipoOperacion || "Compra")}${
+                rowData.reinvertido
+                    ? ` <span class="dividendoReinvTag" title="Compra generada por un dividendo reinvertido. Se edita desde Finanzas › Dividendos.">Reinvertido</span>`
+                    : ""
+            }</td>
             <td data-field="participaciones" data-value="${escapeAttr(toCanonicalNumber(rowData.participaciones))}">${formatAssetParticipationValue(rowData.participaciones, assetType)}</td>
             <td data-field="precioParticipacion" data-value="${escapeAttr(toCanonicalNumber(rowData.precioParticipacion))}">${moneyMono(rowData.precioParticipacion, "precioParticipacion")}</td>
             ${isCrypto ? `<td data-field="currency">${escapeHtml(rowCurrency)}</td>` : ""}
@@ -317,11 +379,15 @@ function renderAssetRows(rows) {
             <td class="rowActionsCell">
                 <div class="rowMenu">
                     <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
-                    <div class="rowMenuDropdown">
+                    <div class="rowMenuDropdown">${
+                        rowData.reinvertido
+                            ? `<span class="rowMenuItem cuentasHint">Viene de un dividendo reinvertido: se edita o se borra desde Finanzas › Dividendos.</span>`
+                            : `
                         <button type="button" class="rowMenuItem assetRowEditBtn avActionBtn avEditBtn" data-row-index="${index}">Editar</button>
                         <hr>
                         <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn avActionBtn avDeleteBtn" data-row-index="${index}">Eliminar</button>
-                    </div>
+                    `
+                    }</div>
                 </div>
             </td>
         `
@@ -330,6 +396,23 @@ function renderAssetRows(rows) {
     _assetUpdateSortArrows()
 
     updateAssetTableTotals()
+    syncAssetSpotEmptyState()
+}
+
+// Sin ninguna fila (ni siquiera una en blanco recién añadida) la tabla se
+// sustituye por el aviso de rayas; con "Añadir compra" aparece la fila y vuelve
+// la tabla para poder rellenarla.
+function syncAssetSpotEmptyState() {
+    const emptySection = document.getElementById("assetSpotEmptySection")
+    const tableWrapper = document.getElementById("assetSpotTableWrapper")
+    if (!emptySection || !tableWrapper) return
+
+    const isEmpty = _assetDisplayRows.length === 0
+    emptySection.innerHTML = isEmpty
+        ? `<div class="assetVentasEmpty"><p class="assetVentasEmptyText">Este activo todavía no tiene compras.</p></div>`
+        : ""
+    tableWrapper.classList.toggle("hidden", isEmpty)
+    syncAssetSideColumn()
 }
 
 // saveAssetDataToServer avisa de cada guardado correcto (ver assets.js). La
@@ -1359,6 +1442,19 @@ function initAssetTableLogic(asset) {
 
     if (addAssetRowButton) {
         addAssetRowButton.addEventListener("click", () => {
+            const activeTab = document.querySelector(".assetTabBtn.assetTabActive")?.dataset.tab
+            if (activeTab === "completadas") {
+                openOperacionDesdeActivo(asset)
+                return
+            }
+            if (activeTab === "ventas") {
+                openAssetAddVentaModal(asset)
+                return
+            }
+            if (activeTab === "planes") {
+                planAbrirEditor()
+                return
+            }
             openAssetRowModal(-1)
         })
     }

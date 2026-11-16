@@ -27,6 +27,7 @@ from core import (
     telegram_notifier,
     zip_seguro,
 )
+from core.centimos import convertirImportes
 from core.copia_sqlite import copiar as copiarSqlite
 from core.db import getActiveDbPath, getDb
 from core.errors import ValidationError, registrarFalloEscritura
@@ -597,7 +598,7 @@ _DECIMALES_PRECIO = {2, 4, 6, 8}
 _TIPOS_SOLO_MERCADO = {"acciones", "etfs", "comoditis", "indices", "cripto"}
 _MODULOS = {
     "panelSuperior", "vistaGeneral", "activos", "gastos",
-    "finanzas", "cripto", "planes", "herramientas", "metricas", "alertas",
+    "misFinanzas", "finanzas", "cripto", "planes", "herramientas", "metricas", "alertas",
 }
 # El panel superior es una barra de la cabecera: no tiene página que abrir.
 _MODULOS_CON_PAGINAS = _MODULOS - {"panelSuperior"}
@@ -1085,6 +1086,7 @@ def exportZip():
     # el navegador manda también las de los demás, que aquí no pintan nada.
     _datos, ui = seguimiento_prefs.separarDeUi(exportables.sanearUi(peticion.get("ui")), None)
     incluirClaves = bool(peticion.get("incluirClaves"))
+    incluirWallets = bool(peticion.get("incluirWallets"))
     contrasena = peticion.get("contrasena")
     contrasena = contrasena if isinstance(contrasena, str) else ""
     if len(contrasena) > exportables.MAX_LARGO_CONTRASENA:
@@ -1096,7 +1098,7 @@ def exportZip():
     try:
         salida = _temporalDeSalida()
         with _copiaComprobada(getActiveDbPath()) as copia:
-            _escribirZipExport(salida, copia, pid, dateStr, ui, incluirClaves, contrasena)
+            _escribirZipExport(salida, copia, pid, dateStr, ui, incluirClaves, contrasena, incluirWallets)
         _verificarZip(salida)
         return _enviarTemporal(salida, "application/zip", f"portfolio-export-{dateStr}.zip")
     except (ExportacionRechazada, OSError, sqlite3.Error, zipfile.BadZipFile) as e:
@@ -1105,8 +1107,20 @@ def exportZip():
         return _respuestaFalloExport(e)
 
 
-def _escribirZipExport(salida, copia, pid: str, dateStr: str, ui: dict, incluirClaves: bool, contrasena: str) -> None:
-    """Escribe en `salida` el ZIP de exportación a partir de la copia ya comprobada."""
+def _escribirZipExport(salida, copia, pid: str, dateStr: str, ui: dict, incluirClaves: bool, contrasena: str,
+                       incluirWallets: bool = False) -> None:
+    """Escribe en `salida` el ZIP de exportación a partir de la copia ya comprobada.
+
+    Args:
+        salida: Fichero abierto donde se escribe el ZIP.
+        copia: Ruta de la copia consistente de la base de datos.
+        pid: Id del portfolio activo.
+        dateStr: Fecha para los nombres de las entradas.
+        ui: Preferencias de la interfaz que manda el navegador.
+        incluirClaves: Si van las claves de API y la del Atajo.
+        contrasena: Con ella, claves y wallets van cifradas; sin ella, en claro.
+        incluirWallets: Si van las wallets de Cripto › Seguimiento, la libreta y el catálogo.
+    """
     with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as zf:
         with _abrirCopia(copia) as conn, zf.open(f"portfolio-export-{dateStr}.json", "w") as entrada:
             _escribirExport(entrada, conn, pid)
@@ -1131,17 +1145,18 @@ def _escribirZipExport(salida, copia, pid: str, dateStr: str, ui: dict, incluirC
         # que es justo el caso en el que no se habían perdido. Con contraseña
         # van cifradas con ella, en un fichero aparte para que la importación
         # sepa que tiene que pedirla.
-        if incluirClaves:
-            # Las wallets, solo con contraseña: en claro dirían qué direcciones
-            # son del usuario a cualquiera que tenga el ZIP.
-            claves = exportables.clavesConWallets() if contrasena else exportables.clavesEnClaro()
-            if claves and contrasena:
-                paquete = exportables.cifrarClaves(claves, contrasena)
-                zf.writestr(exportables.FICHERO_CLAVES_CIFRADAS, json.dumps(paquete, ensure_ascii=False, indent=2))
-                log.info("[export] ZIP generado con claves de API cifradas con contraseña (%d proveedores)", len(claves))
-            elif claves:
-                zf.writestr(exportables.FICHERO_CLAVES, json.dumps(claves, ensure_ascii=False, indent=2))
-                log.info("[export] ZIP generado CON claves de API en claro (%d proveedores)", len(claves))
+        # Las wallets tienen su propia casilla y viajan en el mismo paquete que
+        # las claves: la importación ya sabe restaurarlas desde los dos ficheros.
+        claves = exportables.clavesEnClaro() if incluirClaves else {}
+        if incluirWallets:
+            claves.update(exportables.soloWallets())
+        if claves and contrasena:
+            paquete = exportables.cifrarClaves(claves, contrasena)
+            zf.writestr(exportables.FICHERO_CLAVES_CIFRADAS, json.dumps(paquete, ensure_ascii=False, indent=2))
+            log.info("[export] ZIP generado con claves/wallets cifradas con contraseña (%d entradas)", len(claves))
+        elif claves:
+            zf.writestr(exportables.FICHERO_CLAVES, json.dumps(claves, ensure_ascii=False, indent=2))
+            log.info("[export] ZIP generado CON claves/wallets en claro (%d entradas)", len(claves))
 
 
 def _mensajeDeIntegridad(error, tabla, numero) -> str:
@@ -1273,6 +1288,9 @@ def _restoreTablesFromDict(conn, data: dict):
                     )
                 except sqlite3.IntegrityError as error:
                     raise ImportacionInvalida(_mensajeDeIntegridad(error, table, numero)) from error
+        # Un fichero de una versión anterior trae los importes como texto: se pasan
+        # a céntimos antes de confirmar para no mezclar los dos formatos.
+        convertirImportes(conn)
         _comprobarClavesAjenas(conn, targets)
         conn.commit()
     except Exception as e:

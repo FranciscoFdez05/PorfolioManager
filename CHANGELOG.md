@@ -22,6 +22,155 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.5.0] — 2026-11-16
+
+**Esquema de base de datos:** sube al **41** (antes el 31); añade las tablas
+`hipotecas`, `financiaciones` y `microcreditos` (se crean solas al arrancar), columnas nuevas en
+`financiaciones` y `mensualidades` (`financiacion_id`) y las columnas `*_cent`
+de importes en céntimos (ver «Cambiado»). Al migrar se guarda
+copia previa; para deshacerlo, imagen anterior y restaurar esa copia.
+
+### Añadido
+
+- **Ajustes › Datos › Exportar como ZIP**: casilla **Incluir wallets y claves
+  públicas**, junto a **Incluir APIs**, para llevar las wallets de Cripto ›
+  Seguimiento (propias y ajenas, libreta, tokens y catálogo) sin tener que
+  incluir las claves de API. La contraseña es opcional: sin ella van en claro.
+  Las explicaciones de las dos casillas pasan a un botón **?**.
+- **Ficha del activo › Gráfico › Estacionales**: modo nuevo que superpone los
+  años del activo sobre un eje de enero a diciembre, cada uno en % desde el
+  cierre del anterior, con tooltip de todos los años en el día señalado (el %
+  y el precio de ese día, en la divisa del ticker). Un
+  botón por año permite elegir cuáles se ven; por defecto, los cinco más
+  recientes, y la elección se recuerda. Escala lineal o logarítmica, para que
+  un año extremo no aplaste al resto. Usa las velas diarias de TradingView con todo el histórico del feed
+  (ruta nueva `GET /api/market/historico?symbol=`, con la divisa de cotización);
+  sin ticker, el histórico propio en euros.
+- **Ficha del activo › Gráfico › Estacionales**: botones **Gráfico** y **Tabla**;
+  la tabla es el rendimiento mensual por años con velas mensuales de TradingView.
+- **Ficha lateral › Estacionales**: pulsar el minigráfico abre un popup grande
+  con el gráfico de todos los años y la tabla mensual, alternables como en
+  TradingView; sustituye al modal que solo tenía la tabla.
+- **Ficha del activo › Mercado**: pestaña nueva con capitalización, volumen,
+  FDV y suministro (circulante, total y máximo) en cripto, y los derivados del
+  perpetuo USDT de Binance (precio de marca, base, tasa de financiación,
+  interés abierto y volumen de futuros). Acciones, ETF, índices y materias
+  primas enseñan capitalización o patrimonio, volumen y fundamentales. Todas
+  llevan rendimiento, rango, volatilidad y tendencia técnica. Un par de
+  exchange se resuelve a su moneda base con el propio scanner, sin listas de
+  activos. Ruta nueva: `GET /api/market/ficha`. Sin clave de API y sin cambios
+  de esquema.
+- **Dividendos reinvertidos**: un cobro de dividendo puede marcarse como
+  reinvertido, con las participaciones compradas y el precio. La ficha del
+  activo muestra esa compra como «Reinvertido» y entra en la posición y en el
+  FIFO como una compra más. La compra se regenera desde el dividendo en cada
+  guardado (del dividendo o de la ficha), se mueve con el activo si se
+  renombra y su precio se convierte si el activo cambia de divisa. Al
+  renombrar un activo, sus dividendos pasan ahora al nombre nuevo. Esquema 40:
+  columnas `reinvertido`, `reinv_participaciones` y `reinv_precio` en
+  `dividendos`, y `reinvertido` en `activo_rows`. Un dividendo reinvertido no
+  suma al saldo de la cuenta que cobra los dividendos, y Métricas tiene una
+  sección nueva, «Dividendos reinvertidos», con indicadores, histórico por
+  año, resumen por instrumento y lista de reinversiones.
+- **Mi dinero › Patrimonio**: página nueva con el patrimonio neto, lo que se
+  tiene (inversiones, cuentas, renta fija y bonos sin vencer) menos lo que se
+  debe (hipotecas, compras financiadas y microcréditos), con el desglose de
+  cada lado. Una deuda que no se puede calcular queda fuera del total y se
+  avisa. La vista muestra el endeudamiento, la composición de cada lado en una barra,
+  el peso de cada partida (sobre los importes positivos) y grupos plegables con las
+  partidas a cero resumidas; respeta el modo privacidad. Ruta nueva:
+  `GET /api/patrimonio`. No incluye todavía gráfico de
+  evolución.
+- **Hipotecas › Simular amortización anticipada**: compara la hipoteca actual
+  con un pago hipotético reduciendo el plazo o reduciendo la cuota (cuota tras
+  el pago, cuotas restantes, fecha de fin, intereses pendientes y ahorrados), sin
+  guardar nada. Ruta nueva: `POST /api/hipotecas/<id>/simulacion`.
+- **Mi dinero › Calendario**: nuevo filtro «Vencimientos» con los vencimientos
+  de renta fija y bonos (capital más intereses netos). No entran en el balance
+  porque son capital que vuelve. Las cuotas de hipotecas, compras financiadas y
+  microcréditos ya salían como mensualidades.
+- **Dividendos › Ingresos pasivos**: resumen de los últimos 12 meses (cobrado,
+  media mensual) y rentabilidad sobre coste por activo y global. La proyección
+  a 12 meses es lo cobrado en el último año. Ruta nueva:
+  `GET /api/dividendos/resumen`.
+- **Ajustes › Exportar a CSV**: descarga gastos e ingresos (por año),
+  dividendos, operaciones y cuentas con saldos en CSV para Excel (separador
+  «;», BOM UTF-8, texto a salvo de fórmulas). Ruta nueva:
+  `GET /api/exportar/<módulo>.csv`.
+- **Mi dinero › Hipotecas**: cuadro de amortización y métricas de cada hipoteca,
+  a plazo fijo o variable. En variable el Euríbor se introduce por revisión
+  (anual o semestral) y la cuota se recalcula sobre el capital pendiente.
+  Admite amortizaciones anticipadas (reducir cuota o plazo) y enseña los
+  intereses que ahorran. Rutas nuevas: `GET`/`POST /api/hipotecas`.
+- **Mi dinero › Compras financiadas**: compras a plazos con entrada, número de
+  cuotas, TIN (o sin intereses), cuotas pagadas y restantes, fecha de fin y
+  tiempo restante. Rutas nuevas: `GET`/`POST /api/financiaciones`.
+  Cada compra se cobra como una mensualidad con la etiqueta «Financiada»: elige
+  cuenta y día de cobro, descuenta cada mes en su cuenta y suma en métricas y
+  calendario (las cuotas las genera el servidor y no se editan en Mensualidades).
+  Incluye detalle con el calendario de cuotas, pagos anticipados (acortar plazo
+  o bajar cuota), categoría y tarjetas con total pagado, coste total e intereses.
+- **Mi dinero › Microcréditos**: préstamos pequeños y de corta duración, en
+  pago único (importe más comisión) o en cuotas mensuales. Calcula el coste, la
+  TAE equivalente, los días que faltan para el vencimiento y avisa de los
+  vencidos sin devolver; los de cuotas llevan calendario. Rutas nuevas:
+  `GET`/`POST /api/microcreditos`.
+- **Hipotecas y microcréditos en Gastos y Ahorro**: ambos piden cuenta, día de
+  cobro y categoría, y cada cuota o pago se cobra como una mensualidad (etiquetas
+  «Hipoteca» y «Microcrédito»), igual que las compras financiadas. Ahorro gana
+  la tarjeta «Pagos de deudas», que desglosa lo que se va en hipotecas, compras
+  financiadas y microcréditos. La sincronización pasa a
+  `stores/deudas_mensualidades.py`, que sustituye a `financiaciones_mensualidades.py`.
+- **Mi dinero › Pagos fraccionados**: vista de solo lectura de los gastos que
+  se pagan enteros y se reparten con otros, cada uno con tu parte, lo devuelto
+  y lo pendiente, y el detalle de sus devoluciones.
+
+
+### Cambiado
+
+- **Wallets de seguimiento por portfolio.** Las wallets, su libreta, las
+  carteras conocidas y las lecturas guardadas pasan de ser de la instalación a
+  ser de cada portfolio (`API/portfolios/<id>/`). Las que había se asignan solas
+  al portfolio activo en el primer arranque. Al borrar un portfolio, su carpeta
+  de wallets se aparta a `data/deleted/`. Las claves de API y el estado de la
+  vigilancia de Satoshi siguen siendo de la instalación.
+
+- **Importes en céntimos enteros.** Los importes de gastos, ingresos,
+  transferencias (cantidad y comisión), el saldo inicial de las cuentas, el
+  importe y los doce importes mensuales de mensualidades e ingresos recurrentes,
+  dividendos (total e impuestos), intereses de cuentas remuneradas, renta fija y
+  bonos, hipotecas (capital), compras financiadas (precio y entrada),
+  microcréditos (importe y comisión), ventas (valor y comisión de venta), trading
+  (capital y ganancias), mercado privado, stablecoins (total y comisiones) y el
+  núcleo de inversión (capital invertido, comisiones y total de la ficha, las
+  operaciones y las conversiones, `valor_eur`) pasan de texto a `INTEGER` en céntimos (columnas `*_cent`), para que
+  sumar y comparar no dependa de interpretar texto. La API sigue hablando en
+  texto con el mismo formato, así que el frontend no cambia; la conversión vive
+  en los stores (`core/centimos.py`).
+  La migración es automática al arrancar (esquemas 35 a 39 y 41), con copia previa
+  `pre-esquema-<versión>-a-41`: convierte lo que cabe exacto en céntimos y deja en su
+  columna de texto lo que no (texto ilegible, más de dos decimales, otra divisa),
+  que se sigue leyendo igual. Comprueba que la suma convertida coincide con la
+  original; si no cuadra, revierte el paso y detiene el arranque.
+  Una importación de JSON de una versión anterior también se convierte al
+  importar. En dividendos, renta fija, bonos, ventas, trading, mercado privado,
+  stablecoins y el núcleo de inversión solo se convierten las filas en euros (cada importe va en la divisa de su fila). Siguen en texto lo
+  que necesita más de dos decimales (precios, cantidades de cripto,
+  porcentajes, tipos de cambio y comisiones en cripto; staking, earn y
+  `transacciones` solo tienen de esos), lo que está en otra divisa y las columnas calculadas de ventas
+  (copia que se recalcula en cada lectura).
+- **Finanzas › Intereses** abre en el año en curso, aunque todavía no tenga
+  registros, en lugar del último año con datos. También al cambiar de cuenta o
+  al borrar un año.
+
+### Corregido
+
+- Hacer una copia de seguridad sin `portfolios.json` ya no inicializa los
+  portfolios por el camino: la lista de portfolios para volcar sus wallets se
+  lee sin activar ninguno ni lanzar la copia de arranque.
+
+---
+
 ## [5.4.0] — 2026-11-13
 
 **Esquema de base de datos:** no lo toca (sigue en el **31**). Basta con volver a

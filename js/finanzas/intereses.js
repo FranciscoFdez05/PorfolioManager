@@ -58,7 +58,7 @@ function selectCuenta(id) {
     _allInteresesRows = cuenta ? cuenta.rows : []
     renderCuentasSidebar()
     const years = getInteresesYears(_allInteresesRows)
-    if (years.length) currentInteresesYear = years[years.length - 1]
+    currentInteresesYear = getInteresesYearPorDefecto(years)
     renderInteresesYearBar(years)
     renderFilteredIntereses()
 }
@@ -256,7 +256,7 @@ function deleteCuenta(id) {
                 currentInteresesYear = null
                 renderCuentasSidebar()
                 const years = getInteresesYears(_allInteresesRows)
-                if (years.length) currentInteresesYear = years[years.length - 1]
+                currentInteresesYear = getInteresesYearPorDefecto(years)
                 renderInteresesYearBar(years)
                 renderFilteredIntereses()
                 await saveInteresesDataToServer()
@@ -307,12 +307,19 @@ function parseInteresYear(fecha) {
 }
 
 function getInteresesYears(rows) {
-    const years = new Set()
+    // El año en curso sale siempre, aunque aún no tenga filas, para que sea el de partida.
+    const years = new Set([String(new Date().getFullYear())])
     rows.forEach((r) => {
         const y = parseInteresYear(r.fecha)
         if (y) years.add(y)
     })
     return [...years].sort((a, b) => Number(a) - Number(b))
+}
+
+// Año de partida: el en curso (getInteresesYears lo incluye siempre).
+function getInteresesYearPorDefecto(years) {
+    const actual = String(new Date().getFullYear())
+    return years.includes(actual) ? actual : years[years.length - 1]
 }
 
 function renderInteresesYearBar(years) {
@@ -478,7 +485,7 @@ function loadCuentasFromData(data) {
     renderCuentasSidebar()
 
     const years = getInteresesYears(_allInteresesRows)
-    if (!currentInteresesYear && years.length) currentInteresesYear = years[years.length - 1]
+    if (!currentInteresesYear) currentInteresesYear = getInteresesYearPorDefecto(years)
     renderInteresesYearBar(years)
     renderFilteredIntereses()
 }
@@ -496,7 +503,7 @@ function renderRowsFromData(interesesData) {
     if (cuenta) cuenta.rows = rows
 
     const years = getInteresesYears(_allInteresesRows)
-    if (!currentInteresesYear && years.length) currentInteresesYear = years[years.length - 1]
+    if (!currentInteresesYear) currentInteresesYear = getInteresesYearPorDefecto(years)
     renderInteresesYearBar(years)
     renderFilteredIntereses()
 }
@@ -702,7 +709,7 @@ function deleteCurrentInteresesYear() {
                 _allInteresesRows = _allInteresesRows.filter((r) => parseInteresYear(r.fecha) !== currentInteresesYear)
                 syncRowsBackToCuenta()
                 const remaining = getInteresesYears(_allInteresesRows)
-                currentInteresesYear = remaining.length ? remaining[remaining.length - 1] : null
+                currentInteresesYear = getInteresesYearPorDefecto(remaining)
                 renderInteresesYearBar(remaining)
                 renderFilteredIntereses()
                 await saveInteresesDataToServer()

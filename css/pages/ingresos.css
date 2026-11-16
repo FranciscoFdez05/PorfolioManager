@@ -10,9 +10,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding-right: 18px;
     flex: 1;
-    margin-top: -6px;
 }
 
 .ingresosYearBar {
@@ -78,7 +76,8 @@
 }
 
 .ingresosYearList > .ingresosYearBtn {
-    flex: 0 0 calc((100% - 55px) / 12);
+    flex: 0 0 auto;
+    min-width: 68px;
 }
 
 .ingresosYearBtn,
@@ -87,7 +86,6 @@
     text-align: center;
 }
 
-.ingresosYearBtn,
 .ingresosAddYearBtn,
 .ingresosMonthTab {
     min-width: 78px;
@@ -107,7 +105,6 @@
         transform 0.15s ease;
 }
 
-.ingresosYearBtn:hover,
 .ingresosAddYearBtn:hover,
 .ingresosMonthTab:hover {
     background: var(--btn-bg-hover);
@@ -115,11 +112,38 @@
     transform: translateY(-1px);
 }
 
-.ingresosYearBtn.active,
 .ingresosMonthTab.active {
     background: var(--btn-active-bg);
     border-color: var(--btn-active-border);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Botón de año con el mismo aspecto que .interesesYearBtn (Cuenta remunerada,
+   Dividendos...). El ancho lo sigue fijando la lista. */
+.ingresosYearBtn {
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-bright);
+    font-size: 13px;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        border-color 0.15s;
+}
+
+.ingresosYearBtn:hover {
+    background: var(--bg-elevated);
+    border-color: var(--accent);
+}
+
+.ingresosYearBtn.active {
+    background: var(--bg-elevated);
+    border-color: var(--accent);
+    color: var(--text-subtle);
+    box-shadow: inset 0 0 0 1px var(--accent-glow);
 }
 
 .ingresosYearBtn.yearViewActive {

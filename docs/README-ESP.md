@@ -7,7 +7,7 @@
 <h1 align="center">PorfolioManager</h1>
 
 <p align="center">
-  <a href="../CHANGELOG.md"><img src="https://img.shields.io/badge/versi%C3%B3n-5.4.0-blue" alt="Versión"></a>
+  <a href="../CHANGELOG.md"><img src="https://img.shields.io/badge/versi%C3%B3n-5.5.0-blue" alt="Versión"></a>
   <a href="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml"><img src="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB" alt="Python">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED" alt="Docker">
@@ -101,7 +101,16 @@ Los secretos van en `.env` (copia `.env.example`; `./docker-setup` lo hace por t
 | Dónde | Qué haces ahí |
 | --- | --- |
 | Ficha de un activo › **Gráfico** | Precio o rendimiento de tu posición, con tus compras y ventas marcadas |
+| Ficha de un activo › **Mercado** | Capitalización, suministro, FDV y volumen; futuros (interés abierto, financiación) en cripto; tendencia y fundamentales en el resto |
 | **Mi dinero › Cuentas / Movimientos / Cuenta remunerada** | Saldo e histórico de cada cuenta, transferencias e intereses cobrados |
+| **Mi dinero › Hipotecas / Compras financiadas** | Cuadro de amortización y métricas de cada hipoteca (fija o variable con revisiones de Euríbor y amortizaciones anticipadas) y tus compras a plazos (se cobran cada mes como mensualidades etiquetadas desde la cuenta que elijas, con pagos anticipados y calendario de cuotas) |
+| **Mi dinero › Patrimonio** | Patrimonio neto: inversiones, cuentas y renta fija sin vencer menos hipotecas, compras financiadas y microcréditos, con el desglose de cada lado |
+| **Mi dinero › Hipotecas › Simular amortización** | Compara una hipoteca con un pago anticipado hipotético, acortando el plazo o bajando la cuota, sin guardar nada |
+| **Mi dinero › Calendario › Vencimientos** | Vencimientos de tu renta fija y bonos en el calendario, junto a gastos, ingresos y pagos recurrentes |
+| **Dividendos › Ingresos pasivos** | Dividendos de los últimos 12 meses, media mensual y rentabilidad sobre coste por activo y global |
+| **Dividendos › Reinvertir** | Un dividendo se puede marcar como reinvertido: añade a la ficha del activo una compra «Reinvertido» que cuenta en la posición y en el FIFO |
+| **Ajustes › Exportar a CSV** | Descarga gastos, ingresos, dividendos, operaciones y cuentas en CSV listo para Excel |
+| **Mi dinero › Microcréditos** | Préstamos pequeños y de corta duración, con pago único (importe más comisión) o en cuotas mensuales: coste, TAE equivalente, vencimientos con aviso de los vencidos y calendario en los de cuotas |
 | **Cripto › Transacciones › ··· › Wallets enlazadas** | Importar los movimientos de tus wallets desde la blockchain (nunca pegues claves privadas ni frases semilla) |
 | **Cripto › Seguimiento** | Agrupar wallets propias o ajenas, ver su historial, UTXOs y tokens, y recibir avisos por Telegram |
 

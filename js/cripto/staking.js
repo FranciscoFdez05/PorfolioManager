@@ -31,7 +31,7 @@ function renderStakingCriptosSidebar() {
         const nueva = document.createElement("button")
         nueva.type = "button"
         nueva.className = "cuentaItem cuentaItemNueva"
-        nueva.textContent = "+ Añadir cripto"
+        nueva.textContent = "Añadir cripto"
         nueva.addEventListener("click", () => document.getElementById("addStakingCriptoBtn")?.click())
         list.appendChild(nueva)
         return

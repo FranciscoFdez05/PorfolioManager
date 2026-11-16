@@ -222,8 +222,11 @@ def testInteresesIdaYVuelta(clienteRegistros):
     cuentas = [{"id": "c1", "nombre": "Remunerada", "rows": [{"fecha": "01-2026", "acumulado": "10", "impuestos": "1"}]}]
 
     assert client.post("/api/intereses", json={"cuentas": cuentas}, headers=cabeceras).get_json()["ok"]
-    # Sin cuenta de «Cuentas» elegida, `cuenta` vuelve vacío.
-    assert client.get("/api/intereses").get_json()["cuentas"] == [{**cuentas[0], "cuenta": ""}]
+    # Sin cuenta de «Cuentas» elegida, `cuenta` vuelve vacío. Los importes se
+    # guardan en céntimos y vuelven en formato de presentación («10» -> «10,00 €»).
+    esperada = {**cuentas[0], "cuenta": "",
+                "rows": [{"fecha": "01-2026", "acumulado": "10,00 €", "impuestos": "1,00 €"}]}
+    assert client.get("/api/intereses").get_json()["cuentas"] == [esperada]
     assert client.post("/api/intereses/reset", headers=cabeceras).get_json()["ok"]
     assert client.get("/api/intereses").get_json()["cuentas"] == []
 

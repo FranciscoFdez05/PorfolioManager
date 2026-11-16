@@ -22,6 +22,7 @@ portfolio-export*.zip
 # LOGS
 # =========================
 logs/*.log
+logs/*.log.*
 !logs/.gitkeep
 
 # =========================

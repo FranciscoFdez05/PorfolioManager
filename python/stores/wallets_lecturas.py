@@ -22,8 +22,9 @@ from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from core import bloqueo, paths
+from core import bloqueo
 from core.escritura import escribirAtomico
+from core.wallets_carpeta import carpetaWalletsActiva
 from stores.wallets_store import fernetWallets
 
 log = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ class LecturasRepository:
 
     @property
     def carpeta(self) -> Path:
-        return self._carpeta if self._carpeta is not None else paths.API_DIR / NOMBRE_CARPETA
+        return self._carpeta if self._carpeta is not None else carpetaWalletsActiva() / NOMBRE_CARPETA
 
     @property
     def disponible(self) -> bool:

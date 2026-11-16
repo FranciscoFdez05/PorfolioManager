@@ -426,6 +426,35 @@
     gap: 12px;
 }
 
+/* assetModalInput/Select llevan margin-bottom de modal: dentro de una fila descentran el botón */
+.ajustesActions .assetModalInput,
+.ajustesActions .assetModalSelect {
+    margin-bottom: 0;
+}
+
+.ajustesActions a.primaryButton,
+.ajustesActions a.secondaryButton {
+    text-decoration: none;
+}
+
+/* Exportar CSV: el desplegable propio (.csWrapper) ocupa el hueco libre y el año
+   queda como un campo estrecho y centrado, al estilo del resto de controles. */
+.ajustesActions .csWrapper {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.ajustesActions .csTrigger {
+    min-height: 38px;
+    padding: 0 12px;
+    font-size: 0.95rem;
+    color: var(--text);
+}
+
+.ajustesActions .csWrapper:has(#ajustesExportarAnio) {
+    flex: 0 0 110px;
+}
+
 /* buttons inside ajustesActions — icon + text alignment */
 .ajustesActions .primaryButton,
 .ajustesActions .secondaryButton,
@@ -463,6 +492,190 @@
 }
 .ajustesStatusMsg.error {
     color: var(--color-neg-bright);
+}
+
+/* Píldora del aviso (showMsg en js/ajustes/ajustes.js). --ajustesMsgTono tiñe
+   borde, fondo, icono y barra con el color del estado; los tres temas lo
+   heredan de sus variables sin reglas propias. */
+.ajustesStatusMsg {
+    --ajustesMsgTono: var(--accent);
+}
+.ajustesStatusMsg.ok {
+    --ajustesMsgTono: var(--color-pos-bright);
+}
+.ajustesStatusMsg.error {
+    --ajustesMsgTono: var(--color-neg-bright);
+}
+
+.ajustesStatusChip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    padding: 6px 12px 8px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--ajustesMsgTono) 35%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ajustesMsgTono) 10%, transparent);
+    font-weight: 500;
+    line-height: 1.35;
+    animation: ajustesMsgEntra 0.18s ease-out;
+}
+
+.ajustesStatusMsg.pendiente .ajustesStatusChip {
+    color: var(--text-primary);
+}
+
+.ajustesStatusIcono {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    color: var(--ajustesMsgTono);
+}
+
+.ajustesStatusGiro {
+    box-sizing: border-box;
+    border: 2px solid color-mix(in srgb, var(--ajustesMsgTono) 25%, transparent);
+    border-top-color: var(--ajustesMsgTono);
+    border-radius: 50%;
+    animation: ajustesMsgGira 0.7s linear infinite;
+}
+
+.ajustesStatusTexto {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.ajustesStatusBarra {
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 2px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--ajustesMsgTono) 15%, transparent);
+}
+
+.ajustesStatusRelleno {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 100%;
+    background: var(--ajustesMsgTono);
+    transform-origin: left center;
+}
+
+/* En curso: vaivén indeterminado (progresoVaiven, de css/components/progreso.css). */
+.ajustesStatusMsg.pendiente .ajustesStatusRelleno {
+    width: 35%;
+    animation: progresoVaiven 1.1s ease-in-out infinite;
+}
+
+/* Terminado: la barra se vacía al ritmo del autocierre del aviso. */
+.ajustesStatusMsg.ok .ajustesStatusRelleno,
+.ajustesStatusMsg.error .ajustesStatusRelleno {
+    animation: ajustesMsgCuenta var(--ajustesMsgDuracion, 3000ms) linear forwards;
+}
+
+@keyframes ajustesMsgEntra {
+    from {
+        opacity: 0;
+        transform: translateY(3px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes ajustesMsgGira {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes ajustesMsgCuenta {
+    from {
+        transform: scaleX(1);
+    }
+    to {
+        transform: scaleX(0);
+    }
+}
+
+/* Tarjeta con una operación en curso o recién terminada: una línea en el borde
+   superior. Sin overflow: hidden en la tarjeta (recortaría sus desplegables),
+   así que la línea se separa de las esquinas redondeadas con left/right. */
+.ajustesSection::after {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: 14px;
+    right: 14px;
+    height: 2px;
+    border-radius: 2px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+.ajustesSection.ajustesSeccionOcupada::after {
+    opacity: 1;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent) no-repeat;
+    background-size: 40% 100%;
+    animation: ajustesSeccionVaiven 1.1s ease-in-out infinite;
+}
+
+.ajustesSection.ajustesSeccionHecha::after,
+.ajustesSection.ajustesSeccionFallo::after {
+    animation: ajustesSeccionDestello 1.2s ease-out forwards;
+}
+.ajustesSection.ajustesSeccionHecha::after {
+    background: var(--color-pos-bright);
+}
+.ajustesSection.ajustesSeccionFallo::after {
+    background: var(--color-neg-bright);
+}
+
+/* Con background-size al 40 %, -67 % y 167 % dejan la franja justo fuera por cada lado. */
+@keyframes ajustesSeccionVaiven {
+    from {
+        background-position: -67% 0;
+    }
+    to {
+        background-position: 167% 0;
+    }
+}
+
+@keyframes ajustesSeccionDestello {
+    0% {
+        opacity: 1;
+    }
+    60% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ajustesStatusChip,
+    .ajustesStatusGiro,
+    .ajustesSection.ajustesSeccionOcupada::after {
+        animation: none;
+    }
+    .ajustesStatusMsg.pendiente .ajustesStatusRelleno {
+        width: 100%;
+        animation: none;
+        opacity: 0.6;
+    }
+    .ajustesStatusMsg.ok .ajustesStatusBarra,
+    .ajustesStatusMsg.error .ajustesStatusBarra {
+        display: none;
+    }
+    .ajustesSection.ajustesSeccionOcupada::after {
+        background-size: 100% 100%;
+        opacity: 0.6;
+    }
 }
 
 .ajustesLabelRow {
@@ -844,6 +1057,10 @@
     overflow: hidden;
     flex-direction: column;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.ajustesDropMenu.arriba {
+    top: auto;
+    bottom: calc(100% + 4px);
 }
 .ajustesDropOption {
     width: 100%;
@@ -1435,6 +1652,12 @@
     background: var(--bg-inset);
 }
 
+/* Hijo directo de la sección (Telegram): sin este margen lateral el bloque toca
+   los bordes de la tarjeta en vez de respetar el sangrado de 20px del resto. */
+.ajustesSection > .ajustesTlsAyuda {
+    margin: 4px 20px 20px;
+}
+
 .ajustesTlsAyuda > summary {
     padding: 9px 12px;
     cursor: pointer;
@@ -1787,6 +2010,71 @@
 }
 .ajustesExportClaves em {
     font-style: normal;
+    color: var(--text-subtle);
+}
+
+/* Exportar como ZIP: las dos casillas en una fila y la explicación tras el «?»,
+   para que la tarjeta no sea un bloque de texto. */
+.ajustesExportOpciones {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 0 20px 18px;
+}
+.ajustesExportOpciones .ajustesExportClaves {
+    align-items: center;
+    margin: 0;
+}
+.ajustesExportOpciones .ajustesExportClaves input {
+    margin: 0;
+}
+.ajustesExportAyudaBtn {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--btn-border);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+}
+.ajustesExportAyudaBtn:hover,
+.ajustesExportAyudaBtn[aria-expanded="true"] {
+    color: var(--text-bright);
+    border-color: var(--btn-active-border);
+}
+.ajustesExportAyudaBtn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+.ajustesExportAyuda {
+    margin: -8px 20px 18px;
+    padding: 10px 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-inset);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+.ajustesExportAyuda[hidden] {
+    display: none;
+}
+.ajustesExportAyuda p {
+    margin: 0;
+}
+.ajustesExportAyuda p + p {
+    margin-top: 6px;
+}
+.ajustesExportAyuda strong,
+.ajustesExportAyuda em {
+    font-style: normal;
+    font-weight: 600;
     color: var(--text-subtle);
 }
 

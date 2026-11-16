@@ -1,0 +1,35 @@
+<div class="financiadasPage">
+
+    <div class="hipotecasToolbar">
+        <div class="hipotecasToolbarLeft">
+            <label class="bonosFilterBtn" id="financiadasMostrarLiquidadasLabel">
+                <input type="checkbox" id="financiadasMostrarLiquidadas"><span>Mostrar liquidadas</span>
+            </label>
+        </div>
+        <div class="hipotecasToolbarRight">
+            <button id="financiadasAddBtn" class="primaryButton" type="button" data-no-autohide="true">Añadir compra</button>
+        </div>
+    </div>
+
+    <div class="hipotecasTotales" id="financiadasTotales"></div>
+
+    <div class="financiadasProximos hidden" id="financiadasProximos"></div>
+
+    <div class="hipotecasPanel" id="financiadasPanel">
+        <div class="hipotecasCuadroWrapper financiadasTablaWrapper" id="financiadasTablaWrapper">
+            <table class="hipotecasTabla hipotecasCuadro">
+                <thead>
+                    <tr>
+                        <th>Artículo</th><th>Precio</th><th>Cuota</th><th>Cuotas</th><th>TIN</th>
+                        <th>Próximo cobro</th><th>Fin</th><th>Tiempo restante</th>
+                        <th>Pendiente</th><th>Progreso</th><th></th>
+                    </tr>
+                </thead>
+                <tbody id="financiadasBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <p class="overviewEmpty hidden" id="financiadasEmptyMsg">No hay compras financiadas registradas.</p>
+
+</div>

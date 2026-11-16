@@ -339,6 +339,26 @@ html[data-theme="black"] .portfolioSwitcherBtn:hover {
         inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+/* pages/operaciones.css */
+html[data-theme="black"] #walletsSegEnlazarBtn {
+    background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%);
+    border-color: var(--accent);
+    border-left-color: var(--accent);
+    box-shadow:
+        0 0 0 1px rgba(var(--accent-rgb), 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* pages/operaciones.css */
+html[data-theme="black"] #walletsSegEnlazarBtn:hover {
+    background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%);
+    border-color: var(--accent-hover);
+    border-left-color: var(--accent-soft);
+    box-shadow:
+        0 0 0 2px rgba(var(--accent-rgb), 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
 /* components/selector-portfolios.css */
 html[data-theme="black"] .portfolioMenuItemActive {
     color: var(--accent);
@@ -390,7 +410,17 @@ html[data-theme="black"] #addGastoRowBtn,
 html[data-theme="black"] #addIngresoRowBtn,
 html[data-theme="black"] #cuentasAddRowBtn,
 html[data-theme="black"] #cuentaAhorroAddRowBtn,
-html[data-theme="black"] #mvcAddRowBtn {
+html[data-theme="black"] #mvcAddRowBtn,
+html[data-theme="black"] #cuentasNuevaCuentaBtn,
+html[data-theme="black"] #hipotecasAddBtn,
+html[data-theme="black"] #financiadasAddBtn,
+html[data-theme="black"] #microcreditosAddBtn,
+html[data-theme="black"] #ahorroConfigBtn,
+html[data-theme="black"] #pinvCrearBtn,
+html[data-theme="black"] #mensAddBtn,
+html[data-theme="black"] #recAddBtn,
+html[data-theme="black"] #pinvArchivoBtn,
+html[data-theme="black"] .alPanelNueva {
     background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%) !important;
     border: 1px solid var(--accent) !important;
     border-left: 3px solid var(--accent) !important;
@@ -420,7 +450,17 @@ html[data-theme="black"] #addGastoRowBtn:hover,
 html[data-theme="black"] #addIngresoRowBtn:hover,
 html[data-theme="black"] #cuentasAddRowBtn:hover,
 html[data-theme="black"] #cuentaAhorroAddRowBtn:hover,
-html[data-theme="black"] #mvcAddRowBtn:hover {
+html[data-theme="black"] #mvcAddRowBtn:hover,
+html[data-theme="black"] #cuentasNuevaCuentaBtn:hover,
+html[data-theme="black"] #hipotecasAddBtn:hover,
+html[data-theme="black"] #financiadasAddBtn:hover,
+html[data-theme="black"] #microcreditosAddBtn:hover,
+html[data-theme="black"] #ahorroConfigBtn:hover,
+html[data-theme="black"] #pinvCrearBtn:hover,
+html[data-theme="black"] #mensAddBtn:hover,
+html[data-theme="black"] #recAddBtn:hover,
+html[data-theme="black"] #pinvArchivoBtn:hover,
+html[data-theme="black"] .alPanelNueva:hover {
     background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%) !important;
     border-color: var(--accent-hover) !important;
     border-left-color: var(--accent-soft) !important;
@@ -1230,7 +1270,17 @@ html[data-theme="black"]
         #addIngresoRowBtn,
         #cuentasAddRowBtn,
         #cuentaAhorroAddRowBtn,
-        #mvcAddRowBtn
+        #mvcAddRowBtn,
+        #cuentasNuevaCuentaBtn,
+        #hipotecasAddBtn,
+        #financiadasAddBtn,
+        #microcreditosAddBtn,
+        #ahorroConfigBtn,
+        #pinvCrearBtn,
+        #mensAddBtn,
+        #recAddBtn,
+        #pinvArchivoBtn,
+        .alPanelNueva
     ) {
     background: var(--bg-surface) !important;
     border-color: var(--border-mid) !important;
@@ -1260,7 +1310,17 @@ html[data-theme="black"]
         #addIngresoRowBtn,
         #cuentasAddRowBtn,
         #cuentaAhorroAddRowBtn,
-        #mvcAddRowBtn
+        #mvcAddRowBtn,
+        #cuentasNuevaCuentaBtn,
+        #hipotecasAddBtn,
+        #financiadasAddBtn,
+        #microcreditosAddBtn,
+        #ahorroConfigBtn,
+        #pinvCrearBtn,
+        #mensAddBtn,
+        #recAddBtn,
+        #pinvArchivoBtn,
+        .alPanelNueva
     ):hover {
     background: var(--bg-elevated) !important;
     border-color: var(--border-hard) !important;
@@ -1419,9 +1479,20 @@ html[data-theme="black"] .summaryCardValue {
 
 /* ── 8. Vista general ────────────────────────────────────────────────────── */
 
-html[data-theme="black"] .overviewEmpty {
+html[data-theme="black"] .overviewEmpty,
+html[data-theme="black"] .mensCalEmpty,
+html[data-theme="black"] .calFinEmpty,
+html[data-theme="black"] .ahorroEmpty,
+html[data-theme="black"] .mensTableWrapper:has(.mensEmptyRow),
+html[data-theme="black"] .recTableWrapper:has(.recEmptyRow) {
     background: var(--bg-panel);
     border-color: var(--border-soft);
+    color: var(--text-muted);
+}
+
+html[data-theme="black"] .mensTable tbody .mensEmptyRow td,
+html[data-theme="black"] .recTable tbody .recEmptyRow td {
+    background: transparent;
     color: var(--text-muted);
 }
 
@@ -1747,14 +1818,12 @@ html[data-theme="black"] .bonosTable tbody td {
 /* ── 12. Mi dinero ───────────────────────────────────────────────────────── */
 /* Gastos, ingresos, cuentas, ahorro y calendario. */
 
-html[data-theme="black"] .gastosYearBtn.active,
 html[data-theme="black"] .gastosMonthTab.active {
     background: #2e2e36;
     border-color: #3a3a46;
     color: var(--text-primary);
 }
 
-html[data-theme="black"] .ingresosYearBtn.active,
 html[data-theme="black"] .ingresosMonthTab.active {
     background: #2e2e36;
     border-color: #3a3a46;
@@ -1767,7 +1836,6 @@ html[data-theme="black"] .gastosAnnualTable .headerRow td {
     border-color: #1e4a8a;
 }
 
-html[data-theme="black"] .gastosYearBtn,
 html[data-theme="black"] .gastosAddYearBtn,
 html[data-theme="black"] .gastosMonthTab {
     background: var(--bg-surface);
@@ -1775,7 +1843,6 @@ html[data-theme="black"] .gastosMonthTab {
     color: var(--text-subtle);
 }
 
-html[data-theme="black"] .gastosYearBtn:hover,
 html[data-theme="black"] .gastosAddYearBtn:hover,
 html[data-theme="black"] .gastosMonthTab:hover {
     background: var(--bg-elevated);
@@ -1854,7 +1921,6 @@ html[data-theme="black"] .gtTotalRow td {
     border-top-color: var(--accent);
 }
 
-html[data-theme="black"] .ingresosYearBtn,
 html[data-theme="black"] .ingresosAddYearBtn,
 html[data-theme="black"] .ingresosMonthTab {
     background: var(--bg-surface);
@@ -1862,14 +1928,12 @@ html[data-theme="black"] .ingresosMonthTab {
     color: var(--text-subtle);
 }
 
-html[data-theme="black"] .ingresosYearBtn:hover,
 html[data-theme="black"] .ingresosAddYearBtn:hover,
 html[data-theme="black"] .ingresosMonthTab:hover {
     background: var(--bg-elevated);
     border-color: var(--border-mid);
 }
 
-html[data-theme="black"] .ingresosYearBtn.active,
 html[data-theme="black"] .ingresosMonthTab.active {
     background: var(--accent-dark);
     border-color: var(--accent);

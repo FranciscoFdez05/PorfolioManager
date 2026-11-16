@@ -215,8 +215,10 @@ async function loadCuentaAhorroDividendos() {
     // tienen de una cuenta borrada) van a la primera que cobra los dividendos.
     const actual = getCuentaAhorroActual()
     const porDefecto = cuentaAhorroTodas.find((c) => c.dividendos)
+    // Un reinvertido se gasta en comprar participaciones: no llega a la cuenta.
     const esDeEsta = (row) =>
-        cuentaAhorroTodas.some((c) => c.id === row.cuenta) ? row.cuenta === actual.id : porDefecto?.id === actual.id
+        !row.reinvertido &&
+        (cuentaAhorroTodas.some((c) => c.id === row.cuenta) ? row.cuenta === actual.id : porDefecto?.id === actual.id)
 
     cuentaAhorroDivEur = await Promise.all(
         cuentaAhorroDividendos.filter(esDeEsta).map(async (row) => {

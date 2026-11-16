@@ -29,12 +29,21 @@ log = logging.getLogger(__name__)
 # del periodo con margen; el frontend recorta a la ventana exacta:
 #   dia: 5 min × 300 = 25 h.   semana: 1 h × 200 ≈ 8 días.
 #   mes: 4 h × 200 ≈ 33 días.  anyo/ytd: diarias × 380 ≈ 1 año natural.
+#   estacional: diarias × 1150, para cubrir desde el 1 de enero de hace dos
+#   años en una cripto (365 velas al año); en bolsa sobran velas.
+#   mensual: velas de un mes × 300 = 25 años, para la tabla de rendimiento
+#   mensual por años de la ficha; el feed da las que haya desde el inicio.
+#   historico: diarias × 5000, el máximo del feed (MAX_VELAS_DIARIAS), para los
+#   estacionales: unos 13 años en cripto y 20 en bolsa.
 PERIODOS = {
     "dia": ("5", 300),
     "semana": ("60", 200),
     "mes": ("240", 200),
     "anyo": ("1D", 380),
     "ytd": ("1D", 380),
+    "estacional": ("1D", 1150),
+    "mensual": ("1M", 300),
+    "historico": ("1D", 5000),
 }
 
 # Tope por petición: un mapa con todos los activos ronda los 40; sin tope, una

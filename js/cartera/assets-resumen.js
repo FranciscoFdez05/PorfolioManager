@@ -539,16 +539,21 @@ function initSidebarFilterBar() {
                 }))
             )
         }
-        pnMenu(e.currentTarget, items, async (valor) => {
-            if (valor === SIDEBAR_VALOR_PORTFOLIO) {
-                _sidebarFilter = "portfolio"
-            } else {
-                _sidebarLista = valor
-                _sidebarFilter = "lista"
-            }
-            sidebarActualizarListas()
-            await repintar()
-        })
+        pnMenu(
+            e.currentTarget,
+            items,
+            async (valor) => {
+                if (valor === SIDEBAR_VALOR_PORTFOLIO) {
+                    _sidebarFilter = "portfolio"
+                } else {
+                    _sidebarLista = valor
+                    _sidebarFilter = "lista"
+                }
+                sidebarActualizarListas()
+                await repintar()
+            },
+            { igualarAncho: true }
+        )
     })
     // Crear, renombrar o borrar listas, o cambiar sus activos, desde Seguimiento.
     window.addEventListener("seguimiento:listas", async () => {

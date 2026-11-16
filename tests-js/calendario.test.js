@@ -120,7 +120,9 @@ describe("qué entra en el calendario", () => {
         expect(totales.map((tipo) => [tipo.key, tipo.total])).toEqual([
             ["gastos", 30],
             ["ingresos", 2000],
-            ["mensualidades", 10]
+            ["mensualidades", 10],
+            ["vencimientos", 0],
+            ["dividendos", 0]
         ])
     })
 
@@ -130,5 +132,71 @@ describe("qué entra en el calendario", () => {
 
         const [cargo] = getCalFinApuntes()
         expect(cargo.sinDia).toBe(true)
+    })
+})
+
+describe("vencimientos de renta fija y bonos", () => {
+    beforeEach(() => {
+        calFinTipos = new Set(["vencimientos"])
+        calFinVencimientosData = {
+            rentaFija: [
+                {
+                    instrumento: "Letra 12m",
+                    vencimiento: "20-09-2026",
+                    invertido: "1.000,00 €",
+                    interesAcumulado: "30,00 €",
+                    impuestos: "5,00 €"
+                },
+                { instrumento: "Otro año", vencimiento: "20-09-2027", invertido: "500,00 €" },
+                { instrumento: "Sin fecha", vencimiento: "", invertido: "500,00 €" }
+            ],
+            bonos: [{ instrumento: "Bono 2026", vencimiento: "01-03-2026", invertido: "2.000,00 €" }]
+        }
+    })
+
+    it("pone capital e intereses netos en el día del vencimiento y solo del año elegido", () => {
+        const apuntes = getCalFinApuntes()
+        expect(apuntes.map((apunte) => `${apunte.nombre} ${apunte.date.getMonth() + 1}/${apunte.date.getDate()}`)).toEqual([
+            "Bono 2026 3/1",
+            "Letra 12m 9/20"
+        ])
+        expect(apuntes[1].amount).toBeCloseTo(1025)
+        expect(apuntes.every((apunte) => apunte.sinDia === false)).toBe(true)
+    })
+
+    it("no entran si el chip no está activo", () => {
+        calFinTipos = new Set(["gastos"])
+        expect(getCalFinApuntes()).toHaveLength(0)
+    })
+
+    it("no cuentan en el balance porque son capital que vuelve", () => {
+        expect(calFinBalance(getCalFinApuntes())).toBe(0)
+    })
+
+    it("un instrumento sin importe no apunta nada", () => {
+        calFinVencimientosData = { rentaFija: [{ instrumento: "Vacío", vencimiento: "20-09-2026" }], bonos: [] }
+        expect(getCalFinApuntes()).toHaveLength(0)
+    })
+})
+
+describe("dividendos cobrados", () => {
+    const fila = (extra) => ({ fecha: "10-06-2026", instrumento: "KO", total: "12,50", monedaTotal: "EUR", ...extra })
+
+    it("cae el día de su fecha y suma al balance", () => {
+        const [apunte] = calFinDividendosApuntes([fila()], 2026)
+        expect(apunte.tipo).toBe("dividendos")
+        expect(apunte.date.getDate()).toBe(10)
+        expect(apunte.amount).toBeCloseTo(12.5)
+        expect(calFinBalance([apunte])).toBeCloseTo(12.5)
+    })
+
+    it("omite otro año, fecha incompleta, otra moneda e importe vacío", () => {
+        const filas = [
+            fila({ fecha: "10-06-2025" }),
+            fila({ fecha: "06-2026" }),
+            fila({ monedaTotal: "USD" }),
+            fila({ total: "" })
+        ]
+        expect(calFinDividendosApuntes(filas, 2026)).toEqual([])
     })
 })

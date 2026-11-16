@@ -40,6 +40,7 @@ import json
 import re
 from decimal import Decimal
 
+from core.centimos import escribirImporte, importeSql, leerImporte, leerImporteCanonico
 from core.db import getDb, transactional
 from core.dinero import ImporteInvalido, aDecimal, aDecimalONulo, aTexto, aTextoEs
 
@@ -146,7 +147,8 @@ def _decimal(texto):
 # los demás hilos hasta el siguiente commit.
 
 _SELECT_CUENTAS = (
-    "SELECT c.id, c.nombre, c.tipo, c.etiquetas, c.saldo_inicial, c.dividendos, c.ahorro, v.remunerada_id, "
+    "SELECT c.id, c.nombre, c.tipo, c.etiquetas, c.saldo_inicial, c.saldo_inicial_cent, c.dividendos, c.ahorro, "
+    "v.remunerada_id, "
     "r.nombre AS remunerada_nombre "
     "FROM cuentas c "
     "LEFT JOIN cuenta_remunerada_vinculo v ON v.cuenta_id = c.id "
@@ -187,7 +189,7 @@ def _filaACuenta(fila):
         "nombre": fila["nombre"],
         "tipo": fila["tipo"],
         "etiquetas": _etiquetasGuardadas(fila["etiquetas"], fila["tipo"]),
-        "saldo_inicial": fila["saldo_inicial"],
+        "saldo_inicial": leerImporteCanonico(fila["saldo_inicial_cent"], fila["saldo_inicial"]),
         "protegida": fila["id"] in (ID_BANCO, ID_AHORRO),
         "remunerada": fila["remunerada_id"] or "",
         "remunerada_nombre": fila["remunerada_nombre"] or "",
@@ -373,15 +375,15 @@ def crearCuenta(nombre, tipo, saldoInicial="", remunerada="", dividendos=False, 
     _nombreLibre(nombre, conn)
     if len(listarCuentas(conn)) >= _MAX_CUENTAS:
         raise CuentaInvalida("Has llegado al máximo de cuentas")
-    inicial = _saldoInicial(saldoInicial)
+    inicialCent, inicialLegado = escribirImporte(_saldoInicial(saldoInicial))
     orden = conn.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cuentas").fetchone()[0]
     cuentaId = _idNuevo(nombre, tipo, conn)
     esAhorro = tipo == "ahorro" if ahorro is None else bool(ahorro)
     extra = _normalizarEtiquetas(etiquetas, tipo)
     conn.execute(
-        "INSERT INTO cuentas (id, nombre, tipo, etiquetas, saldo_inicial, sort_order, ahorro) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (cuentaId, nombre, tipo, extra, inicial, orden, 1 if esAhorro else 0),
+        "INSERT INTO cuentas (id, nombre, tipo, etiquetas, saldo_inicial, saldo_inicial_cent, sort_order, ahorro) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (cuentaId, nombre, tipo, extra, inicialLegado, inicialCent, orden, 1 if esAhorro else 0),
     )
     _vincular(cuentaId, remunerada, conn)
     _marcarDividendos(cuentaId, bool(dividendos), conn)
@@ -412,8 +414,10 @@ def modificarCuenta(
         conn.execute("UPDATE cuentas SET nombre = ? WHERE id = ?", (nombre, cuentaId))
 
     if saldoInicial is not None:
+        inicialCent, inicialLegado = escribirImporte(_saldoInicial(saldoInicial))
         conn.execute(
-            "UPDATE cuentas SET saldo_inicial = ? WHERE id = ?", (_saldoInicial(saldoInicial), cuentaId)
+            "UPDATE cuentas SET saldo_inicial = ?, saldo_inicial_cent = ? WHERE id = ?",
+            (inicialLegado, inicialCent, cuentaId),
         )
 
     if tipo is not None or etiquetas is not None:
@@ -507,8 +511,8 @@ def _filaATransferencia(fila, nombres):
         "destino": fila["destino"],
         "origen_nombre": nombres.get(fila["origen"], fila["origen"]),
         "destino_nombre": nombres.get(fila["destino"], fila["destino"]),
-        "cantidad": fila["cantidad"],
-        "comision": fila["comision"],
+        "cantidad": leerImporte(fila["cantidad_cent"], fila["cantidad"]),
+        "comision": leerImporte(fila["comision_cent"], fila["comision"]),
         "concepto": fila["concepto"],
         "nota": fila["nota"],
     }
@@ -518,7 +522,8 @@ def listarTransferencias(conn=None):
     conn = conn or getDb()
     nombres = {c["id"]: c["nombre"] for c in listarCuentas(conn)}
     filas = conn.execute(
-        "SELECT id, fecha, origen, destino, cantidad, comision, concepto, nota FROM transferencias ORDER BY id"
+        "SELECT id, fecha, origen, destino, cantidad, cantidad_cent, comision, comision_cent, concepto, nota "
+        "FROM transferencias ORDER BY id"
     ).fetchall()
     return [_filaATransferencia(f, nombres) for f in filas]
 
@@ -564,10 +569,11 @@ def crearTransferencia(origen, destino, fecha, cantidad, concepto="", nota="", c
     origen, destino, fecha, cantidad, concepto, nota, comision = _prepararTransferencia(
         origen, destino, fecha, cantidad, concepto, nota, comision, conn
     )
+    (cantidadCent, cantidadLegado), (comisionCent, comisionLegado) = escribirImporte(cantidad), escribirImporte(comision)
     cursor = conn.execute(
-        "INSERT INTO transferencias (fecha, origen, destino, cantidad, concepto, nota, comision) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (fecha, origen, destino, cantidad, concepto, nota, comision),
+        "INSERT INTO transferencias (fecha, origen, destino, cantidad, cantidad_cent, concepto, nota, comision, "
+        "comision_cent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (fecha, origen, destino, cantidadLegado, cantidadCent, concepto, nota, comisionLegado, comisionCent),
     )
     conn.commit()
     return next(t for t in listarTransferencias(conn) if t["id"] == cursor.lastrowid)
@@ -581,10 +587,12 @@ def modificarTransferencia(transferenciaId, origen, destino, fecha, cantidad, co
     origen, destino, fecha, cantidad, concepto, nota, comision = _prepararTransferencia(
         origen, destino, fecha, cantidad, concepto, nota, comision, conn
     )
+    (cantidadCent, cantidadLegado), (comisionCent, comisionLegado) = escribirImporte(cantidad), escribirImporte(comision)
     conn.execute(
-        "UPDATE transferencias SET fecha = ?, origen = ?, destino = ?, cantidad = ?, concepto = ?, nota = ?, "
-        "comision = ? WHERE id = ?",
-        (fecha, origen, destino, cantidad, concepto, nota, comision, transferenciaId),
+        "UPDATE transferencias SET fecha = ?, origen = ?, destino = ?, cantidad = ?, cantidad_cent = ?, "
+        "concepto = ?, nota = ?, comision = ?, comision_cent = ? WHERE id = ?",
+        (fecha, origen, destino, cantidadLegado, cantidadCent, concepto, nota, comisionLegado, comisionCent,
+         transferenciaId),
     )
     conn.commit()
     return next(t for t in listarTransferencias(conn) if t["id"] == transferenciaId)
@@ -679,7 +687,8 @@ def _rendimientosEn(conn, fechas, aEuros=None):
     resultados = [{} for _ in fechas]
 
     for fila in conn.execute(
-        "SELECT v.cuenta_id, i.fecha, i.acumulado, i.impuestos FROM intereses_v2 i "
+        f"SELECT v.cuenta_id, i.fecha, {importeSql('i.acumulado')} AS acumulado, "
+        f"{importeSql('i.impuestos')} AS impuestos FROM intereses_v2 i "
         "JOIN cuenta_remunerada_vinculo v ON v.remunerada_id = i.cuenta_id"
     ).fetchall():
         year, month = _anioMes(fila["fecha"])
@@ -698,7 +707,11 @@ def _rendimientosEn(conn, fechas, aEuros=None):
     # tienen de una cuenta borrada) van a la que cobra los dividendos, si hay.
     cobra = conn.execute("SELECT id FROM cuentas WHERE dividendos = 1 ORDER BY sort_order, rowid").fetchone()
     existentes = {fila["id"] for fila in conn.execute("SELECT id FROM cuentas").fetchall()}
-    for fila in conn.execute("SELECT fecha, total, moneda_total, cuenta FROM dividendos").fetchall():
+    # Un dividendo reinvertido no llega a la cuenta: se gasta en comprar
+    # participaciones, así que no suma a su saldo ni a lo que rinde.
+    for fila in conn.execute(
+        f"SELECT fecha, {importeSql('total')} AS total, moneda_total, cuenta FROM dividendos WHERE reinvertido = 0"
+    ).fetchall():
         destino = fila["cuenta"] if fila["cuenta"] in existentes else (cobra["id"] if cobra is not None else None)
         if destino is None:
             continue
@@ -741,7 +754,10 @@ def _saldosEn(conn, fechas, aEuros=None):
     rendidos = _rendimientosEn(conn, fechas, aEuros)
     existentes = acumulados[0]
 
-    for fila in conn.execute("SELECT fecha, origen, destino, cantidad, comision FROM transferencias").fetchall():
+    for fila in conn.execute(
+        f"SELECT fecha, origen, destino, {importeSql('cantidad')} AS cantidad, {importeSql('comision')} AS comision "
+        "FROM transferencias"
+    ).fetchall():
         year, month = _yearMonth(fila["fecha"])
         importe = _decimal(fila["cantidad"])
         comision = _decimal(fila["comision"])
@@ -756,7 +772,9 @@ def _saldosEn(conn, fechas, aEuros=None):
                 acumulado[fila["origen"]]["comisiones"] += comision
 
     for tabla, campo in (("ingresos_rows", "entradas"), ("gastos_rows", "salidas")):
-        for fila in conn.execute(f"SELECT year, month, cantidad, cuenta FROM {tabla}").fetchall():
+        for fila in conn.execute(
+            f"SELECT year, month, {importeSql('cantidad')} AS cantidad, cuenta FROM {tabla}"
+        ).fetchall():
             cuentaId = _cuentaDeFila(fila["cuenta"])
             if cuentaId not in existentes:
                 continue
@@ -768,7 +786,7 @@ def _saldosEn(conn, fechas, aEuros=None):
     # Mensualidades e ingresos recurrentes: importes por mes, de la cuenta con la
     # que se pagan o en la que se cobran (vacía, o una que ya no existe, = bancaria).
     for tabla, campo in (("ingresos_recurrentes", "entradas"), ("mensualidades", "salidas")):
-        columnas = ", ".join(["year", "cuenta", "cuentas_cobro", *MONTH_KEYS])
+        columnas = ", ".join(["year", "cuenta", "cuentas_cobro", *(f"{importeSql(mes)} AS {mes}" for mes in MONTH_KEYS)])
         for fila in conn.execute(f"SELECT {columnas} FROM {tabla}").fetchall():
             habitual = _cuentaDeFila(fila["cuenta"])
             # Un mes puede cobrarse con otra cuenta que la habitual de la fila.
@@ -885,7 +903,7 @@ def movimientosDeCuenta(cuentaId, conn=None):
 
     for tabla, origen, kind in (("ingresos_rows", "ingreso", "entrada"), ("gastos_rows", "gasto", "salida")):
         for fila in conn.execute(
-            f"SELECT id, year, month, fecha, nombre, tipo, cantidad, nota, cuenta FROM {tabla} ORDER BY id"
+            f"SELECT id, year, month, fecha, nombre, tipo, cantidad, cantidad_cent, nota, cuenta FROM {tabla} ORDER BY id"
         ).fetchall():
             if _cuentaDeFila(fila["cuenta"]) != cuentaId:
                 continue
@@ -899,7 +917,7 @@ def movimientosDeCuenta(cuentaId, conn=None):
                 "year": fila["year"],
                 "month": fila["month"],
                 "nombre": fila["nombre"],
-                "cantidad": fila["cantidad"],
+                "cantidad": leerImporte(fila["cantidad_cent"], fila["cantidad"]),
                 "nota": fila["nota"],
             })
     return movimientos

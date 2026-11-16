@@ -8,6 +8,20 @@
     font-family: inherit;
 }
 
+/* Texto de las barras de cuentas y años cuando no hay nada que elegir: sin él
+   quedaban dos huecos vacíos y la barra de cuentas casi sin ancho. */
+.crBarraVacia {
+    display: inline-flex;
+    align-items: center;
+    height: 34px;
+    padding: 0 12px;
+    font-size: 12px;
+    white-space: nowrap;
+    color: var(--text-muted);
+    border: 1px dashed var(--border-soft);
+    border-radius: 8px;
+}
+
 .crPanel {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);

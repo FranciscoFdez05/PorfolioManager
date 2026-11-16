@@ -129,7 +129,7 @@ function construirColumnaCategorias(panel) {
         <section class="catColumn">
             <h4 class="catColumnTitle">${escapeCategoriasHtml(panel.titulo)}<span class="catCount">${filas.length}</span></h4>
             <ul class="catList">${cuerpo}</ul>
-            <button type="button" class="catAddBtn" data-cat-add="${panel.clave}">+ Añadir categoría</button>
+            <button type="button" class="catAddBtn" data-cat-add="${panel.clave}">Añadir categoría</button>
         </section>
     `
 }
@@ -306,7 +306,7 @@ function refrescarPaginaTrasCategorias() {
     }
 }
 
-function abrirCategoriasModal() {
+function abrirCategoriasModal(panelInicial = "") {
     cerrarCategoriasModal()
 
     const overlay = document.createElement("div")
@@ -369,7 +369,15 @@ function abrirCategoriasModal() {
     cargarCategoriasEstado()
         .then((estado) => {
             categoriasEstado = estado
+            // Desde el botón de una tabla sin categorías se llega para crearlas:
+            // se deja ya una fila lista para escribir en la lista que toca.
+            if (panelInicial && estado[panelInicial] && !estado[panelInicial].filas.length) {
+                estado[panelInicial].filas.push({ original: "", valor: "", usos: 0 })
+            }
             renderCategoriasModal()
+            if (panelInicial) {
+                document.querySelector(`[data-cat-input="${panelInicial}"]`)?.focus()
+            }
         })
         .catch((error) => {
             console.error(error)
@@ -380,7 +388,25 @@ function abrirCategoriasModal() {
 // Delegación en document: los fragmentos de página se inyectan después de que
 // este script se ejecute, así que enlazar por id al cargar no serviría.
 document.addEventListener("click", (event) => {
-    if (event.target.closest("[data-abrir-categorias]")) {
-        abrirCategoriasModal()
+    const disparador = event.target.closest("[data-abrir-categorias]")
+    if (disparador) {
+        abrirCategoriasModal(disparador.dataset.abrirCategorias)
     }
+})
+
+// Intro en un nombre añade otra fila debajo: así se escriben varias categorías
+// seguidas sin ir al ratón.
+document.addEventListener("keydown", (event) => {
+    const input = event.target.closest?.("[data-cat-input]")
+    if (event.key !== "Enter" || !input || !categoriasEstado) {
+        return
+    }
+
+    event.preventDefault()
+    leerInputsCategorias()
+    const clave = input.dataset.catInput
+    categoriasEstado[clave].filas.push({ original: "", valor: "", usos: 0 })
+    renderCategoriasModal()
+    const inputs = document.querySelectorAll(`[data-cat-input="${clave}"]`)
+    inputs[inputs.length - 1]?.focus()
 })

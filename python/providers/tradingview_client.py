@@ -92,6 +92,11 @@ _PERFORMANCE_COLUMNS = [
     "price_52_week_high",
     "price_52_week_low",
     "High.All",
+    "Low.All",
+    "High.1M",
+    "Low.1M",
+    "High.3M",
+    "Low.3M",
     "ATR",
     "Volatility.D",
     "Volatility.W",
@@ -150,6 +155,35 @@ _TECHNICAL_COLUMNS = [
 _STATS_COLUMNS = (
     _SCAN_COLUMNS + _FUNDAMENTAL_COLUMNS + _PERFORMANCE_COLUMNS + _TECHNICAL_COLUMNS + _PIVOT_COLUMNS
 )
+
+# Extras de la pestaña "Mercado" de la ficha del activo. `base_currency` es la
+# moneda real de un par cripto (BITVAVO:BTCEUR -> BTC): de ahí se llega a la
+# fila de moneda sin recortar sufijos del ticker a mano.
+_FICHA_EXTRA_COLUMNS = [
+    "subtype",
+    "base_currency",
+    "volume",
+    "average_volume_30d_calc",
+    "total_shares_outstanding",
+]
+_FICHA_COLUMNS = _STATS_COLUMNS + _FICHA_EXTRA_COLUMNS
+
+# El screener `coin` tiene una fila por moneda (no por par de exchange): es el
+# único sitio donde el scanner publica suministro, FDV y volumen agregado.
+_COIN_COLUMNS = [
+    "base_currency",
+    "base_currency_desc",
+    "close",
+    "market_cap_calc",
+    "market_cap_diluted_calc",
+    "circulating_supply",
+    "total_supply",
+    "max_supply",
+    "24h_vol_cmc",
+    "24h_vol_change|5",
+    "crypto_total_rank",
+    "crypto_common_categories",
+]
 
 # La búsqueda de TradingView contesta 403 a peticiones sin pinta de navegador
 # (a diferencia del scanner de cotizaciones, que no filtra por esto). No es un
@@ -313,6 +347,58 @@ def fetchStats(tickers, timeout=None):
             continue
         stats[symbol] = dict(zip(_STATS_COLUMNS, values, strict=False))
     return stats
+
+
+def fetchFichaStats(ticker: str, timeout: float | None = None) -> dict | None:
+    """Estadísticas de un único ticker para la pestaña "Mercado" de la ficha.
+
+    Igual que `fetchStats` más los campos que solo necesita la ficha (tipo,
+    moneda base, volumen medio, acciones en circulación).
+
+    Args:
+        ticker: Ticker con mercado (`NASDAQ:AAPL`).
+        timeout: Segundos máximos de la petición; None usa config.ini.
+
+    Returns:
+        `{columna: valor}` con None donde el scanner no publica el dato, o None
+        si el scanner no conoce el ticker.
+
+    Raises:
+        HTTPError, URLError: Igual que `fetchStats`; quien llama decide qué enseñar.
+    """
+    payload = _fetchJson(
+        TRADINGVIEW_SCAN_URL,
+        jsonBody={"symbols": {"tickers": [ticker], "query": {"types": []}}, "columns": _FICHA_COLUMNS},
+        timeout=timeout,
+    )
+    for row in payload.get("data") or []:
+        if row.get("s") == ticker:
+            return dict(zip(_FICHA_COLUMNS, row.get("d") or [], strict=False))
+    return None
+
+
+def fetchCoin(baseCurrency: str, timeout: float | None = None) -> dict | None:
+    """Fila de moneda (suministro, FDV, volumen agregado) de una cripto.
+
+    Args:
+        baseCurrency: Moneda base tal cual la da el scanner (`BTC`).
+        timeout: Segundos máximos de la petición; None usa config.ini.
+
+    Returns:
+        `{columna: valor}` con None donde no hay dato, o None si el scanner no
+        tiene esa moneda.
+
+    Raises:
+        HTTPError, URLError: Igual que `fetchScreener`.
+    """
+    payload = fetchScreener(
+        [{"left": "base_currency", "operation": "equal", "right": baseCurrency}],
+        _COIN_COLUMNS, limit=1, market="coin", timeout=timeout,
+    )
+    rows = payload.get("data") or []
+    if not rows:
+        return None
+    return dict(zip(_COIN_COLUMNS, rows[0].get("d") or [], strict=False))
 
 
 def fetchCapitalizacion(tickers, timeout=None):

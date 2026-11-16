@@ -31,7 +31,7 @@ function renderEarnCriptosSidebar() {
         const nueva = document.createElement("button")
         nueva.type = "button"
         nueva.className = "cuentaItem cuentaItemNueva"
-        nueva.textContent = "+ Añadir cripto/producto"
+        nueva.textContent = "Añadir cripto/producto"
         nueva.addEventListener("click", () => document.getElementById("addEarnCriptoBtn")?.click())
         list.appendChild(nueva)
         return

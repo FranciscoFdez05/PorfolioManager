@@ -596,9 +596,9 @@ def testMovimientoVaAlPortfolioIndicado(movimientosApp, portfolios):
     assert respuesta.get_json()["movimiento"]["portfolio"] == "test2"
 
     conn = sqlite3.connect(str(portfolios / "test2.db"))
-    filas = conn.execute("SELECT nombre, tipo, cantidad FROM gastos_rows").fetchall()
+    filas = conn.execute("SELECT nombre, tipo, cantidad_cent FROM gastos_rows").fetchall()
     conn.close()
-    assert filas == [("Piso", "Alquiler", "800,00 €")]
+    assert filas == [("Piso", "Alquiler", 80000)]
 
     # Y el otro portfolio se ha quedado intacto.
     otro = sqlite3.connect(str(portfolios / "principal.db"))

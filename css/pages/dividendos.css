@@ -404,3 +404,68 @@ html .dividendosTableWrapper {
     border-color: var(--accent);
     color: var(--accent);
 }
+
+/* Ingresos pasivos: resumen de los últimos 12 meses bajo las tarjetas del año. */
+.dividendosPasivos {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.dividendosPasivosLista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dividendosPasivosItem {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: var(--text-subtle);
+}
+
+.dividendosPasivosItem span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dividendosPasivosItem span:last-child {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.dividendosPasivosNota {
+    margin: 0;
+    font-size: 0.68rem;
+    line-height: 1.3;
+    color: var(--text-dim);
+}
+
+/* ── Dividendo reinvertido ───────────────────────────────────────── */
+
+.dividendoReinvTag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--accent-tint);
+    color: var(--accent-soft);
+    font-size: 0.68rem;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+.dividendoReinvCheck {
+    justify-self: start;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+}

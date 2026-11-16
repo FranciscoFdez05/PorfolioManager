@@ -9,6 +9,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
+
+from core.wallets_carpeta import carpetaWalletsActiva
 from cryptography.fernet import Fernet
 
 from core.wallets_historial import HistorialWallets, claveMovimiento, fusionarMovimientos
@@ -248,7 +250,7 @@ class TestRutas:
         assert historial["fecha"]
         # Con la libreta aplicada al enseñarlo, igual que lo recién leído.
         assert "sentido" in historial["movimientos"][0]
-        assert hashLargo.encode() not in (rutas["claves"] / "wallets_lecturas" / f"{walletId}.key").read_bytes()
+        assert hashLargo.encode() not in (carpetaWalletsActiva() / "wallets_lecturas" / f"{walletId}.key").read_bytes()
 
     def testLosNuevosSeSumanALoGuardado(self, cliente, monkeypatch):
         client, _cabeceras, walletId, _rutas = cliente
@@ -311,7 +313,7 @@ class TestRutas:
         client, cabeceras, walletId, rutas = cliente
         _ponerLector(monkeypatch, [_movimiento("h1")])
         client.get(f"/api/wallets/{walletId}/movimientos")
-        fichero = rutas["claves"] / "wallets_lecturas" / f"{walletId}.key"
+        fichero = carpetaWalletsActiva() / "wallets_lecturas" / f"{walletId}.key"
         assert fichero.exists()
 
         assert client.delete(f"/api/wallets/{walletId}", headers=cabeceras).status_code == 200
@@ -322,7 +324,7 @@ class TestRutas:
         client, cabeceras, walletId, rutas = cliente
         _ponerLector(monkeypatch, [_movimiento("h1")])
         client.get(f"/api/wallets/{walletId}/movimientos")
-        fichero = rutas["claves"] / "wallets_lecturas" / f"{walletId}.key"
+        fichero = carpetaWalletsActiva() / "wallets_lecturas" / f"{walletId}.key"
 
         respuesta = client.post("/api/wallets/seguimientos/eliminar", json={"clave": "satoshi"}, headers=cabeceras)
 

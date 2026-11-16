@@ -1,5 +1,6 @@
 import json
 
+from core.centimos import columnasConCent, escribirColumnas, escribirImporte, leerColumnas, leerImporte
 from core.db import getDb, transactional
 from core.validation import normalizeYear
 from stores import revisiones
@@ -158,7 +159,9 @@ def sanitizeMonthRows(rows):
 def sanitizeMensualidadesRows(rows):
     if not isinstance(rows, list):
         return []
-    rows = [row for row in rows if isinstance(row, dict)]
+    # Las cuotas de compras financiadas las genera el servidor
+    # (stores/deudas_mensualidades.py): guardarlas aquí las duplicaría.
+    rows = [row for row in rows if isinstance(row, dict) and not row.get("financiacionId")]
     if len(rows) > 100:
         rows = rows[:100]
 
@@ -277,6 +280,9 @@ def readGastosYear(year):
     if not normalized:
         return None
 
+    # Importación diferida: deudas_mensualidades importa este módulo.
+    from stores.deudas_mensualidades import origenDeFila
+
     conn = getDb()
     if not conn.execute("SELECT 1 FROM gastos_years WHERE year = ? LIMIT 1", (normalized,)).fetchone():
         return None
@@ -285,7 +291,7 @@ def readGastosYear(year):
         {
             "nombre": r["nombre"],
             "categoria": r["categoria"],
-            "importe": r["importe"],
+            "importe": leerImporte(r["importe_cent"], r["importe"]),
             "frecuencia": normalizeFrecuencia(r["frecuencia"]),
             "diaCobro": normalizeDiaCobro(r["dia_cobro"]),
             "diasCobro": normalizeDiasCobro(r["dias_cobro"]),
@@ -294,13 +300,14 @@ def readGastosYear(year):
             "activa": bool(r["activa"]),
             "nota": r["nota"],
             "cuenta": r["cuenta"],
-            "meses": {month: r[month] for month in MONTH_KEYS},
+            "meses": leerColumnas(r, MONTH_KEYS),
+            "financiacionId": r["financiacion_id"],
+            "origen": origenDeFila(r["financiacion_id"]),
         }
         for r in conn.execute(
-            "SELECT nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
-            "septiembre, octubre, noviembre, diciembre, "
-            "categoria, importe, frecuencia, dia_cobro, dias_cobro, mes_inicio, activa, nota, cuenta, cuentas_cobro "
-            "FROM mensualidades WHERE year = ? ORDER BY id",
+            f"SELECT nombre, {columnasConCent(MONTH_KEYS)}, "
+            "categoria, importe, importe_cent, frecuencia, dia_cobro, dias_cobro, mes_inicio, activa, nota, "
+            "cuenta, cuentas_cobro, financiacion_id FROM mensualidades WHERE year = ? ORDER BY id",
             (normalized,)
         ).fetchall()
     ]
@@ -308,14 +315,14 @@ def readGastosYear(year):
     months = {}
     for month in MONTH_KEYS:
         monthRows = conn.execute(
-            "SELECT fecha, nombre, tipo, cantidad, nota, cuenta FROM gastos_rows "
+            "SELECT fecha, nombre, tipo, cantidad, cantidad_cent, nota, cuenta FROM gastos_rows "
             "WHERE year = ? AND month = ? ORDER BY id",
             (normalized, month)
         ).fetchall()
         months[month] = {"rows": [
             {
                 "fecha": r["fecha"], "nombre": r["nombre"], "tipo": r["tipo"],
-                "cantidad": r["cantidad"], "nota": r["nota"], "cuenta": r["cuenta"],
+                "cantidad": leerImporte(r["cantidad_cent"], r["cantidad"]), "nota": r["nota"], "cuenta": r["cuenta"],
             }
             for r in monthRows
         ]}
@@ -348,46 +355,45 @@ def writeGastosYear(year, data, revisionEsperada=None):
     conn.execute("DELETE FROM mensualidades WHERE year = ?", (normalized,))
 
     validas = cuentasValidasParaFilas(conn)
+    columnasMes = ", ".join(MONTH_KEYS)
+    columnasMesCent = ", ".join(f"{mes}_cent" for mes in MONTH_KEYS)
+    filasMensualidades = []
+    for m in data.get("mensualidades", []):
+        mesesLegado, mesesCent = escribirColumnas(m.get("meses", {}), MONTH_KEYS)
+        importeCent, importeLegado = escribirImporte(m.get("importe", ""))
+        filasMensualidades.append((
+            normalized, m.get("nombre", ""), *mesesLegado, *mesesCent,
+            m.get("categoria", ""), importeLegado, importeCent,
+            normalizeFrecuencia(m.get("frecuencia")),
+            normalizeDiaCobro(m.get("diaCobro")),
+            serializeDiasCobro(m.get("diasCobro")),
+            normalizeMes(m.get("mesInicio")),
+            1 if m.get("activa", True) else 0,
+            m.get("nota", ""),
+            normalizarCuentaDeFila(m.get("cuenta"), validas),
+            serializeCuentasCobro(m.get("cuentasCobro"), validas | {ID_BANCO}),
+        ))
     conn.executemany(
-        "INSERT INTO mensualidades "
-        "(year, nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
-        "septiembre, octubre, noviembre, diciembre, "
-        "categoria, importe, frecuencia, dia_cobro, dias_cobro, mes_inicio, activa, nota, cuenta, cuentas_cobro) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [
-            (normalized, m.get("nombre", ""),
-             m.get("meses", {}).get("enero", ""), m.get("meses", {}).get("febrero", ""),
-             m.get("meses", {}).get("marzo", ""), m.get("meses", {}).get("abril", ""),
-             m.get("meses", {}).get("mayo", ""), m.get("meses", {}).get("junio", ""),
-             m.get("meses", {}).get("julio", ""), m.get("meses", {}).get("agosto", ""),
-             m.get("meses", {}).get("septiembre", ""), m.get("meses", {}).get("octubre", ""),
-             m.get("meses", {}).get("noviembre", ""), m.get("meses", {}).get("diciembre", ""),
-             m.get("categoria", ""), m.get("importe", ""),
-             normalizeFrecuencia(m.get("frecuencia")),
-             normalizeDiaCobro(m.get("diaCobro")),
-             serializeDiasCobro(m.get("diasCobro")),
-             normalizeMes(m.get("mesInicio")),
-             1 if m.get("activa", True) else 0,
-             m.get("nota", ""),
-             normalizarCuentaDeFila(m.get("cuenta"), validas),
-             serializeCuentasCobro(m.get("cuentasCobro"), validas | {ID_BANCO}))
-            for m in data.get("mensualidades", [])
-        ]
+        f"INSERT INTO mensualidades (year, nombre, {columnasMes}, {columnasMesCent}, "
+        "categoria, importe, importe_cent, frecuencia, dia_cobro, dias_cobro, mes_inicio, activa, nota, "
+        f"cuenta, cuentas_cobro) VALUES ({', '.join('?' * (2 + 2 * len(MONTH_KEYS) + 11))})",
+        filasMensualidades,
     )
 
     rowsToInsert = []
     for month in MONTH_KEYS:
         for row in data.get("months", {}).get(month, {}).get("rows", []):
+            centimosFila, legado = escribirImporte(row.get("cantidad", ""))
             rowsToInsert.append((
                 normalized, month,
                 row.get("fecha", ""), row.get("nombre", ""),
-                row.get("tipo", ""), row.get("cantidad", ""),
+                row.get("tipo", ""), legado, centimosFila,
                 row.get("nota", ""),
                 normalizarCuentaDeFila(row.get("cuenta"), validas),
             ))
     conn.executemany(
-        "INSERT INTO gastos_rows (year, month, fecha, nombre, tipo, cantidad, nota, cuenta) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO gastos_rows (year, month, fecha, nombre, tipo, cantidad, cantidad_cent, nota, cuenta) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         rowsToInsert
     )
 
@@ -398,6 +404,11 @@ def writeGastosYear(year, data, revisionEsperada=None):
             "INSERT OR IGNORE INTO gastos_tipos (label) VALUES (?)",
             [(t,) for t in data["gastosTipos"] if t not in existing]
         )
+
+    # Importación diferida: ese módulo importa éste. Se regeneran los pagos de las
+    # deudas con la revisión que se avanza justo debajo.
+    from stores.deudas_mensualidades import sincronizarAnio
+    sincronizarAnio(conn, normalized)
 
     nueva = revisiones.avanzar(conn, "gastos", normalized)
     conn.commit()

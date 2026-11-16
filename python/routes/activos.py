@@ -3,6 +3,7 @@ from decimal import Decimal
 from flask import Blueprint, jsonify, request
 
 from core import dinero, pnl_divisa
+from core.centimos import importeSql
 from core.db import getActiveDbPath, getDb
 from core.validation import jsonBody
 from providers.finnhub_client import convertAmount, fetchExchangeRate
@@ -648,7 +649,7 @@ def changeActivoCurrency(assetId):
     # borraría esos cambios. Con la revisión de entonces, el guardado se rechaza.
     try:
         assetData["revision"] = writeAssetFile(
-            assetId, assetData, revisionEsperada=revisionLeida
+            assetId, assetData, revisionEsperada=revisionLeida, factorReinversiones=rate
         )
     except revisiones.ConflictoRevision as conflicto:
         return _respuestaConflicto(conflicto)
@@ -703,11 +704,12 @@ def getMetricasInversiones():
     conn = getDb()
 
     spotRows = conn.execute(
-        "SELECT fecha_operacion, tipo_operacion, capital_invertido_bruto FROM activo_rows"
+        f"SELECT fecha_operacion, tipo_operacion, {importeSql('capital_invertido_bruto')} AS capital_invertido_bruto "
+        "FROM activo_rows"
     ).fetchall()
 
     opRows = conn.execute(
-        "SELECT fecha_apertura, fecha_cierre, orden, total "
+        f"SELECT fecha_apertura, fecha_cierre, orden, {importeSql('total')} AS total "
         "FROM activo_operation_rows WHERE estado = 'Completado'"
     ).fetchall()
 

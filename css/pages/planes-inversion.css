@@ -141,6 +141,16 @@
     flex: 0 0 auto;
 }
 
+/* Mismas medidas que el botón principal de la barra (ver activos.css), para
+   que los dos queden a la misma altura. */
+.pinvToolbarActions .pinvArchivoBtn {
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+}
+
 /* ── Cuerpo: tabla + gráfica ── */
 .pinvBody {
     display: grid;
@@ -553,6 +563,7 @@
     min-width: 0;
     min-height: 0;
     max-height: calc(100 * var(--vh) - 216px);
+    overflow-x: hidden;
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--border-mid) transparent;
@@ -560,6 +571,7 @@
 
 .pinvSide > * {
     flex-shrink: 0;
+    min-width: 0;
 }
 
 .pinvChartCard {

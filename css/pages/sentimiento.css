@@ -7,7 +7,7 @@
    las listas de mayores subidas/bajadas. */
 
 .sentimientoPage {
-    padding: 0 0 4px;
+    padding: 0;
     display: flex;
     flex-direction: column;
     gap: 18px;

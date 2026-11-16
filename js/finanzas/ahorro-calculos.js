@@ -42,6 +42,8 @@ const AhorroCalculos = (() => {
     const SIN_CATEGORIA = "Sin categoría"
     // Mismo nombre que usan Gastos y Métricas para agrupar las mensualidades.
     const MENSUALIDADES = "Mensualidades"
+    // La parte de los demás en un pago fraccionado se te devuelve: no es gasto tuyo, así que no entra en Ahorro.
+    const PAGOS_FRACCIONADOS = "pagos fraccionados"
     const OPCIONES_DEFECTO = Object.freeze({ categoriasInversion: [] })
     // Por debajo de medio céntimo un importe es ruido de coma flotante.
     const UMBRAL_CENTIMO = 0.005
@@ -153,6 +155,7 @@ const AhorroCalculos = (() => {
             else categorias[categoria] = (categorias[categoria] || 0) + valor
         }
         for (const fila of datosAnio.months?.[mes]?.rows || []) {
+            if (normalizarCategoria(fila.tipo) === PAGOS_FRACCIONADOS) continue
             anadir(nombreDeCategoria(fila.tipo), importe(fila.cantidad))
         }
         for (const mensualidad of datosAnio.mensualidades || []) {

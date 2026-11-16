@@ -1,4 +1,5 @@
 from core import dinero
+from core.centimos import leerImporte, legadoYCentimos, normalizarImporte
 from core.db import transaction
 from providers.finnhub_client import convertAmount
 from stores import revisiones
@@ -241,6 +242,12 @@ _CAMPOS_OPERACION = (
 )
 
 
+# Columnas de importe en moneda: van a céntimos si la fila es en euros. Se comparan
+# normalizadas (como se leerán tras guardarlas) para que una operación ya
+# guardada no parezca distinta de la deseada y se reescriba en cada lectura.
+_IMPORTES_OPERACION = ("comisiones_fiat", "total")
+
+
 def syncCompletedOperationsIntoAssets(rows):
     """Copia las operaciones completadas a `activo_operation_rows` de cada activo.
 
@@ -255,12 +262,35 @@ def syncCompletedOperationsIntoAssets(rows):
     """
     operationsByAsset = buildCompletedOperationsByAsset(rows)
     columnas = [c for c, _ in _CAMPOS_OPERACION]
-    lista = ", ".join(columnas)
+    seleccion = ", ".join(f"{c}, {c}_cent" if c in _IMPORTES_OPERACION else c for c in columnas)
+    insercion = ", ".join(f"{c}, {c}_cent" if c in _IMPORTES_OPERACION else c for c in columnas)
+
+    def valorGuardado(fila, columna):
+        if columna in _IMPORTES_OPERACION:
+            return leerImporte(fila[f"{columna}_cent"], fila[columna])
+        return str(fila[columna])
+
+    def valorDeseado(operacion, columna, clave):
+        valor = str(operacion.get(clave, ""))
+        if columna in _IMPORTES_OPERACION:
+            return normalizarImporte(valor, operacion.get("currency", "EUR"))
+        return valor
+
+    def conCentimos(valores):
+        """Expande los importes a `(texto legado, céntimos)`, en el orden de `insercion`."""
+        moneda = valores[columnas.index("currency")]
+        expandidos = []
+        for columna, valor in zip(columnas, valores, strict=True):
+            if columna in _IMPORTES_OPERACION:
+                expandidos.extend(legadoYCentimos(valor, moneda))
+            else:
+                expandidos.append(valor)
+        return expandidos
 
     def desfasados(conn):
         existentes = {}
         for fila in conn.execute(
-            f"SELECT asset_id, {lista}, fx_rate, fx_fecha, fx_origen "
+            f"SELECT asset_id, {seleccion}, fx_rate, fx_fecha, fx_origen "
             "FROM activo_operation_rows ORDER BY rowid"
         ):
             existentes.setdefault(fila["asset_id"], []).append(fila)
@@ -269,11 +299,11 @@ def syncCompletedOperationsIntoAssets(rows):
         idsActivos = {r[0] for r in conn.execute("SELECT id FROM activos")}
         for assetId in idsActivos:
             deseadas = [
-                tuple(str(op.get(clave, "")) for _, clave in _CAMPOS_OPERACION)
+                tuple(valorDeseado(op, columna, clave) for columna, clave in _CAMPOS_OPERACION)
                 for op in operationsByAsset.get(assetId, [])
             ]
             previas = existentes.get(assetId, [])
-            if [tuple(str(f[c]) for c in columnas) for f in previas] != deseadas:
+            if [tuple(valorGuardado(f, c) for c in columnas) for f in previas] != deseadas:
                 pendientes.append((assetId, previas, deseadas))
         return pendientes
 
@@ -292,10 +322,10 @@ def syncCompletedOperationsIntoAssets(rows):
             indiceDivisa = columnas.index("currency")
             conn.execute("DELETE FROM activo_operation_rows WHERE asset_id = ?", (assetId,))
             conn.executemany(
-                f"INSERT INTO activo_operation_rows (asset_id, {lista}, fx_rate, fx_fecha, fx_origen) "
-                f"VALUES ({', '.join('?' * (len(columnas) + 4))})",
+                f"INSERT INTO activo_operation_rows (asset_id, {insercion}, fx_rate, fx_fecha, fx_origen) "
+                f"VALUES ({', '.join('?' * (len(columnas) + len(_IMPORTES_OPERACION) + 4))})",
                 [
-                    (assetId, *valores,
+                    (assetId, *conCentimos(valores),
                      *fx.get((valores[indiceFecha], valores[indiceDivisa]), ("", "", "")))
                     for valores in deseadas
                 ],

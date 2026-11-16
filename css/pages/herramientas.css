@@ -10,11 +10,8 @@
 
 /* ── Página ─────────────────────────────────────────────────────────────── */
 .herramientasPage {
-    /* Arriba apenas hay margen: la barra de navegación ya deja el suyo, y sumar
-       20 px más empujaba las herramientas altas (divisas, capitalización) fuera
-       de la ventana. */
-    padding: 4px 20px 16px;
-    margin-top: -10px;
+    /* Sin relleno ni margen propios: el hueco con la barra de navegación y los
+       bordes lo pone contentArea, igual que en el resto de páginas. */
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -900,6 +897,11 @@
 .cvToolbar #conversionesAssetMenu > * {
     flex: 0 0 auto;
     white-space: nowrap;
+}
+
+.cvToolbar .cvSinCriptos {
+    color: var(--text-muted);
+    font-size: 13px;
 }
 
 .cvToolbar > .operationsToolbarRight {

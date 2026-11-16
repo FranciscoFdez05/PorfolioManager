@@ -450,6 +450,11 @@ body.asset-rotation-halted .detailRotationBar span {
     font-variant-numeric: tabular-nums;
 }
 
+.detailChange:empty,
+.detailMeta:empty {
+    display: none;
+}
+
 .detailChange.negative {
     color: var(--color-neg-bright);
     background: rgba(248, 113, 113, 0.12);
@@ -508,6 +513,462 @@ body.asset-rotation-halted .detailRotationBar span {
     color: #ff8f98;
 }
 
+.detailStatValue.positive {
+    color: var(--color-pos-bright);
+}
+
+/* ── Bloques de mercado de la ficha lateral (assets-detalle-mercado.js) ── */
+.detMkBlock {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.detMkTitle {
+    margin: 0;
+    color: var(--text-bright);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.detMkEmpty {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 11px;
+}
+
+.detMkPerf {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.detMkPerfCell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 6px 4px;
+    border-radius: 6px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+}
+
+.detMkPerfValue {
+    color: var(--text-bright);
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.detMkPerfLabel {
+    color: var(--text-dim);
+    font-size: 9px;
+    font-weight: 600;
+}
+
+.detMkPerfPos {
+    background: rgba(46, 204, 113, 0.12);
+    border-color: rgba(46, 204, 113, 0.22);
+}
+
+.detMkPerfPos .detMkPerfValue {
+    color: var(--color-pos-bright);
+}
+
+.detMkPerfNeg {
+    background: rgba(231, 76, 60, 0.14);
+    border-color: rgba(231, 76, 60, 0.24);
+}
+
+.detMkPerfNeg .detMkPerfValue {
+    color: var(--color-neg-bright);
+}
+
+/* Las líneas se dibujan en un viewBox estirado: el grosor no debe estirarse con él. */
+.detMkSeasonPlot {
+    position: relative;
+    height: 110px;
+}
+
+.detMkSeasonSvg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.detMkSeasonSvg line,
+.detMkSeasonSvg path {
+    vector-effect: non-scaling-stroke;
+    fill: none;
+}
+
+.detMkSeasonGuide {
+    stroke: var(--border-mid);
+    stroke-dasharray: 3 3;
+}
+
+.detMkSeasonZero {
+    stroke: var(--text-dim);
+    stroke-width: 1;
+}
+
+.detMkSeasonLine {
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+}
+
+.detMkSeasonLine.detMkSeasonY0 {
+    stroke-width: 2.2;
+}
+
+.detMkSeasonY0 {
+    --season-color: #3b82f6;
+}
+
+.detMkSeasonY1 {
+    --season-color: #22c55e;
+}
+
+.detMkSeasonY2 {
+    --season-color: #f59e0b;
+}
+
+path.detMkSeasonLine {
+    stroke: var(--season-color);
+}
+
+.detMkSeasonEnd {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    border-radius: 50%;
+    background: var(--season-color);
+}
+
+.detMkSeasonAxis {
+    position: relative;
+    height: 14px;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.detMkSeasonAxis span {
+    position: absolute;
+    top: 0;
+}
+
+.detMkSeasonLegend {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
+.detMkSeasonKey {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.detMkSeasonDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--season-color);
+}
+
+.detMkTitleRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.detMkTitleBtn {
+    padding: 2px 8px;
+    border: 1px solid var(--border-inset);
+    border-radius: 6px;
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.detMkTitleBtn:hover,
+.detMkTitleBtn:focus-visible {
+    color: var(--text-bright);
+    border-color: var(--border-mid);
+}
+
+/* El minigráfico abre el popup de estacionales. */
+.detMkSeason[role="button"] {
+    border-radius: 6px;
+    cursor: zoom-in;
+}
+
+.detMkSeason[role="button"]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Popup de estacionales (gráfico de años y tabla mensual) de la ficha lateral:
+   casi a pantalla completa, como el de TradingView, para que quepan los años. */
+.detMkEstModal {
+    width: calc(96 * var(--vw));
+    max-width: 1500px;
+    height: calc(88 * var(--vh));
+    max-height: calc(88 * var(--vh));
+}
+
+/* En la tabla el cuadro se ajusta a su contenido; el gráfico sí necesita la altura completa. */
+.detMkEstModal.detMkEstModalTabla {
+    height: auto;
+}
+
+.detMkEstCabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+}
+
+.detMkEstCabecera .mToggleBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.detMkEstCuerpo {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.detMkEstGrafico {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+}
+
+/* Una acción puede tener veinte años: los botones se reparten en varias filas. */
+.detMkEstAnios {
+    flex-wrap: wrap;
+    align-self: flex-start;
+    max-width: 100%;
+}
+
+.detMkEstAnios .mToggleBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+.detMkEstAnios .mToggleBtn:not(.active) {
+    opacity: 0.55;
+}
+
+/* Chart.js necesita un contenedor con altura propia para no crecer sin fin. */
+.detMkEstLienzo {
+    position: relative;
+    flex: 1;
+    min-height: 280px;
+}
+
+.detMkEstNota {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.detMkEstNota:empty {
+    display: none;
+}
+
+/* Trece columnas de porcentajes no caben en un móvil: se desplaza la tabla, no la página. */
+.detMkTablaScroll {
+    overflow-x: auto;
+}
+
+.detMkTabla {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.detMkTabla th,
+.detMkTabla td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-inset);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.detMkTabla thead th {
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.detMkTabla th[scope="row"] {
+    color: var(--text-muted);
+    font-weight: 600;
+    text-align: left;
+}
+
+.detMkTabla thead th:first-child {
+    text-align: left;
+}
+
+.detMkTablaCelda {
+    color: var(--text-bright);
+    border-left: 1px solid var(--border-inset);
+}
+
+.detMkTablaPos {
+    background: rgba(46, 204, 113, 0.14);
+}
+
+.detMkTablaNeg {
+    background: rgba(231, 76, 60, 0.18);
+}
+
+.detMkTabla .detMkTablaAnyo {
+    font-weight: 700;
+}
+
+.detMkTablaPos.detMkTablaAnyo {
+    background: rgba(46, 204, 113, 0.32);
+}
+
+.detMkTablaNeg.detMkTablaAnyo {
+    background: rgba(231, 76, 60, 0.36);
+}
+
+.detMkTabla tfoot td,
+.detMkTabla tfoot th {
+    border-bottom: none;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.detMkTablaSube {
+    color: var(--color-pos-bright);
+}
+
+.detMkTablaBaja {
+    color: var(--color-neg-bright);
+}
+
+.detMkGauge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.detMkGaugeSvg {
+    width: 150px;
+    max-width: 100%;
+}
+
+.detMkGaugeSvg path {
+    fill: none;
+    stroke-width: 6;
+    stroke-linecap: round;
+}
+
+.detMkArcStrongSell {
+    stroke: var(--color-neg);
+}
+
+.detMkArcSell {
+    stroke: var(--color-neg-bright);
+    opacity: 0.6;
+}
+
+.detMkArcNeutral {
+    stroke: var(--text-dim);
+}
+
+.detMkArcBuy {
+    stroke: var(--color-pos-bright);
+    opacity: 0.6;
+}
+
+.detMkArcStrongBuy {
+    stroke: var(--color-pos);
+}
+
+.detMkNeedle {
+    stroke: var(--text-muted);
+    stroke-width: 3;
+    stroke-linecap: round;
+}
+
+.detMkNeedleHub {
+    fill: var(--text-muted);
+}
+
+/* Reutiliza las clases fnRat* solo por su color de texto, sin la píldora. */
+.detMkGauge .detMkGaugeLabel {
+    margin-top: 2px;
+    font-size: 14px;
+    font-weight: 700;
+    background: none;
+}
+
+.detMkGauge .detMkGaugeLabel.fnRatNeutral {
+    color: var(--text-muted);
+}
+
+.detMkStats {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+}
+
+.detMkStatRow {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border-inset);
+    font-size: 11px;
+}
+
+.detMkStatRow:last-child {
+    border-bottom: none;
+}
+
+.detMkStatRow dt {
+    color: var(--text-muted);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detMkStatRow dd {
+    margin: 0;
+    color: var(--text-bright);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
 .detailStatSub {
     color: var(--text-dim);
     font-size: 9px;
@@ -521,14 +982,15 @@ body.asset-rotation-halted .detailRotationBar span {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding-right: 18px;
 }
 
 /* Misma rejilla que .assetTodosLayout: las tarjetas ocupan la columna de la
    tabla y terminan donde ella, y el menú ⋯ queda sobre la columna de gráficos. */
 .assetPageHeader {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 340px;
+    /* La columna derecha solo lleva el botón del menú: con ancho auto las
+       tarjetas aprovechan todo el ancho en vez de cortarse junto a la tabla. */
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: stretch;
     gap: 18px;
 }
@@ -645,7 +1107,37 @@ body.asset-rotation-halted .detailRotationBar span {
     gap: 8px;
     margin: 0;
     flex: 1;
-    flex-wrap: wrap;
+    /* Una sola fila: lo que no cabe se desplaza en horizontal (y se puede
+       arrastrar, ver activarArrastreHorizontal) en vez de caer a una segunda. */
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+    cursor: grab;
+}
+
+.assetStatsPanel::-webkit-scrollbar {
+    height: 6px;
+}
+
+.assetStatsPanel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.assetStatsPanel::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.assetStatsPanel::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+.assetStatsPanel.dragging {
+    cursor: grabbing;
+    user-select: none;
 }
 
 .assetStatCard {
@@ -657,27 +1149,8 @@ body.asset-rotation-halted .detailRotationBar span {
     flex-direction: column;
     justify-content: center;
     gap: 6px;
-    flex: 1 1 180px;
+    flex: 1 0 auto;
     min-width: 180px;
-}
-
-/* Con el coste anual, los ETFs llevan seis tarjetas: a 180px mínimos no caben
-   en una fila y la de ganancias caía a una segunda. Sin mínimo y sin partir,
-   se reparten el ancho disponible. */
-.assetStatsPanelEtf {
-    flex-wrap: nowrap;
-    min-width: 0;
-}
-
-.assetStatsPanelEtf .assetStatCard {
-    flex-basis: 0;
-    min-width: 0;
-    padding: 10px 12px;
-}
-
-.assetStatsPanelEtf .assetStatCardPnL {
-    flex-grow: 1.8;
-    min-width: 0;
 }
 
 .assetStatLabel {
@@ -996,12 +1469,60 @@ body.asset-rotation-halted .detailRotationBar span {
     overflow: hidden;
 }
 
+/* Cuando las pestañas no caben en el ancho de la columna se desplazan en
+   horizontal, arrastrando o con una barra fina. La línea inferior va como
+   sombra interior y no como borde: la sombra se pinta debajo del contenido, así
+   el subrayado de la pestaña activa la tapa sin bajar 1px, que con overflow
+   quedaría recortado. */
 .assetTabsNav {
     display: flex;
     align-items: center;
     background: var(--bg-inset);
-    border-bottom: 1px solid var(--border-soft);
+    box-shadow: inset 0 -1px 0 var(--border-soft);
     padding: 0 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+}
+
+.assetTabsNav.dragging {
+    cursor: grabbing;
+    user-select: none;
+}
+
+.assetTabsNav::-webkit-scrollbar {
+    display: block;
+    height: 4px;
+}
+
+.assetTabsNav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.assetTabsNav::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 2px;
+}
+
+.assetTabsNav::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* En Chromium cualquier scrollbar-width distinto de auto (base.css pone none a
+   todo) anula los ::-webkit-scrollbar, y con thin la barra mediría lo que
+   decida el navegador. auto deja mandar al pseudo de 4px; Firefox, que no lo
+   tiene, se queda con thin. */
+@supports selector(::-webkit-scrollbar) {
+    .assetTabsNav {
+        scrollbar-width: auto;
+    }
+}
+
+@supports not selector(::-webkit-scrollbar) {
+    .assetTabsNav {
+        scrollbar-width: thin;
+        scrollbar-color: var(--border-mid) transparent;
+    }
 }
 
 /* Acción de la pestaña activa: vive en la propia barra, pegada a la derecha,
@@ -1046,7 +1567,6 @@ body.asset-rotation-halted .detailRotationBar span {
     color: var(--text-muted);
     border: none;
     border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
     cursor: pointer;
     font-size: 0.78rem;
     font-weight: 600;
@@ -1054,6 +1574,13 @@ body.asset-rotation-halted .detailRotationBar span {
     text-transform: uppercase;
     transition: color 0.15s;
     white-space: nowrap;
+}
+
+/* Envoltorio del botón «Gráfico» y su menú de modos. `contents` deja el botón
+   como hijo directo de la barra, alineado igual que las demás pestañas; el
+   menú va en position: fixed y no ocupa sitio. */
+.assetTabDropdown {
+    display: contents;
 }
 
 .assetTabBtn:hover {
@@ -1084,6 +1611,27 @@ body.asset-rotation-halted .detailRotationBar span {
     color: var(--text-muted);
     font-size: 14px;
     margin: 0;
+}
+
+/* Pestaña sin datos (Todos, Operaciones Spot, Ventas): marco de rayas, igual
+   que el recuadro "No data" que ocupa el sitio de los gráficos. */
+.assetTabsContainer.assetTabsContainerVacio {
+    border-style: dashed;
+}
+
+.assetNoDataCol {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 240px;
+    border: 1px dashed var(--border-soft);
+    border-radius: 8px;
+}
+
+.assetNoDataText {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 14px;
 }
 
 .assetCompletedOpsTable td,
@@ -1577,7 +2125,6 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
     display: flex;
     flex-direction: column;
     gap: 14px;
-    padding-right: 18px;
 }
 
 .overviewFilters {
@@ -4168,7 +4715,6 @@ button.calPopupTitulo:hover,
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding-right: 18px;
     flex: 1;
 }
 
@@ -4638,7 +5184,7 @@ button.calPopupTitulo:hover,
 }
 
 .placeholderPage {
-    padding: 20px;
+    padding: 0;
     color: #ffffff;
 }
 
@@ -4868,6 +5414,14 @@ button.calPopupTitulo:hover,
     color: var(--text-bright);
 }
 
+/* Variante dentro de las tablas anuales vacías (Gastos, Ingresos): la fila
+   no lleva los 42px de las demás, así que el botón se ajusta a su altura. */
+.catAddBtnTabla {
+    width: auto;
+    min-width: 200px;
+    margin: 0;
+}
+
 .catAddBtn:focus-visible {
     outline: none;
     border-color: var(--accent);
@@ -4989,6 +5543,12 @@ button.calPopupTitulo:hover,
 
 .assetTodosLayout > .assetMainCol {
     min-width: 0;
+}
+
+/* Alto máximo calculado en JS (fitAssetTodosTableHeight): el de la columna de
+   gráficos en su vista base. Fijo aunque se desplieguen otros gráficos. */
+.assetTodosLayout #assetTodosSection .assetTableWrapper {
+    max-height: var(--todosTablaAltoMax, 563px);
 }
 
 .todosChartsCol {

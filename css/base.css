@@ -930,6 +930,25 @@ body {
     box-sizing: border-box;
 }
 
+/* Rótulo de grupo dentro de un desplegable (Mis finanzas). Cada uno, salvo el
+   primero, se separa del grupo anterior con una línea. */
+.navDropdownTitulo {
+    padding: 6px 8px 2px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.navDropdownTitulo:not(:first-child) {
+    margin-top: 4px;
+    border-top: 1px solid var(--btn-border);
+    padding-top: 8px;
+}
+
 .navBtn {
     height: 30px;
     width: 138px;
@@ -1027,7 +1046,13 @@ body {
     min-width: 0;
     box-sizing: border-box;
     min-height: 100%;
-    padding: 18px 18px 24px 18px;
+    /* Único hueco entre el contenido y lo que lo rodea (barra superior,
+       lateral, bordes): las páginas no suman relleno ni márgenes propios en su
+       raíz para que el espacio sea el mismo en todas. */
+    /* A la derecha se suma el carril del tirador del lateral (.toggleButton,
+       position: fixed): sobresale del lateral sobre el contenido y se
+       montaba encima de las tablas. */
+    padding: 12px calc(12px + var(--toggle-lane)) 12px 12px;
     background: var(--bg-panel);
     display: flex;
     flex-direction: column;

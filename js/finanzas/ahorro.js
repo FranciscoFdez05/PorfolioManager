@@ -336,6 +336,7 @@ function ahorroRender() {
     ahorroPintarResumenAnual(vista)
     ahorroPintarPresupuesto(vista)
     ahorroPintarDistribucion(vista)
+    ahorroPintarDeudas(vista)
     ahorroPintarObservaciones(vista)
 }
 
@@ -1105,6 +1106,65 @@ function ahorroPintarDistribucion(vista) {
         </div>`
         )
         .join("")
+}
+
+// ── Pagos de deudas ──────────────────────────────────────────────────────
+
+const AHORRO_ORIGENES_DEUDA = [
+    { clave: "hipoteca", nombre: "Hipotecas" },
+    { clave: "financiada", nombre: "Compras financiadas" },
+    { clave: "microcredito", nombre: "Microcréditos" }
+]
+const AHORRO_MESES_CLAVES = [
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre"
+]
+
+/**
+ * Lo que se paga en el periodo por cada tipo de deuda. Son las mensualidades
+ * que genera el servidor para hipotecas, compras financiadas y microcréditos
+ * (llevan `financiacionId` y `origen`), así que ya están dentro del gasto: aquí
+ * solo se desglosan.
+ * @param {{anio: string, mes: string|null}} vista
+ * @returns {{nombre: string, valor: number}[]} Un elemento por tipo, también los que no pagan nada.
+ */
+function ahorroPagosDeudas(vista) {
+    const mensualidades = ahorroEstado.gastosPorAnio?.[vista.anio]?.mensualidades || []
+    const meses = vista.mes ? [vista.mes] : AHORRO_MESES_CLAVES
+    return AHORRO_ORIGENES_DEUDA.map(({ clave, nombre }) => ({
+        nombre,
+        valor: mensualidades
+            .filter((m) => m.financiacionId && (m.origen || "financiada") === clave)
+            .reduce((total, m) => total + meses.reduce((suma, mes) => suma + parseEuroNumber(m.meses?.[mes] || ""), 0), 0)
+    }))
+}
+
+function ahorroPintarDeudas(vista) {
+    const contenedor = document.getElementById("ahorroDeudas")
+    if (!contenedor) return
+    const filas = ahorroPagosDeudas(vista)
+    ahorroSetText("ahorroDeudasSub", `${vista.etiquetaPeriodo} · % sobre el gasto`)
+    const total = filas.reduce((suma, fila) => suma + fila.valor, 0)
+    const gastos = vista.resumen.gastos
+    const fila = (nombre, valor, clase = "") => `
+        <div class="ahorroDonutLegendRow ${clase}">
+            <span class="ahorroDonutLegendName" title="${escapeHtml(nombre)}">${escapeHtml(nombre)}</span>
+            <span class="ahorroDonutLegendVal">${formatEuro(valor)}</span>
+            <span class="ahorroDonutLegendPct">${gastos > 0 ? ahorroPct((valor / gastos) * 100) : "—"}</span>
+        </div>`
+    contenedor.innerHTML =
+        filas.map((f) => fila(f.nombre, f.valor)).join("") +
+        fila("Total deudas", total, "ahorroDeudasTotal")
 }
 
 // ── Observaciones ────────────────────────────────────────────────────────

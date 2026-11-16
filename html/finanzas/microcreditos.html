@@ -1,0 +1,34 @@
+<div class="microcreditosPage">
+
+    <div class="hipotecasToolbar">
+        <div class="hipotecasToolbarLeft">
+            <label class="bonosFilterBtn" id="microcreditosMostrarDevueltosLabel">
+                <input type="checkbox" id="microcreditosMostrarDevueltos"><span>Mostrar devueltos</span>
+            </label>
+        </div>
+        <div class="hipotecasToolbarRight">
+            <button id="microcreditosAddBtn" class="primaryButton" type="button" data-no-autohide="true">Añadir microcrédito</button>
+        </div>
+    </div>
+
+    <div class="hipotecasTotales" id="microcreditosTotales"></div>
+
+    <div class="microcreditosProximos hidden" id="microcreditosProximos"></div>
+
+    <div class="hipotecasPanel" id="microcreditosPanel">
+        <div class="hipotecasCuadroWrapper microcreditosTablaWrapper" id="microcreditosTablaWrapper">
+            <table class="hipotecasTabla hipotecasCuadro">
+                <thead>
+                    <tr>
+                        <th>Microcrédito</th><th>Importe</th><th>Coste</th><th>TAE</th>
+                        <th>Vencimiento</th><th>Estado</th><th>Pendiente</th><th>Progreso</th><th></th>
+                    </tr>
+                </thead>
+                <tbody id="microcreditosBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <p class="overviewEmpty hidden" id="microcreditosEmptyMsg">No hay microcréditos registrados.</p>
+
+</div>

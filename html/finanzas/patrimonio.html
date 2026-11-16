@@ -1,0 +1,46 @@
+<div class="patrimonioPage">
+
+    <p class="patrimonioError hidden" id="patrimonioError"></p>
+    <p class="patrimonioAviso hidden" id="patrimonioAvisos"></p>
+
+    <div class="patrimonioResumen" id="patrimonioTotales"></div>
+
+    <div class="patrimonioComposicion">
+        <section class="patrimonioBarraBloque">
+            <h3>Qué tengo</h3>
+            <div class="patrimonioBarra" id="patrimonioBarraActivos" role="img" aria-label="Composición de lo que tengo"></div>
+            <ul class="patrimonioLeyenda" id="patrimonioLeyendaActivos"></ul>
+        </section>
+        <section class="patrimonioBarraBloque">
+            <h3>Qué debo</h3>
+            <div class="patrimonioBarra" id="patrimonioBarraPasivos" role="img" aria-label="Composición de lo que debo"></div>
+            <ul class="patrimonioLeyenda" id="patrimonioLeyendaPasivos"></ul>
+        </section>
+    </div>
+
+    <div class="patrimonioColumnas">
+        <section class="patrimonioPanel">
+            <header class="patrimonioPanelCabecera">
+                <h3>Lo que tengo</h3>
+                <span class="patrimonioPanelTotal patrimonioImporte" id="patrimonioActivosTotal"></span>
+            </header>
+            <div id="patrimonioActivosLista"></div>
+        </section>
+
+        <section class="patrimonioPanel">
+            <header class="patrimonioPanelCabecera">
+                <h3>Lo que debo</h3>
+                <span class="patrimonioPanelTotal patrimonioImporte" id="patrimonioPasivosTotal"></span>
+            </header>
+            <div id="patrimonioPasivosLista"></div>
+            <p class="patrimonioVacio hidden" id="patrimonioPasivosVacio">Sin deudas registradas.</p>
+        </section>
+    </div>
+
+    <p class="patrimonioNota">
+        Inversiones valoradas con el último precio conocido, sin refrescar cotizaciones.
+        Renta fija y bonos: solo los que no han vencido.
+        Hipotecas y compras financiadas: capital pendiente; microcréditos: lo que queda por pagar.
+        Los porcentajes se calculan sobre los importes positivos.
+    </p>
+</div>

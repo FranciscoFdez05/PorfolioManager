@@ -1,5 +1,6 @@
+from core.centimos import importeSql, leerImporte, leerImporteCompacto, legadoYCentimos
 from core.db import getDb, transactional
-from stores import rendimiento_activo, revisiones
+from stores import reinversion_dividendos, rendimiento_activo, revisiones
 from stores.asset_utils import slugify
 from stores.fx_historico import tipoActualConMemo
 
@@ -48,20 +49,22 @@ def readAssetFile(assetId):
             "currency": r["currency"],
             "participaciones": r["participaciones"],
             "precioParticipacion": r["precio_participacion"],
-            "capitalInvertidoBruto": r["capital_invertido_bruto"],
+            "capitalInvertidoBruto": leerImporte(r["capital_invertido_bruto_cent"], r["capital_invertido_bruto"]),
             "costeAnual": r["coste_anual"],
-            "comisiones": r["comisiones"],
-            "comisionesFiat": r["comisiones_fiat"],
+            "comisiones": leerImporte(r["comisiones_cent"], r["comisiones"]),
+            "comisionesFiat": leerImporte(r["comisiones_fiat_cent"], r["comisiones_fiat"]),
             "comisionesCripto": r["comisiones_cripto"],
             "comisionesSatoshis": r["comisiones_satoshis"],
             "fxRate": r["fx_rate"],
             "fxFecha": r["fx_fecha"],
             "fxOrigen": r["fx_origen"],
+            "reinvertido": bool(r["reinvertido"]),
         }
         for r in conn.execute(
             "SELECT fecha_operacion, tipo_operacion, exchange, currency, participaciones, "
-            "precio_participacion, capital_invertido_bruto, coste_anual, comisiones, "
-            "comisiones_fiat, comisiones_cripto, comisiones_satoshis, fx_rate, fx_fecha, fx_origen "
+            "precio_participacion, capital_invertido_bruto, capital_invertido_bruto_cent, coste_anual, "
+            "comisiones, comisiones_cent, comisiones_fiat, comisiones_fiat_cent, comisiones_cripto, "
+            "comisiones_satoshis, fx_rate, fx_fecha, fx_origen, reinvertido "
             "FROM activo_rows WHERE asset_id = ? ORDER BY id",
             (safeId,)
         ).fetchall()
@@ -80,8 +83,8 @@ def readAssetFile(assetId):
             "precioCurrency": r["precio_currency"],
             "cantidad": r["cantidad"],
             "comisionesCripto": r["comisiones_cripto"],
-            "comisionesFiat": r["comisiones_fiat"],
-            "total": r["total"],
+            "comisionesFiat": leerImporte(r["comisiones_fiat_cent"], r["comisiones_fiat"]),
+            "total": leerImporte(r["total_cent"], r["total"]),
             "currency": r["currency"],
             "estado": r["estado"],
             "fechaCierre": r["fecha_cierre"],
@@ -91,8 +94,8 @@ def readAssetFile(assetId):
         }
         for r in conn.execute(
             "SELECT id, activo, fecha_apertura, par, stablecoin_symbol, orden, precio_orden, "
-            "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, "
-            "fecha_cierre, fx_rate, fx_fecha, fx_origen "
+            "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, comisiones_fiat_cent, total, "
+            "total_cent, currency, estado, fecha_cierre, fx_rate, fx_fecha, fx_origen "
             "FROM activo_operation_rows WHERE asset_id = ? ORDER BY rowid",
             (safeId,)
         ).fetchall()
@@ -106,12 +109,13 @@ def readAssetFile(assetId):
             "tipo": r["tipo"],
             "cantidad": r["cantidad"],
             "cantidadContraparte": r["cantidad_contraparte"],
-            "comision": r["comision"],
+            "comision": leerImporteCompacto(r["comision_cent"], r["comision"]),
             "comisionMoneda": r["comision_moneda"],
-            "valorEur": r["valor_eur"],
+            "valorEur": leerImporteCompacto(r["valor_eur_cent"], r["valor_eur"]),
         }
         for r in conn.execute(
-            "SELECT id, fecha, par, tipo, cantidad, cantidad_contraparte, comision, comision_moneda, valor_eur "
+            "SELECT id, fecha, par, tipo, cantidad, cantidad_contraparte, comision, comision_cent, "
+            "comision_moneda, valor_eur, valor_eur_cent "
             "FROM activo_conversion_rows "
             "WHERE asset_id = ? ORDER BY rowid",
             (safeId,)
@@ -186,11 +190,16 @@ def _fxDeFila(fila, previos, fecha, divisa):
 
 
 @transactional
-def writeAssetFile(assetId, data, revisionEsperada=None):
+def writeAssetFile(assetId, data, revisionEsperada=None, factorReinversiones=None):
     """Sustituye el activo entero. Devuelve la revisión nueva.
 
     Con `revisionEsperada` lanza ConflictoRevision si el activo se guardó desde
     otro sitio después de que el cliente lo leyera (ver stores/revisiones.py).
+
+    Las compras reinvertidas no se sustituyen: salen de los dividendos y se
+    regeneran al final (ver stores/reinversion_dividendos.py). `factorReinversiones`
+    es el cambio de divisa, si el guardado es una conversión del activo: el precio
+    de esas compras se convierte con el mismo factor que el del resto.
     """
     conn = getDb()
     safeId = slugify(assetId)
@@ -198,6 +207,15 @@ def writeAssetFile(assetId, data, revisionEsperada=None):
     revisiones.comprobar(conn, "activos", safeId, revisionEsperada)
     fxFilas = _fxPrevios(conn, "activo_rows", "fecha_operacion", safeId)
     fxOperaciones = _fxPrevios(conn, "activo_operation_rows", "fecha_apertura", safeId)
+    nombreAnterior = (conn.execute("SELECT name FROM activos WHERE id = ?", (safeId,)).fetchone() or [""])[0]
+    # Tipos de cambio de las compras reinvertidas que llegan ya reescalados (la
+    # conversión de divisa los manda); en un guardado normal no hay ninguno.
+    fxReinversiones = {
+        (r.get("fechaOperacion", ""), r.get("currency", "EUR")):
+            (str(r["fxRate"]), str(r.get("fxFecha") or ""), str(r.get("fxOrigen") or ""))
+        for r in data.get("rows", [])
+        if r.get("reinvertido") and str(r.get("fxRate") or "").strip()
+    }
 
     conn.execute(
         "INSERT INTO activos "
@@ -234,37 +252,51 @@ def writeAssetFile(assetId, data, revisionEsperada=None):
         )
     )
 
-    conn.execute("DELETE FROM activo_rows WHERE asset_id = ?", (safeId,))
+    # Las compras reinvertidas no son de la ficha sino de sus dividendos: ni se
+    # borran ni se aceptan del cliente (una copia antigua las duplicaría o las
+    # resucitaría); se vuelven a derivar al final de este guardado.
+    conn.execute("DELETE FROM activo_rows WHERE asset_id = ? AND reinvertido = 0", (safeId,))
     conn.executemany(
         "INSERT INTO activo_rows "
         "(asset_id, fecha_operacion, tipo_operacion, exchange, currency, participaciones, "
-        "precio_participacion, capital_invertido_bruto, coste_anual, comisiones, "
-        "comisiones_fiat, comisiones_cripto, comisiones_satoshis, fx_rate, fx_fecha, fx_origen) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "precio_participacion, capital_invertido_bruto, capital_invertido_bruto_cent, coste_anual, "
+        "comisiones, comisiones_cent, comisiones_fiat, comisiones_fiat_cent, comisiones_cripto, "
+        "comisiones_satoshis, fx_rate, fx_fecha, fx_origen) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (safeId, r.get("fechaOperacion", ""), r.get("tipoOperacion", ""),
              r.get("exchange", ""), r.get("currency", "EUR"), r.get("participaciones", ""),
-             r.get("precioParticipacion", ""), r.get("capitalInvertidoBruto", ""),
-             r.get("costeAnual", ""), r.get("comisiones", ""), r.get("comisionesFiat", ""),
+             r.get("precioParticipacion", ""),
+             *legadoYCentimos(r.get("capitalInvertidoBruto", ""), r.get("currency", "EUR")),
+             r.get("costeAnual", ""),
+             *legadoYCentimos(r.get("comisiones", ""), r.get("currency", "EUR")),
+             *legadoYCentimos(r.get("comisionesFiat", ""), r.get("currency", "EUR")),
              r.get("comisionesCripto", ""), r.get("comisionesSatoshis", ""),
              *_fxDeFila(r, fxFilas, r.get("fechaOperacion", ""), r.get("currency", "EUR")))
             for r in data.get("rows", [])
+            if not r.get("reinvertido")
         ]
     )
+    nombreNuevo = data.get("name", "")
+    reinversion_dividendos.renombrarInstrumento(conn, nombreAnterior, nombreNuevo)
+    if factorReinversiones is not None:
+        reinversion_dividendos.convertirPrecios(conn, nombreNuevo, factorReinversiones)
+    reinversion_dividendos.sincronizar(conn, safeId, avanzarRevision=False, fxExtra=fxReinversiones)
 
     conn.execute("DELETE FROM activo_operation_rows WHERE asset_id = ?", (safeId,))
     conn.executemany(
         "INSERT INTO activo_operation_rows "
         "(id, asset_id, activo, fecha_apertura, par, stablecoin_symbol, orden, precio_orden, "
-        "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre, "
-        "fx_rate, fx_fecha, fx_origen) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, comisiones_fiat_cent, total, "
+        "total_cent, currency, estado, fecha_cierre, fx_rate, fx_fecha, fx_origen) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("id", ""), safeId, r.get("activo", ""), r.get("fechaApertura", ""),
              r.get("par", ""), r.get("stablecoinSymbol", ""), r.get("orden", "Compra"),
              r.get("precioOrden", ""), r.get("precioCurrency", "EUR"), r.get("cantidad", ""),
-             r.get("comisionesCripto", ""), r.get("comisionesFiat", ""),
-             r.get("total", ""), r.get("currency", "EUR"),
+             r.get("comisionesCripto", ""),
+             *legadoYCentimos(r.get("comisionesFiat", ""), r.get("currency", "EUR")),
+             *legadoYCentimos(r.get("total", ""), r.get("currency", "EUR")), r.get("currency", "EUR"),
              r.get("estado", "Activo"), r.get("fechaCierre", ""),
              *_fxDeFila(r, fxOperaciones, r.get("fechaApertura", ""), r.get("currency", "EUR")))
             for r in data.get("operationRows", [])
@@ -274,12 +306,13 @@ def writeAssetFile(assetId, data, revisionEsperada=None):
     conn.execute("DELETE FROM activo_conversion_rows WHERE asset_id = ?", (safeId,))
     conn.executemany(
         "INSERT INTO activo_conversion_rows "
-        "(id, asset_id, fecha, par, tipo, cantidad, cantidad_contraparte, comision, comision_moneda, valor_eur) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "(id, asset_id, fecha, par, tipo, cantidad, cantidad_contraparte, comision, comision_cent, "
+        "comision_moneda, valor_eur, valor_eur_cent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("id", ""), safeId, r.get("fecha", ""), r.get("par", ""),
              r.get("tipo", ""), r.get("cantidad", ""), r.get("cantidadContraparte", ""),
-             r.get("comision", ""), r.get("comisionMoneda", ""), r.get("valorEur", ""))
+             *legadoYCentimos(r.get("comision", ""), r.get("comisionMoneda", "")),
+             r.get("comisionMoneda", ""), *legadoYCentimos(r.get("valorEur", "")))
             for r in data.get("conversionRows", [])
         ]
     )
@@ -299,13 +332,15 @@ def listAssets():
     ).fetchall()
 
     assetRows = conn.execute(
-        "SELECT asset_id, fecha_operacion, tipo_operacion, participaciones, capital_invertido_bruto, "
-        "comisiones, comisiones_fiat, comisiones_cripto FROM activo_rows ORDER BY id"
+        "SELECT asset_id, fecha_operacion, tipo_operacion, participaciones, "
+        f"{importeSql('capital_invertido_bruto')} AS capital_invertido_bruto, "
+        f"{importeSql('comisiones')} AS comisiones, {importeSql('comisiones_fiat')} AS comisiones_fiat, "
+        "comisiones_cripto FROM activo_rows ORDER BY id"
     ).fetchall()
 
     opRows = conn.execute(
-        "SELECT asset_id, fecha_apertura, orden, cantidad, comisiones_cripto, total "
-        "FROM activo_operation_rows WHERE estado = 'Completado'"
+        "SELECT asset_id, fecha_apertura, orden, cantidad, comisiones_cripto, "
+        f"{importeSql('total')} AS total FROM activo_operation_rows WHERE estado = 'Completado'"
     ).fetchall()
 
     rowsByAsset = {}

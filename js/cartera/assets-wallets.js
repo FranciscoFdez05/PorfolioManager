@@ -77,7 +77,7 @@ function walletsActivoFormularioHtml(wallets) {
             </div>
             <div class="walletsActivoColumna">
                 <ul class="walletsFilas walletsActivoFilas">${walletsFilaHtml({ conActivo: false })}</ul>
-                <button type="button" class="cancelButton walletsAnadirFilaBtn walletsActivoAnadirBtn">+ Añadir otra wallet</button>
+                <button type="button" class="cancelButton walletsAnadirFilaBtn walletsActivoAnadirBtn">Añadir otra wallet</button>
                 <label class="assetRowModalLabel walletsActivoEtherscan hidden">Clave de API de Etherscan (gratuita para ETH; BNB requiere plan de pago o NodeReal, en Ajustes › API)
                     <input class="assetRowModalInput walletsActivoEtherscanValor" type="text" autocomplete="off" autocapitalize="off" spellcheck="false">
                 </label>

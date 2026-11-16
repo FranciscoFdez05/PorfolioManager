@@ -25,6 +25,63 @@ const ASSET_GRAFICO_UNIDADES = [
     { clave: "eur", etiqueta: "€" },
     { clave: "pct", etiqueta: "%" }
 ]
+// Qué se ve en la pestaña. «Compras / ventas» se pinta aquí; los otros dos, en
+// assets-grafico-modos.js.
+const assetGraficoModos = [
+    { clave: "compras", etiqueta: "Compras / ventas" },
+    { clave: "indices", etiqueta: "Comparativa índices" },
+    { clave: "estacional", etiqueta: "Estacionales" },
+    { clave: "anual", etiqueta: "Comparativa anual" }
+]
+// Ilustración y texto del «?» de cada modo. Los colores llevan valor de respaldo porque
+// el menú es fijo y queda fuera de .assetGrafico, donde se definen las variables.
+const ASSET_GRAFICO_AYUDA = {
+    compras: {
+        texto: "El precio (o el rendimiento de tu posición) a lo largo del tiempo, con un punto verde en cada compra y uno rojo en cada venta.",
+        svg: `<path class="ayudaLinea" d="M10 70 L40 55 L70 80 L100 50 L130 62 L160 30 L190 42"/>
+            <circle cx="70" cy="80" r="5" fill="var(--graficoCompra,#16a34a)"/>
+            <circle cx="130" cy="62" r="5" fill="var(--graficoCompra,#16a34a)"/>
+            <circle cx="160" cy="30" r="5" fill="var(--graficoVenta,#dc2626)"/>`
+    },
+    indices: {
+        texto: "Tu activo frente a uno o varios índices desde el inicio del periodo: todas las líneas parten de 0 % y se ve quién ha rendido más.",
+        svg: `<line class="ayudaEje" x1="10" y1="60" x2="210" y2="60"/>
+            <path class="ayudaLinea" d="M10 60 L50 48 L90 54 L130 32 L170 38 L200 20"/>
+            <path class="ayudaLinea ayudaLineaTenue" d="M10 60 L50 56 L90 50 L130 46 L170 44 L200 40"/>
+            <text class="ayudaTexto" x="204" y="20">Activo</text>
+            <text class="ayudaTexto" x="204" y="44">Índice</text>`
+    },
+    estacional: {
+        texto: "Cada línea es un año natural, de enero a diciembre, partiendo de 0 %. Sirve para ver si el activo suele subir o bajar en ciertos meses.",
+        svg: `<line class="ayudaEje" x1="10" y1="60" x2="210" y2="60"/>
+            <path class="ayudaLinea" d="M10 60 L45 50 L80 56 L115 40 L150 44 L190 30"/>
+            <path class="ayudaLinea ayudaLineaTenue" d="M10 60 L45 66 L80 58 L115 70 L150 62 L190 72"/>
+            <path class="ayudaLinea ayudaLineaPunteada" d="M10 60 L45 58 L80 48 L115 52 L150 36 L190 46"/>
+            <text class="ayudaTexto" x="10" y="100">Ene</text>
+            <text class="ayudaTexto" x="186" y="100">Dic</text>`
+    },
+    anual: {
+        texto: "Una barra por año: variación del precio entre el cierre de un año y el del siguiente. Verde si subió, rojo si bajó.",
+        svg: `<line class="ayudaEje" x1="10" y1="60" x2="210" y2="60"/>
+            <rect x="35" y="25" width="30" height="35" rx="2" fill="var(--graficoCompra,#16a34a)"/>
+            <rect x="95" y="60" width="30" height="22" rx="2" fill="var(--graficoVenta,#dc2626)"/>
+            <rect x="155" y="40" width="30" height="20" rx="2" fill="var(--graficoCompra,#16a34a)"/>
+            <text class="ayudaTexto" x="38" y="100">2024</text>
+            <text class="ayudaTexto" x="98" y="100">2025</text>
+            <text class="ayudaTexto" x="158" y="100">2026</text>`
+    }
+}
+// En «Estacionales», el gráfico de años superpuestos o la tabla de rendimiento mensual.
+const ASSET_GRAFICO_VISTAS_ESTACIONAL = [
+    { clave: "grafico", etiqueta: "Gráfico" },
+    { clave: "tabla", etiqueta: "Tabla" }
+]
+// Escala del eje del gráfico de estacionales. La logarítmica evita que un año extremo
+// (+1000 %) aplaste a los demás contra el 0.
+const ASSET_GRAFICO_ESCALAS_ESTACIONAL = [
+    { clave: "lineal", etiqueta: "Lineal" },
+    { clave: "log", etiqueta: "Log" }
+]
 const ASSET_GRAFICO_MODO = "assetGraficoCercano"
 
 // Distancia en píxeles a la que el cursor ya «coge» un punto de compra o venta.
@@ -54,8 +111,11 @@ function assetGraficoHayVentana() {
 
 // Con ventana se pide «Todo» al servidor: una ventana puede caer en cualquier punto del
 // histórico y el recorte se hace aquí.
+// La comparativa anual necesita todo el histórico para tener años completos.
+// Los estacionales, también: son el respaldo cuando no hay velas de TradingView.
 function assetGraficoRangoEfectivo() {
-    return assetGraficoHayVentana() ? "TODO" : assetGraficoEstado().rango
+    const { modo, rango } = assetGraficoEstado()
+    return assetGraficoHayVentana() || modo === "anual" || modo === "estacional" ? "TODO" : rango
 }
 
 // Inicio del primer día y final del último, en hora local, en segundos.
@@ -91,6 +151,20 @@ function assetGraficoRecortar(datos, ventana) {
     return { ...datos, puntos, operaciones }
 }
 
+// En la vista de posición, antes de la primera compra la línea es un tramo plano en
+// cero que no dice nada: se empieza en esa compra. Si el usuario fija «Desde», se
+// respeta su fecha.
+function assetGraficoDesdePrimeraCompra(datos, vista, ventana) {
+    if (vista !== "posicion" || ventana.desde) return datos
+    const puntos = datos.puntos || []
+    const primero = puntos.findIndex((punto) => Number.isFinite(punto.coste) && punto.coste > 0)
+    if (primero <= 0) return datos
+    const operaciones = (datos.operaciones || [])
+        .filter((operacion) => operacion.indice >= primero)
+        .map((operacion) => ({ ...operacion, indice: operacion.indice - primero }))
+    return { ...datos, puntos: puntos.slice(primero), operaciones }
+}
+
 function assetGraficoConHora(rango) {
     return !assetGraficoHayVentana() && (rango === "1D" || rango === "7D")
 }
@@ -102,9 +176,16 @@ function assetGraficoPreferencia(clave, opciones, defecto) {
 
 function assetGraficoEstado() {
     return {
+        modo: assetGraficoPreferencia("assetGraficoModo", assetGraficoModos, "compras"),
         rango: assetGraficoPreferencia("assetGraficoRango", ASSET_GRAFICO_RANGOS, "30D"),
         vista: assetGraficoPreferencia("assetGraficoVista", ASSET_GRAFICO_VISTAS, "precio"),
-        unidad: assetGraficoPreferencia("assetGraficoUnidad", ASSET_GRAFICO_UNIDADES, "eur")
+        unidad: assetGraficoPreferencia("assetGraficoUnidad", ASSET_GRAFICO_UNIDADES, "eur"),
+        vistaEstacional: assetGraficoPreferencia("assetGraficoVistaEstacional", ASSET_GRAFICO_VISTAS_ESTACIONAL, "grafico"),
+        escalaEstacional: assetGraficoPreferencia(
+            "assetGraficoEscalaEstacional",
+            ASSET_GRAFICO_ESCALAS_ESTACIONAL,
+            "lineal"
+        )
     }
 }
 
@@ -280,14 +361,108 @@ function assetGraficoFormatearEje(ts, segundosVisibles) {
     return fecha.toLocaleDateString(_nl(), { month: "short", year: "2-digit" })
 }
 
-function assetGraficoSelector(nombre, opciones, activa) {
+// `modos` son los modos del gráfico en los que se ve el grupo, separados por espacios;
+// sin él, se ve siempre.
+function assetGraficoSelector(nombre, opciones, activa, modos = "") {
     const botones = opciones
         .map(
             (opcion) =>
                 `<button type="button" class="mToggleBtn${opcion.clave === activa ? " active" : ""}" data-grafico-${nombre}="${opcion.clave}" aria-pressed="${opcion.clave === activa}">${escapeHtml(opcion.etiqueta)}</button>`
         )
         .join("")
-    return `<div class="mToggleGroup" role="group">${botones}</div>`
+    return `<div class="mToggleGroup" role="group"${modos ? ` data-grafico-modos="${modos}"` : ""}>${botones}</div>`
+}
+
+// El modo se elige desde el propio botón de la pestaña «Gráfico», que hace de
+// desplegable con el mismo aspecto que los del menú superior.
+function assetGraficoOpcionesModo(activo) {
+    return assetGraficoModos
+        .map(
+            (modo) =>
+                `<div class="assetGraficoModoFila">
+                    <button type="button" class="navBtn navDropdownItem${modo.clave === activo ? " active" : ""}" role="menuitemradio" aria-checked="${modo.clave === activo}" data-grafico-modo="${modo.clave}">${escapeHtml(modo.etiqueta)}</button>
+                    <button type="button" class="assetGraficoAyudaBtn" data-grafico-ayuda="${modo.clave}" aria-label="Qué muestra ${escapeHtml(modo.etiqueta)}" aria-expanded="false">?</button>
+                </div>`
+        )
+        .join("")
+}
+
+// Panel con la ilustración del modo, a un lado del menú. Si ya se ve el de ese modo, se cierra.
+function assetGraficoAlternarAyuda(menu, boton) {
+    const clave = boton.dataset.graficoAyuda
+    const previo = menu.querySelector(".assetGraficoAyuda")
+    const eraElMismo = previo?.dataset.modo === clave
+    previo?.remove()
+    menu.querySelectorAll("[data-grafico-ayuda]").forEach((otro) => otro.setAttribute("aria-expanded", "false"))
+    const ayuda = ASSET_GRAFICO_AYUDA[clave]
+    if (eraElMismo || !ayuda) return
+    boton.setAttribute("aria-expanded", "true")
+    menu.insertAdjacentHTML(
+        "beforeend",
+        `<div class="assetGraficoAyuda" data-modo="${clave}" role="note">
+            <svg viewBox="0 0 230 110" role="img" aria-hidden="true">${ayuda.svg}</svg>
+            <p>${escapeHtml(ayuda.texto)}</p>
+        </div>`
+    )
+}
+
+function assetGraficoAlternarMenuModo(boton) {
+    const menu = document.getElementById("assetGraficoModoMenu")
+    if (!menu) return
+    const abierto = menu.classList.contains("open")
+    document.querySelectorAll(".navDropdownMenu.open").forEach((otro) => otro.classList.remove("open"))
+    boton.setAttribute("aria-expanded", String(!abierto))
+    if (abierto) return
+    menu.innerHTML = assetGraficoOpcionesModo(assetGraficoEstado().modo)
+    // position: fixed, como los del menú superior: el contenedor de pestañas
+    // tiene overflow: hidden y recortaría un menú absoluto.
+    const rect = boton.getBoundingClientRect()
+    menu.style.top = `${rect.bottom + 4}px`
+    menu.style.left = `${rect.left}px`
+    menu.style.minWidth = `${rect.width}px`
+    menu.classList.add("open")
+}
+
+function assetGraficoCambiarModo(modo) {
+    setChartPref("assetGraficoModo", modo)
+    const assetId = document.querySelector(".assetTablePage")?.dataset.assetId
+    if (!assetId || !document.getElementById("assetGraficoSection")?.dataset.assetId) return
+    assetGraficoSincronizarModo()
+    // El modo anual pide todo el histórico y los demás el rango elegido.
+    assetGraficoCargar(assetId)
+}
+
+// Se llama una vez por ficha, desde setupAssetTabs.
+function assetGraficoRegistrarMenuModo() {
+    const menu = document.getElementById("assetGraficoModoMenu")
+    if (!menu) return
+    menu.addEventListener("click", (evento) => {
+        const ayuda = evento.target.closest("[data-grafico-ayuda]")
+        if (ayuda) {
+            // Sin esto el clic llega al document y cerraría el menú.
+            evento.stopPropagation()
+            assetGraficoAlternarAyuda(menu, ayuda)
+            return
+        }
+        // Un clic dentro del panel de ayuda tampoco debe cerrar el menú.
+        if (evento.target.closest(".assetGraficoAyuda")) {
+            evento.stopPropagation()
+            return
+        }
+        const opcion = evento.target.closest("[data-grafico-modo]")
+        if (!opcion) return
+        menu.classList.remove("open")
+        document.getElementById("graficoTabBtn")?.setAttribute("aria-expanded", "false")
+        assetGraficoCambiarModo(opcion.dataset.graficoModo)
+    })
+}
+
+// Enseña solo los controles que valen para el modo elegido.
+function assetGraficoSincronizarModo() {
+    const { modo } = assetGraficoEstado()
+    document.querySelectorAll("#assetGraficoSection [data-grafico-modos]").forEach((elemento) => {
+        elemento.classList.toggle("hidden", !elemento.dataset.graficoModos.split(" ").includes(modo))
+    })
 }
 
 // Misma cápsula de fechas que el seguimiento de wallets (css/pages/operaciones.css),
@@ -320,7 +495,7 @@ function assetGraficoCampoFechaHtml(campo, etiqueta, valor) {
 function assetGraficoFechasHtml() {
     const { desde, hasta } = _assetGraficoVentana
     return `
-        <div class="walletsSegRango${assetGraficoHayVentana() ? " activo" : ""}" id="assetGraficoFechas" role="group" aria-label="Buscar por fecha">
+        <div class="walletsSegRango${assetGraficoHayVentana() ? " activo" : ""}" id="assetGraficoFechas" data-grafico-modos="compras indices" role="group" aria-label="Buscar por fecha">
             ${assetGraficoCampoFechaHtml("desde", "Desde", desde)}
             <span class="walletsSegRangoSep" aria-hidden="true">→</span>
             ${assetGraficoCampoFechaHtml("hasta", "Hasta", hasta)}
@@ -333,7 +508,7 @@ function assetGraficoEtiquetaVista(vista) {
 }
 
 function assetGraficoPintarEsqueleto(seccion) {
-    const { rango, vista, unidad } = assetGraficoEstado()
+    const { rango, vista, unidad, vistaEstacional, escalaEstacional } = assetGraficoEstado()
     seccion.innerHTML = `
         <div class="assetGrafico">
             <div class="assetGraficoCabecera">
@@ -346,13 +521,18 @@ function assetGraficoPintarEsqueleto(seccion) {
                     <span class="assetGraficoFecha" id="assetGraficoFecha">&nbsp;</span>
                 </div>
                 <div class="assetGraficoControles">
-                    ${assetGraficoSelector("vista", ASSET_GRAFICO_VISTAS, vista)}
-                    ${assetGraficoSelector("unidad", ASSET_GRAFICO_UNIDADES, unidad)}
-                    ${assetGraficoSelector("rango", ASSET_GRAFICO_RANGOS, assetGraficoHayVentana() ? "" : rango)}
+                    ${assetGraficoSelector("vista", ASSET_GRAFICO_VISTAS, vista, "compras")}
+                    ${assetGraficoSelector("unidad", ASSET_GRAFICO_UNIDADES, unidad, "compras")}
+                    ${assetGraficoSelector("vista-estacional", ASSET_GRAFICO_VISTAS_ESTACIONAL, vistaEstacional, "estacional")}
+                    ${assetGraficoSelector("escala-estacional", ASSET_GRAFICO_ESCALAS_ESTACIONAL, escalaEstacional, "estacional")}
+                    <div class="mToggleGroup" role="group" id="assetGraficoIndices" aria-label="Índices a comparar" data-grafico-modos="indices"></div>
+                    <div class="mToggleGroup assetGraficoAnios" role="group" id="assetGraficoAnios" aria-label="Años a comparar" data-grafico-modos="estacional"></div>
+                    ${assetGraficoSelector("rango", ASSET_GRAFICO_RANGOS, assetGraficoHayVentana() ? "" : rango, "compras indices")}
                     ${assetGraficoFechasHtml()}
                 </div>
             </div>
             <div class="assetGraficoLienzo" id="assetGraficoLienzo"><canvas id="assetGraficoCanvas"></canvas></div>
+            <div class="assetGraficoTabla hidden" id="assetGraficoTabla"></div>
             <p class="assetGraficoVacio hidden" id="assetGraficoVacio"></p>
             <div class="assetGraficoLeyenda" id="assetGraficoLeyenda"></div>
             <p class="assetGraficoNota" id="assetGraficoNota"></p>
@@ -616,8 +796,19 @@ function assetGraficoDibujar() {
     const pagina = document.querySelector(".assetTablePage")
     if (!lienzo || !canvas || !_assetGraficoDatos || typeof Chart === "undefined") return
 
-    const { rango, vista, unidad } = assetGraficoEstado()
-    _assetGraficoVisibles = assetGraficoRecortar(_assetGraficoDatos, _assetGraficoVentana)
+    assetGraficoSincronizarModo()
+    // La tabla solo existe en «Estacionales» y la vuelve a enseñar ese modo si toca.
+    document.getElementById("assetGraficoTabla")?.classList.add("hidden")
+    const { modo, rango, vista, unidad } = assetGraficoEstado()
+    if (modo !== "compras") {
+        assetGraficoDibujarModo(modo)
+        return
+    }
+    // Vuelve del otro modo: la cabecera y la leyenda las reescribe el resto de la función.
+    _assetGraficoVisibles = assetGraficoRecortar(
+        assetGraficoDesdePrimeraCompra(_assetGraficoDatos, vista, _assetGraficoVentana),
+        _assetGraficoVentana
+    )
     const series = assetGraficoSeries(_assetGraficoVisibles, vista, unidad)
     assetGraficoEscribir("assetGraficoEtiqueta", assetGraficoEtiquetaVista(vista))
 
@@ -835,6 +1026,10 @@ function assetGraficoPulsar(boton, assetId) {
     }
     if (boton.dataset.graficoVista) setChartPref("assetGraficoVista", boton.dataset.graficoVista)
     if (boton.dataset.graficoUnidad) setChartPref("assetGraficoUnidad", boton.dataset.graficoUnidad)
+    if (boton.dataset.graficoVistaEstacional) setChartPref("assetGraficoVistaEstacional", boton.dataset.graficoVistaEstacional)
+    if (boton.dataset.graficoEscalaEstacional) {
+        setChartPref("assetGraficoEscalaEstacional", boton.dataset.graficoEscalaEstacional)
+    }
     assetGraficoDibujar()
 }
 
@@ -895,6 +1090,16 @@ function renderAssetGraficoSection() {
         _assetGraficoDias = null
         assetGraficoPintarEsqueleto(seccion)
         seccion.addEventListener("click", (evento) => {
+            const indice = evento.target.closest("[data-grafico-indice]")
+            if (indice) {
+                assetGraficoAlternarIndice(indice.dataset.graficoIndice)
+                return
+            }
+            const anio = evento.target.closest("[data-grafico-anio]")
+            if (anio) {
+                assetGraficoAlternarAnio(anio)
+                return
+            }
             const boton = evento.target.closest(".mToggleBtn")
             if (boton) assetGraficoPulsar(boton, assetId)
             const calendario = evento.target.closest("[data-grafico-calendario]")

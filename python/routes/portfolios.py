@@ -19,6 +19,7 @@ from admin.portfolios_manager import (
     switchPortfolio,
 )
 from core import paths, settings, zip_seguro
+from core.centimos import leerImporte, leerImporteCompacto
 from core.copia_sqlite import copiar as copiarSqlite
 from core.escritura import escribirJsonAtomico, limpiarTemporal, rutaTemporal, temporalPara
 from routes.ajustes import configuracionDelZip
@@ -79,17 +80,18 @@ def _readAssetFromPortfolioDb(conn, assetId, pid, portfolioName):
             "currency": r["currency"],
             "participaciones": r["participaciones"],
             "precioParticipacion": r["precio_participacion"],
-            "capitalInvertidoBruto": r["capital_invertido_bruto"],
+            "capitalInvertidoBruto": leerImporte(r["capital_invertido_bruto_cent"], r["capital_invertido_bruto"]),
             "costeAnual": r["coste_anual"],
-            "comisiones": r["comisiones"],
-            "comisionesFiat": r["comisiones_fiat"],
+            "comisiones": leerImporte(r["comisiones_cent"], r["comisiones"]),
+            "comisionesFiat": leerImporte(r["comisiones_fiat_cent"], r["comisiones_fiat"]),
             "comisionesCripto": r["comisiones_cripto"],
             "comisionesSatoshis": r["comisiones_satoshis"],
         }
         for r in conn.execute(
             "SELECT fecha_operacion, tipo_operacion, exchange, currency, participaciones, "
-            "precio_participacion, capital_invertido_bruto, coste_anual, comisiones, "
-            "comisiones_fiat, comisiones_cripto, comisiones_satoshis "
+            "precio_participacion, capital_invertido_bruto, capital_invertido_bruto_cent, coste_anual, "
+            "comisiones, comisiones_cent, comisiones_fiat, comisiones_fiat_cent, comisiones_cripto, "
+            "comisiones_satoshis "
             "FROM activo_rows WHERE asset_id = ? ORDER BY id",
             (safeId,)
         ).fetchall()
@@ -108,15 +110,16 @@ def _readAssetFromPortfolioDb(conn, assetId, pid, portfolioName):
             "precioCurrency": r["precio_currency"],
             "cantidad": r["cantidad"],
             "comisionesCripto": r["comisiones_cripto"],
-            "comisionesFiat": r["comisiones_fiat"],
-            "total": r["total"],
+            "comisionesFiat": leerImporte(r["comisiones_fiat_cent"], r["comisiones_fiat"]),
+            "total": leerImporte(r["total_cent"], r["total"]),
             "currency": r["currency"],
             "estado": r["estado"],
             "fechaCierre": r["fecha_cierre"],
         }
         for r in conn.execute(
             "SELECT id, activo, fecha_apertura, par, stablecoin_symbol, orden, precio_orden, "
-            "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre "
+            "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, comisiones_fiat_cent, total, "
+            "total_cent, currency, estado, fecha_cierre "
             "FROM activo_operation_rows WHERE asset_id = ? ORDER BY rowid",
             (safeId,)
         ).fetchall()
@@ -130,12 +133,13 @@ def _readAssetFromPortfolioDb(conn, assetId, pid, portfolioName):
             "tipo": r["tipo"],
             "cantidad": r["cantidad"],
             "cantidadContraparte": r["cantidad_contraparte"],
-            "comision": r["comision"],
+            "comision": leerImporteCompacto(r["comision_cent"], r["comision"]),
             "comisionMoneda": r["comision_moneda"],
-            "valorEur": r["valor_eur"],
+            "valorEur": leerImporteCompacto(r["valor_eur_cent"], r["valor_eur"]),
         }
         for r in conn.execute(
-            "SELECT id, fecha, par, tipo, cantidad, cantidad_contraparte, comision, comision_moneda, valor_eur "
+            "SELECT id, fecha, par, tipo, cantidad, cantidad_contraparte, comision, comision_cent, "
+            "comision_moneda, valor_eur, valor_eur_cent "
             "FROM activo_conversion_rows "
             "WHERE asset_id = ? ORDER BY rowid",
             (safeId,)

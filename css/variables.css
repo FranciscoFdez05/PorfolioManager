@@ -2,6 +2,8 @@
    css/themes/: noche-clara.css (por defecto), claro.css y oscuro.css. */
 :root {
     --sidebar-width: 300px;
+    /* Ancho que el tirador del lateral sobresale sobre el contenido. */
+    --toggle-lane: 20px;
 
     /* Escala de la interfaz en pantallas grandes: la fija responsive.css y la
        aplica `zoom` en <html>. Con zoom, 1vh y 1vw se amplían con todo lo

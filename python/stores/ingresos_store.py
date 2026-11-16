@@ -1,5 +1,6 @@
 import json
 
+from core.centimos import columnasConCent, escribirColumnas, escribirImporte, leerColumnas, leerImporte
 from core.db import getDb, transactional
 from core.validation import normalizeYear
 from stores import revisiones
@@ -275,7 +276,7 @@ def readIngresosYear(year):
         {
             "nombre": r["nombre"],
             "categoria": r["categoria"],
-            "importe": r["importe"],
+            "importe": leerImporte(r["importe_cent"], r["importe"]),
             "frecuencia": normalizeFrecuencia(r["frecuencia"]),
             "diaCobro": normalizeDiaCobro(r["dia_cobro"]),
             "mesInicio": normalizeMes(r["mes_inicio"]),
@@ -284,13 +285,12 @@ def readIngresosYear(year):
             "cuenta": r["cuenta"],
             "cuentasCobro": normalizeCuentasCobro(r["cuentas_cobro"]),
             "pagasExtra": normalizePagasExtra(r["pagas_extra"]),
-            "meses": {month: r[month] for month in MONTH_KEYS},
+            "meses": leerColumnas(r, MONTH_KEYS),
         }
         for r in conn.execute(
-            "SELECT nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
-            "septiembre, octubre, noviembre, diciembre, "
-            "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta, cuentas_cobro, "
-            "pagas_extra "
+            f"SELECT nombre, {columnasConCent(MONTH_KEYS)}, "
+            "categoria, importe, importe_cent, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta, "
+            "cuentas_cobro, pagas_extra "
             "FROM ingresos_recurrentes WHERE year = ? ORDER BY id",
             (normalized,)
         ).fetchall()
@@ -299,14 +299,14 @@ def readIngresosYear(year):
     months = {}
     for month in MONTH_KEYS:
         monthRows = conn.execute(
-            "SELECT fecha, nombre, tipo, cantidad, nota, cuenta FROM ingresos_rows "
+            "SELECT fecha, nombre, tipo, cantidad, cantidad_cent, nota, cuenta FROM ingresos_rows "
             "WHERE year = ? AND month = ? ORDER BY id",
             (normalized, month)
         ).fetchall()
         months[month] = {"rows": [
             {
                 "fecha": r["fecha"], "nombre": r["nombre"], "tipo": r["tipo"],
-                "cantidad": r["cantidad"], "nota": r["nota"], "cuenta": r["cuenta"],
+                "cantidad": leerImporte(r["cantidad_cent"], r["cantidad"]), "nota": r["nota"], "cuenta": r["cuenta"],
             }
             for r in monthRows
         ]}
@@ -338,47 +338,45 @@ def writeIngresosYear(year, data, revisionEsperada=None):
     conn.execute("DELETE FROM ingresos_recurrentes WHERE year = ?", (normalized,))
 
     validas = cuentasValidasParaFilas(conn)
+    columnasMes = ", ".join(MONTH_KEYS)
+    columnasMesCent = ", ".join(f"{mes}_cent" for mes in MONTH_KEYS)
+    filasRecurrentes = []
+    for m in data.get("recurrentes", []):
+        mesesLegado, mesesCent = escribirColumnas(m.get("meses", {}), MONTH_KEYS)
+        importeCent, importeLegado = escribirImporte(m.get("importe", ""))
+        filasRecurrentes.append((
+            normalized, m.get("nombre", ""), *mesesLegado, *mesesCent,
+            m.get("categoria", ""), importeLegado, importeCent,
+            normalizeFrecuencia(m.get("frecuencia")),
+            normalizeDiaCobro(m.get("diaCobro")),
+            normalizeMes(m.get("mesInicio")),
+            1 if m.get("activa", True) else 0,
+            m.get("nota", ""),
+            normalizarCuentaDeFila(m.get("cuenta"), validas),
+            serializeCuentasCobro(m.get("cuentasCobro"), validas | {ID_BANCO}),
+            serializePagasExtra(m.get("pagasExtra")),
+        ))
     conn.executemany(
-        "INSERT INTO ingresos_recurrentes "
-        "(year, nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
-        "septiembre, octubre, noviembre, diciembre, "
-        "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta, cuentas_cobro, "
-        "pagas_extra) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [
-            (normalized, m.get("nombre", ""),
-             m.get("meses", {}).get("enero", ""), m.get("meses", {}).get("febrero", ""),
-             m.get("meses", {}).get("marzo", ""), m.get("meses", {}).get("abril", ""),
-             m.get("meses", {}).get("mayo", ""), m.get("meses", {}).get("junio", ""),
-             m.get("meses", {}).get("julio", ""), m.get("meses", {}).get("agosto", ""),
-             m.get("meses", {}).get("septiembre", ""), m.get("meses", {}).get("octubre", ""),
-             m.get("meses", {}).get("noviembre", ""), m.get("meses", {}).get("diciembre", ""),
-             m.get("categoria", ""), m.get("importe", ""),
-             normalizeFrecuencia(m.get("frecuencia")),
-             normalizeDiaCobro(m.get("diaCobro")),
-             normalizeMes(m.get("mesInicio")),
-             1 if m.get("activa", True) else 0,
-             m.get("nota", ""),
-             normalizarCuentaDeFila(m.get("cuenta"), validas),
-             serializeCuentasCobro(m.get("cuentasCobro"), validas | {ID_BANCO}),
-             serializePagasExtra(m.get("pagasExtra")))
-            for m in data.get("recurrentes", [])
-        ]
+        f"INSERT INTO ingresos_recurrentes (year, nombre, {columnasMes}, {columnasMesCent}, "
+        "categoria, importe, importe_cent, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta, "
+        f"cuentas_cobro, pagas_extra) VALUES ({', '.join('?' * (2 + 2 * len(MONTH_KEYS) + 11))})",
+        filasRecurrentes,
     )
 
     rowsToInsert = []
     for month in MONTH_KEYS:
         for row in data.get("months", {}).get(month, {}).get("rows", []):
+            centimosFila, legado = escribirImporte(row.get("cantidad", ""))
             rowsToInsert.append((
                 normalized, month,
                 row.get("fecha", ""), row.get("nombre", ""),
-                row.get("tipo", ""), row.get("cantidad", ""),
+                row.get("tipo", ""), legado, centimosFila,
                 row.get("nota", ""),
                 normalizarCuentaDeFila(row.get("cuenta"), validas),
             ))
     conn.executemany(
-        "INSERT INTO ingresos_rows (year, month, fecha, nombre, tipo, cantidad, nota, cuenta) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO ingresos_rows (year, month, fecha, nombre, tipo, cantidad, cantidad_cent, nota, cuenta) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         rowsToInsert
     )
 

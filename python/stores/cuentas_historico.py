@@ -22,6 +22,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from decimal import Decimal
 
+from core.centimos import importeSql
 from core.db import getDb
 from stores.cuentas_store import (
     _FECHA,
@@ -101,7 +102,10 @@ def _diaDeMes(year: str, month: str, fecha: str, hoy: datetime.date) -> datetime
 
 
 def _transferencias(conn, acumulado: _Acumulador, hoy: datetime.date) -> None:
-    for fila in conn.execute("SELECT fecha, origen, destino, cantidad, comision FROM transferencias").fetchall():
+    for fila in conn.execute(
+        f"SELECT fecha, origen, destino, {importeSql('cantidad')} AS cantidad, {importeSql('comision')} AS comision "
+        "FROM transferencias"
+    ).fetchall():
         year, month = _yearMonth(fila["fecha"])
         if year:
             dia = _diaDeMes(year, month, fila["fecha"], hoy)
@@ -116,14 +120,16 @@ def _transferencias(conn, acumulado: _Acumulador, hoy: datetime.date) -> None:
 
 def _filas(conn, acumulado: _Acumulador, hoy: datetime.date) -> None:
     for tabla, anotar in (("ingresos_rows", acumulado.entrada), ("gastos_rows", acumulado.salida)):
-        for fila in conn.execute(f"SELECT year, month, fecha, cantidad, cuenta FROM {tabla}").fetchall():
+        for fila in conn.execute(
+            f"SELECT year, month, fecha, {importeSql('cantidad')} AS cantidad, cuenta FROM {tabla}"
+        ).fetchall():
             dia = _diaDeMes(fila["year"], fila["month"], fila["fecha"], hoy)
             if dia is not False:
                 anotar(_cuentaDeFila(fila["cuenta"]), dia, _decimal(fila["cantidad"]))
 
 
 def _recurrentes(conn, acumulado: _Acumulador, hoy: datetime.date) -> None:
-    columnas = ", ".join(["year", "cuenta", "cuentas_cobro", *MONTH_KEYS])
+    columnas = ", ".join(["year", "cuenta", "cuentas_cobro", *(f"{importeSql(mes)} AS {mes}" for mes in MONTH_KEYS)])
     for tabla, anotar in (("ingresos_recurrentes", acumulado.entrada), ("mensualidades", acumulado.salida)):
         for fila in conn.execute(f"SELECT {columnas} FROM {tabla}").fetchall():
             habitual = _cuentaDeFila(fila["cuenta"])
@@ -160,7 +166,8 @@ def _diaDeRendimiento(texto: str, hoy: datetime.date) -> datetime.date | bool | 
 
 def _rendimientos(conn, acumulado: _Acumulador, hoy: datetime.date, aEuros: Callable | None) -> None:
     for fila in conn.execute(
-        "SELECT v.cuenta_id, i.fecha, i.acumulado, i.impuestos FROM intereses_v2 i "
+        f"SELECT v.cuenta_id, i.fecha, {importeSql('i.acumulado')} AS acumulado, "
+        f"{importeSql('i.impuestos')} AS impuestos FROM intereses_v2 i "
         "JOIN cuenta_remunerada_vinculo v ON v.remunerada_id = i.cuenta_id"
     ).fetchall():
         dia = _diaDeRendimiento(fila["fecha"], hoy)
@@ -168,7 +175,10 @@ def _rendimientos(conn, acumulado: _Acumulador, hoy: datetime.date, aEuros: Call
             acumulado.entrada(fila["cuenta_id"], dia, _decimal(fila["acumulado"]) - _decimal(fila["impuestos"]))
 
     cobra = conn.execute("SELECT id FROM cuentas WHERE dividendos = 1 ORDER BY sort_order, rowid").fetchone()
-    for fila in conn.execute("SELECT fecha, total, moneda_total, cuenta FROM dividendos").fetchall():
+    # Los reinvertidos no entran en la cuenta (ver `cuentas_store`).
+    for fila in conn.execute(
+        f"SELECT fecha, {importeSql('total')} AS total, moneda_total, cuenta FROM dividendos WHERE reinvertido = 0"
+    ).fetchall():
         destino = fila["cuenta"] if fila["cuenta"] in acumulado.existentes else (cobra["id"] if cobra else None)
         if destino is None:
             continue
@@ -261,10 +271,12 @@ def gastosPorCategoria(
             return
         totales[str(categoria or "").strip() or SIN_CATEGORIA] += importe
 
-    for fila in conn.execute("SELECT year, month, fecha, tipo, cantidad FROM gastos_rows").fetchall():
+    for fila in conn.execute(
+        f"SELECT year, month, fecha, tipo, {importeSql('cantidad')} AS cantidad FROM gastos_rows"
+    ).fetchall():
         anotar(fila["tipo"], _diaDeMes(fila["year"], fila["month"], fila["fecha"], hoy), _decimal(fila["cantidad"]))
 
-    columnas = ", ".join(["year", "categoria", *MONTH_KEYS])
+    columnas = ", ".join(["year", "categoria", *(f"{importeSql(mes)} AS {mes}" for mes in MONTH_KEYS)])
     for fila in conn.execute(f"SELECT {columnas} FROM mensualidades").fetchall():
         for mes in MONTH_KEYS:
             if fila[mes]:

@@ -24,6 +24,7 @@ async function initCuentasLogic() {
         await cntRecargar()
         cntBind()
         cntRender()
+        cntPedirNombrePendiente()
     } catch (error) {
         console.error("Error inicializando las cuentas:", error)
         showError("No se pudieron cargar las cuentas", error)
@@ -47,6 +48,36 @@ async function cntRecargar() {
     cntGastosCache = {}
     // Los desplegables de Gastos e Ingresos leen esta misma lista.
     window._cuentasDinero = cntCuentas
+}
+
+// Las dos cuentas de partida nacen con un nombre genérico. Mientras lo
+// conserven se pide uno propio al abrir Cuentas; si se cancela, no se insiste
+// hasta la próxima sesión del navegador.
+const CNT_NOMBRES_GENERICOS = { banco: "Cuenta bancaria", ahorro: "Cuenta de ahorro" }
+
+function cntPedirNombrePendiente() {
+    const pendiente = cntCuentas.find((c) => {
+        if (CNT_NOMBRES_GENERICOS[c.id] !== c.nombre) return false
+        try {
+            return !sessionStorage.getItem(`cntNombrePedido:${c.id}`)
+        } catch {
+            return true
+        }
+    })
+    if (!pendiente) return
+    try {
+        sessionStorage.setItem(`cntNombrePedido:${pendiente.id}`, "1")
+    } catch {
+        // Sin almacenamiento solo se vuelve a preguntar al reabrir la página.
+    }
+    cntAbrirModalCuenta(
+        { ...pendiente, nombre: "" },
+        {
+            titulo: `Pon nombre a tu ${CNT_NOMBRES_GENERICOS[pendiente.id].toLowerCase()}`,
+            // Fuera del guardado: el popup se cierra justo después y cerraría el siguiente.
+            alGuardar: () => setTimeout(cntPedirNombrePendiente, 0)
+        }
+    )
 }
 
 function cntNombre(id) {
@@ -471,9 +502,9 @@ function cntRepartirEtiquetas(marcadas, tipoActual = "") {
 // Sin `cuenta` crea una; con ella, edita el nombre, las etiquetas, el saldo
 // inicial y si cobra los dividendos. Que sea remunerada o
 // de ahorro se decide en sus ventanas, eligiendo allí esta cuenta.
-function cntAbrirModalCuenta(cuenta = null) {
+function cntAbrirModalCuenta(cuenta = null, { titulo = "", alGuardar = null } = {}) {
     openGastosCreateModal({
-        title: cuenta ? "Editar cuenta" : "Nueva cuenta",
+        title: titulo || (cuenta ? "Editar cuenta" : "Nueva cuenta"),
         modalClass: "gastosCreateModalWide mensFormModal",
         bodyHtml: `
             <div class="mensFormGrid">
@@ -537,6 +568,7 @@ function cntAbrirModalCuenta(cuenta = null) {
                 }
                 await cntRecargar()
                 cntRender()
+                alGuardar?.()
                 return true
             } catch (error) {
                 setFeedback(error?.message || "No se pudo guardar la cuenta.", true)

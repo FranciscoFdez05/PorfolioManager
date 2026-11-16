@@ -1115,6 +1115,8 @@ async function updateAssetDetail(asset) {
 
     _sidebarAssetActual = asset
 
+    pintarDetalleMercado(asset)
+
     renderAssetCompletedOperationsSection(asset)
     renderAssetVentasSection(asset)
     renderAssetTodosSection(asset)
@@ -1139,6 +1141,7 @@ function renderAssetCompletedOperationsSection(asset) {
                 <p class="assetVentasEmptyText">No hay operaciones spot registradas para este activo.</p>
             </div>
         `
+        if (typeof syncAssetSideColumn === "function") syncAssetSideColumn()
         return
     }
 
@@ -1187,6 +1190,7 @@ function renderAssetCompletedOperationsSection(asset) {
         </div>
     `
     bindTableSort(section.querySelector("table"), "completedOps")
+    if (typeof syncAssetSideColumn === "function") syncAssetSideColumn()
 }
 
 const ASSET_TRANSACCION_TIPOS = {

@@ -110,6 +110,13 @@ function renderConversionesAssetMenu() {
     menu.innerHTML = ""
     if (addButton) addButton.disabled = !conversionesCryptoAssets.length
 
+    if (!conversionesCryptoAssets.length) {
+        const emptyHint = document.createElement("span")
+        emptyHint.className = "cvSinCriptos"
+        emptyHint.textContent = "No hay criptomonedas asociadas a esta cuenta"
+        menu.appendChild(emptyHint)
+    }
+
     conversionesCryptoAssets.forEach((asset) => {
         const label = document.createElement("label")
         label.className = "overviewFilterOption transaccionesFilterChip"

@@ -273,13 +273,24 @@ function alertasPanelHtml(p, asset) {
             <div class="alPanelBarra">
                 <div class="mToggleGroup alPanelFiltros" id="${p}Filtros" role="group" aria-label="Filtrar por tipo"></div>
                 ${filtroActivo}
-                <button type="button" class="primaryButton alPanelNueva" id="${p}Nueva">+ Nueva alerta</button>
+                <button type="button" class="primaryButton alPanelNueva" id="${p}Nueva">Nueva alerta</button>
             </div>
 
             <form id="${p}Form" class="alPanelForm" autocomplete="off" hidden>
                 <div class="alPanelFormCabecera">
                     <span class="alPanelFormTitulo">Nueva alerta${asset ? ` · ${escapeHtml(alertasEtiquetaActivo(asset))}` : ""}</span>
                     <button type="button" class="alPanelCerrar" id="${p}Cerrar" aria-label="Cerrar"><span class="icono iconoCerrar" aria-hidden="true"></span></button>
+                </div>
+                <div class="alPanelAtajos">
+                    <span class="alPanelTiposNombre">Atajos</span>
+                    <div class="alPanelAtajosBotones">
+                        ${alertasSugerencias(!!asset)
+                            .map(
+                                (s, i) =>
+                                    `<button type="button" class="alPanelSugerencia" data-sugerencia="${i}">${escapeHtml(s.texto)}</button>`
+                            )
+                            .join("")}
+                    </div>
                 </div>
                 <div class="alPanelTipos" id="${p}Tipos"></div>
                 <p class="alPanelAyuda" id="${p}Ayuda"></p>
@@ -577,14 +588,27 @@ async function crearPanelAlertas(contenedor, { asset = null, alCambiar = null } 
 
         const base = fila.dataset.fuente === "precio" ? "/api/alertas" : "/api/alertas-reglas"
         const id = encodeURIComponent(fila.dataset.alertaId)
+        if (control.dataset.accion === "borrar") {
+            // El popup propio de la app no captura errores de onConfirm, por eso
+            // el try/catch va dentro del callback.
+            openConfirmModal({
+                title: "Borrar alerta",
+                message: "Se dejará de vigilar esta alerta y no se podrá recuperar.",
+                confirmLabel: "Borrar",
+                onConfirm: async () => {
+                    try {
+                        await Api.del(`${base}/${id}`)
+                        avisar("Alerta borrada")
+                    } catch (error) {
+                        avisar(Api.describeError(error), "error")
+                    }
+                    await cargar()
+                }
+            })
+            return
+        }
         try {
-            if (control.dataset.accion === "borrar") {
-                if (!window.confirm("¿Borrar esta alerta?")) return
-                await Api.del(`${base}/${id}`)
-                avisar("Alerta borrada")
-            } else {
-                await Api.post(`${base}/${id}/estado`, { activa: control.checked })
-            }
+            await Api.post(`${base}/${id}/estado`, { activa: control.checked })
             await cargar()
         } catch (error) {
             avisar(Api.describeError(error), "error")
@@ -610,6 +634,12 @@ async function crearPanelAlertas(contenedor, { asset = null, alCambiar = null } 
     })
     el("FiltroActivo")?.addEventListener("change", pintarLista)
     el("Lista").addEventListener("change", accionFila)
+    // Los atajos del formulario rellenan los campos sin cerrarlo, para poder
+    // cambiar de plantilla antes de crear la alerta.
+    el("Form").addEventListener("click", (evento) => {
+        const atajo = evento.target.closest("[data-sugerencia]")
+        if (atajo) abrirFormulario(alertasSugerencias(!!asset)[Number(atajo.dataset.sugerencia)])
+    })
     el("Lista").addEventListener("click", (evento) => {
         const sugerencia = evento.target.closest("[data-sugerencia]")
         if (sugerencia) {

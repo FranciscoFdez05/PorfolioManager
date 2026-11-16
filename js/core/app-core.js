@@ -12,13 +12,18 @@ const _PAGE_DIRS = {
     alertas: "cartera",
     alertasAvisos: "cartera",
 
+    patrimonio: "finanzas",
     gastos: "finanzas",
     ingresos: "finanzas",
+    pagosFraccionados: "finanzas",
     ahorro: "finanzas",
     cuentaAhorro: "finanzas",
     cuentaRemunerada: "finanzas",
     cuentas: "finanzas",
     movimientosCuentas: "finanzas",
+    hipotecas: "finanzas",
+    financiadas: "finanzas",
+    microcreditos: "finanzas",
     calendario: "finanzas",
     ventas: "finanzas",
     dividendos: "finanzas",
@@ -123,17 +128,24 @@ const _MODULE_PAGES = {
     vistaGeneral: ["vistaGeneral"],
     activos: ["activos", "seguimiento", "heatmap", "fundamentales", "sentimiento", "paneles"],
     gastos: [
+        "patrimonio",
         "gastos",
         "ingresos",
         "mensualidades",
         "ingresosRecurrentes",
+        "pagosFraccionados",
         "metricasDinero",
+        "calendario"
+    ],
+    misFinanzas: [
         "ahorro",
         "cuentas",
         "movimientosCuentas",
+        "hipotecas",
+        "financiadas",
+        "microcreditos",
         "cuentaAhorro",
-        "cuentaRemunerada",
-        "calendario"
+        "cuentaRemunerada"
     ],
     finanzas: ["intereses", "dividendos", "bonos", "ventas", "privateMarket", "operacionesBolsa"],
     cripto: [
@@ -258,7 +270,7 @@ function paginaRestaurada() {
     const navegacion = performance.getEntriesByType?.("navigation")?.[0]
     if (navegacion?.type !== "reload") return null
 
-    let page = null
+    let page
     try {
         page = sessionStorage.getItem(CLAVE_PAGINA_RECARGA)
     } catch (_) {
@@ -270,17 +282,33 @@ function paginaRestaurada() {
     return existe && page !== "ajustes" && paginaVisible(page) ? page : null
 }
 
+// El desplegable de la ventana abierta muestra el nombre de esa ventana; el
+// resto conserva su nombre base, que se guarda en data-nombre-base la primera
+// vez (Ajustes lo lee de ahí para no ver el nombre de la ventana).
+function etiquetarDesplegables() {
+    document.querySelectorAll(".navDropdownBtn").forEach((btn) => {
+        if (!btn.dataset.nombreBase) {
+            btn.dataset.nombreBase = btn.textContent.replace("▾", "").trim()
+        }
+        const item = btn.closest(".navDropdown")?.querySelector(".navDropdownItem.active")
+        const nombre = item ? item.textContent.trim() : btn.dataset.nombreBase
+        btn.textContent = `${nombre} ▾`
+    })
+}
+
 function activarBotonNav(page) {
     document.querySelectorAll(".navBtn").forEach((item) => item.classList.remove("active"))
     document.querySelectorAll(".navDropdownBtn").forEach((item) => item.classList.remove("active"))
 
     const boton = document.querySelector(`.navButtons [data-page="${page}"]`)
     if (!boton) {
+        etiquetarDesplegables()
         return
     }
 
     boton.classList.add("active")
     boton.closest(".navDropdown")?.querySelector(".navDropdownBtn")?.classList.add("active")
+    etiquetarDesplegables()
 }
 
 function applyModulesVisibility() {
@@ -794,7 +822,7 @@ let confirmModalState = null
 let editAssetModalState = null
 let draggedAssetId = null
 /* eslint-enable prefer-const */
-const PAGE_HTML_VERSION = "20260826b"
+const PAGE_HTML_VERSION = "20261114a"
 
 window._viewAllPortfolios = localStorage.getItem("viewAllPortfolios") === "1"
 
@@ -1037,6 +1065,7 @@ function initSidePanel(toggleButton, sideWrapper) {
 function clearNavSelection() {
     document.querySelectorAll(".navBtn").forEach((button) => button.classList.remove("active"))
     document.querySelectorAll(".navDropdownBtn").forEach((button) => button.classList.remove("active"))
+    etiquetarDesplegables()
 }
 
 function initAssetSelector(assetButtons) {
@@ -1101,6 +1130,7 @@ function initNavigation(navButtons, contentArea) {
                 parentMenu.querySelector(".navDropdownBtn").classList.add("active")
                 parentMenu.querySelector(".navDropdownMenu").classList.remove("open")
             }
+            etiquetarDesplegables()
 
             loadPage(page, contentArea)
         })
@@ -1170,20 +1200,40 @@ function initNavigation(navButtons, contentArea) {
             m.style.bottom = ""
             m.style.left = ""
             m.style.right = ""
+            m.style.maxHeight = ""
+            m.style.maxWidth = ""
         })
         if (!wasOpen) {
+            const margin = 8
             const rect = trigger.getBoundingClientRect()
+            menu.style.maxHeight = ""
             const menuHeight = menu.offsetHeight || 90
-            const spaceBelow = window.innerHeight - rect.bottom
-            if (spaceBelow < menuHeight + 8) {
+            const spaceBelow = window.innerHeight - rect.bottom - 4 - margin
+            const spaceAbove = rect.top - 4 - margin
+            // Abre hacia donde quepa; si no cabe en ningún lado, hacia el hueco
+            // mayor, y el max-height hace que se desplace en vez de salirse.
+            const opensUp = spaceBelow < menuHeight && spaceAbove > spaceBelow
+            if (opensUp) {
                 menu.style.bottom = window.innerHeight - rect.top + 4 + "px"
                 menu.style.top = "auto"
             } else {
                 menu.style.top = rect.bottom + 4 + "px"
                 menu.style.bottom = "auto"
             }
-            menu.style.right = window.innerWidth - rect.right + "px"
-            menu.style.left = "auto"
+            menu.style.maxHeight = Math.max(opensUp ? spaceAbove : spaceBelow, 0) + "px"
+            // Alineado a la derecha del botón crece hacia la izquierda; si por ese
+            // lado no cabe, se alinea a la izquierda del botón y crece hacia la derecha.
+            const spaceLeft = rect.right - margin
+            const spaceRight = window.innerWidth - rect.left - margin
+            if (menu.offsetWidth > spaceLeft && spaceRight > spaceLeft) {
+                menu.style.left = Math.max(rect.left, margin) + "px"
+                menu.style.right = "auto"
+                menu.style.maxWidth = spaceRight + "px"
+            } else {
+                menu.style.right = window.innerWidth - rect.right + "px"
+                menu.style.left = "auto"
+                menu.style.maxWidth = Math.max(spaceLeft, 0) + "px"
+            }
             menu.classList.add("open")
         }
     })
@@ -1310,6 +1360,7 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
                 "mensualidades",
                 "ingresos",
                 "ingresosRecurrentes",
+                "pagosFraccionados",
                 "calendario",
                 "movimientosCuentas",
                 "ventas",
@@ -1340,6 +1391,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initIngresosLogic()
         } else if (page === "ingresosRecurrentes") {
             await initIngresosLogic({ soloRecurrentes: true })
+        } else if (page === "pagosFraccionados") {
+            await initPagosFraccionadosLogic()
         } else if (page === "ventas") {
             await initVentasLogic()
         } else if (page === "stablecoins") {
@@ -1390,6 +1443,14 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initCuentaRemuneradaLogic()
         } else if (page === "cuentas") {
             await initCuentasLogic()
+        } else if (page === "patrimonio") {
+            await initPatrimonioLogic()
+        } else if (page === "hipotecas") {
+            await initHipotecasLogic()
+        } else if (page === "financiadas") {
+            await initFinanciadasLogic()
+        } else if (page === "microcreditos") {
+            await initMicrocreditosLogic()
         } else if (page === "movimientosCuentas") {
             await initMovimientosCuentasLogic()
         } else if (page === "calendario") {

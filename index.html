@@ -45,6 +45,9 @@
     <link rel="stylesheet" href="css/pages/intereses.css">
     <link rel="stylesheet" href="css/pages/cuentas.css">
     <link rel="stylesheet" href="css/pages/movimientos-cuentas.css">
+    <link rel="stylesheet" href="css/pages/hipotecas.css">
+    <link rel="stylesheet" href="css/pages/patrimonio.css">
+    <link rel="stylesheet" href="css/pages/microcreditos.css">
     <link rel="stylesheet" href="css/pages/calendario.css">
     <link rel="stylesheet" href="css/pages/ventas.css">
     <link rel="stylesheet" href="css/pages/fundamentales.css">
@@ -118,7 +121,7 @@
                 <div class="navDropdownMenu portfolioSwitcherMenu" id="portfolioSwitcherMenu">
                     <div id="portfolioList"></div>
                     <div class="portfolioMenuDivider"></div>
-                    <button class="portfolioNewBtn" id="portfolioNewBtn" type="button">+ Nuevo portfolio</button>
+                    <button class="portfolioNewBtn" id="portfolioNewBtn" type="button">Nuevo portfolio</button>
                     <button class="portfolioNewBtn portfolioImportBtn" id="portfolioImportBtn" type="button">↑ Importar portfolio</button>
                 </div>
             </div>
@@ -303,18 +306,31 @@
                 <div class="navDropdown" data-module="gastos">
                     <button class="navDropdownBtn" type="button">Mi dinero ▾</button>
                     <div class="navDropdownMenu">
+                        <button class="navBtn navDropdownItem" data-page="patrimonio">Patrimonio</button>
                         <button class="navBtn navDropdownItem" data-page="gastos">Gastos</button>
                         <button class="navBtn navDropdownItem" data-page="ingresos">Ingresos</button>
+                        <button class="navBtn navDropdownItem" data-page="calendario">Calendario</button>
                         <button class="navBtn navDropdownItem" data-page="mensualidades">Mensualidades</button>
                         <button class="navBtn navDropdownItem" data-page="ingresosRecurrentes">Ingresos recurrentes</button>
-                        <button class="navBtn navDropdownItem" data-page="metricasDinero">Métricas</button>
-                        <button class="navBtn navDropdownItem" data-page="calendario">Calendario</button>
+                        <button class="navBtn navDropdownItem" data-page="pagosFraccionados">Pagos fraccionados</button>
+                    </div>
+                </div>
+
+                <!-- Lo que se tiene y se debe (cuentas, ahorro, hipotecas, compras
+                     a plazos), frente a lo que entra y sale de la ventana anterior. -->
+                <div class="navDropdown" data-module="misFinanzas">
+                    <button class="navDropdownBtn" type="button">Mis finanzas ▾</button>
+                    <div class="navDropdownMenu">
+                        <span class="navDropdownTitulo" aria-hidden="true">Banco</span>
                         <button class="navBtn navDropdownItem" data-page="ahorro">Ahorro</button>
                         <button class="navBtn navDropdownItem" data-page="cuentas">Cuentas</button>
                         <button class="navBtn navDropdownItem" data-page="movimientosCuentas">Movimientos</button>
-                        <!-- Fuera del menú: solo se llega desde «Abrir cuenta de ahorro» en las tarjetas de Cuentas, que pulsa este botón. -->
-                        <button class="navBtn navDropdownItem" data-page="cuentaAhorro" style="display: none">Cuenta de ahorro</button>
                         <button class="navBtn navDropdownItem" data-page="cuentaRemunerada">Cuenta remunerada</button>
+                        <span class="navDropdownTitulo" aria-hidden="true">Deudas</span>
+                        <button class="navBtn navDropdownItem" data-page="hipotecas">Hipotecas</button>
+                        <button class="navBtn navDropdownItem" data-page="microcreditos">Microcréditos</button>
+                        <button class="navBtn navDropdownItem" data-page="financiadas">Compras financiadas</button>                        <!-- Fuera del menú: solo se llega desde «Abrir cuenta de ahorro» en las tarjetas de Cuentas, que pulsa este botón. -->
+                        <button class="navBtn navDropdownItem" data-page="cuentaAhorro" style="display: none">Cuenta de ahorro</button>
                     </div>
                 </div>
 
@@ -391,19 +407,19 @@
                 <div class="detailRotationBar" id="detailRotationBar" aria-hidden="true"><span></span></div>
                 <div class="detailTop">
                     <div class="detailIdentity">
-                        <div class="detailHeader" id="detSymbol">---</div>
+                        <div class="detailHeader" id="detSymbol"></div>
                         <div class="detailSub" id="detName">Selecciona un activo</div>
                     </div>
                 </div>
                 <div class="detailPriceRow">
                 <div class="detailPrice" id="detPrice">0,00 €</div>
-                <div class="detailChange" id="detChange">---</div>
+                <div class="detailChange" id="detChange"></div>
                 </div>
 
                 <div class="detailStats">
                     <div class="detailStatCard">
                         <span class="detailStatLabel">Tipo</span>
-                        <span class="detailStatValue" id="detType">---</span>
+                        <span class="detailStatValue" id="detType"></span>
                     </div>
                     <div class="detailStatCard">
                         <span class="detailStatLabel">Posición</span>
@@ -432,12 +448,33 @@
                     </div>
                     <div class="detailStatCard">
                         <span class="detailStatLabel">Peso cartera</span>
-                        <span class="detailStatValue" id="detWeight">---</span>
+                        <span class="detailStatValue" id="detWeight"></span>
                     </div>
                 </div>
 
+                <!-- Bloques de mercado: los rellena js/cartera/assets-detalle-mercado.js -->
+                <section class="detMkBlock" aria-labelledby="detMkRendTitulo">
+                    <h3 class="detMkTitle" id="detMkRendTitulo">Rendimiento</h3>
+                    <div class="detMkPerf" id="detMkPerf" role="list"></div>
+                </section>
+                <section class="detMkBlock" aria-labelledby="detMkEstTitulo">
+                    <div class="detMkTitleRow">
+                        <h3 class="detMkTitle" id="detMkEstTitulo">Estacionales</h3>
+                        <button class="detMkTitleBtn" id="detMkEstTablaBtn" type="button" title="Rendimiento mensual por años">Tabla</button>
+                    </div>
+                    <div class="detMkSeason" id="detMkSeason" role="button" tabindex="0" title="Ampliar estacionales"></div>
+                </section>
+                <section class="detMkBlock" aria-labelledby="detMkTecTitulo">
+                    <h3 class="detMkTitle" id="detMkTecTitulo">Datos técnicos</h3>
+                    <div class="detMkGauge" id="detMkGauge"></div>
+                </section>
+                <section class="detMkBlock" aria-labelledby="detMkStatsTitulo">
+                    <h3 class="detMkTitle" id="detMkStatsTitulo">Estadísticas clave</h3>
+                    <dl class="detMkStats" id="detMkStats"></dl>
+                </section>
+
                 <div class="detailMeta" id="detStatus">Sin datos de mercado</div>
-                <div class="detailMeta" id="detFinnhub">Ticker mercado: ---</div>
+                <div class="detailMeta" id="detFinnhub"></div>
 
             </div>
         </aside>
@@ -663,6 +700,30 @@
     </div>
 </div>
 
+<!-- Estacionales del activo de la ficha (gráfico de años y tabla mensual): js/cartera/assets-detalle-mercado.js -->
+<div class="modalOverlay hidden" id="detMkEstOverlay">
+    <div class="calendarioModal detMkEstModal" role="dialog" aria-modal="true" aria-labelledby="detMkEstModalTitulo">
+        <div class="calendarioModalHeader">
+            <div class="detMkEstCabecera">
+                <h3 class="assetModalTitle" id="detMkEstModalTitulo">Estacionales</h3>
+                <div class="mToggleGroup" role="group" aria-label="Vista">
+                    <button type="button" class="mToggleBtn" data-det-mk-vista="grafico" aria-pressed="false" title="Gráfico"><span class="icono iconoGraficoLinea" aria-hidden="true"></span> Gráfico</button>
+                    <button type="button" class="mToggleBtn" data-det-mk-vista="tabla" aria-pressed="false" title="Tabla"><span class="icono iconoTabla" aria-hidden="true"></span> Tabla</button>
+                </div>
+            </div>
+            <button id="detMkEstCerrarBtn" class="calendarioCloseBtn" type="button" aria-label="Cerrar"><span class="icono iconoCerrar" aria-hidden="true"></span></button>
+        </div>
+        <div class="calendarioModalBody detMkEstCuerpo">
+            <div class="detMkEstGrafico" id="detMkEstGrafico">
+                <div class="mToggleGroup detMkEstAnios" id="detMkEstAnios" role="group" aria-label="Años a comparar"></div>
+                <div class="detMkEstLienzo" id="detMkEstLienzo"><canvas id="detMkEstCanvas"></canvas></div>
+                <p class="detMkEmpty hidden" id="detMkEstVacio"></p>
+                <p class="detMkEstNota" id="detMkEstNota"></p>
+            </div>
+            <div class="hidden" id="detMkTablaCuerpo"></div>
+        </div>
+    </div>
+</div>
 
 <!-- Modal confirm genérico portfolios -->
 <div class="modalOverlay hidden" id="pConfirmOverlay">
@@ -2144,6 +2205,30 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
+                        <span class="icono iconoDescargar" aria-hidden="true"></span>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Exportar a CSV</div>
+                        <div class="ajustesSectionDesc">Descarga un módulo como hoja de cálculo (separador «;», listo para Excel).</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesActions">
+                    <select id="ajustesExportarModulo" class="assetModalSelect">
+                        <option value="gastos">Gastos (por año)</option>
+                        <option value="ingresos">Ingresos (por año)</option>
+                        <option value="dividendos">Dividendos</option>
+                        <option value="operaciones">Operaciones</option>
+                        <option value="cuentas">Cuentas y saldos</option>
+                    </select>
+                    <select id="ajustesExportarAnio" class="assetModalSelect" aria-label="Año a exportar"></select>
+                    <a id="ajustesExportarCsvBtn" class="primaryButton" href="#" download>Descargar CSV</a>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
                         <span class="icono iconoHistorial" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
@@ -2249,17 +2334,26 @@
                     <span id="ajustesExportMsg" class="ajustesStatusMsg"></span>
                 </div>
 
-                <label class="ajustesExportClaves" for="ajustesExportClaves">
-                    <input id="ajustesExportClaves" type="checkbox">
-                    <span>
-                        <strong>Incluir las claves de API.</strong>
-                        Es lo que permite restaurarlas en un servidor recién instalado, donde la
-                        <code>SECRET_KEY</code> ya es otra y las cifradas con ella no se podrían leer. Al
-                        exportar se te ofrece <em>ponerles una contraseña</em>, que se pedirá al importar.
-                        Sin contraseña van en claro y <strong>el archivo pasa a ser un secreto</strong>: quien lo
-                        tenga tiene tus claves de los proveedores y la del Atajo.
-                    </span>
-                </label>
+                <div class="ajustesExportOpciones">
+                    <label class="ajustesExportClaves" for="ajustesExportClaves">
+                        <input id="ajustesExportClaves" type="checkbox">
+                        <span><strong>Incluir APIs</strong></span>
+                    </label>
+                    <label class="ajustesExportClaves" for="ajustesExportWallets">
+                        <input id="ajustesExportWallets" type="checkbox">
+                        <span><strong>Incluir wallets y claves públicas</strong></span>
+                    </label>
+                    <button id="ajustesExportAyudaBtn" class="ajustesExportAyudaBtn" type="button" aria-label="Qué incluye cada opción" aria-expanded="false" aria-controls="ajustesExportAyuda">?</button>
+                </div>
+                <div id="ajustesExportAyuda" class="ajustesExportAyuda" role="note" hidden>
+                    <p><strong>Incluir APIs:</strong> las claves de los proveedores y la del Atajo. Es lo que permite
+                        restaurarlas en un servidor recién instalado, donde la <code>SECRET_KEY</code> ya es otra.</p>
+                    <p><strong>Incluir wallets y claves públicas:</strong> tus wallets de Cripto › Seguimiento, propias
+                        y ajenas, con la libreta de direcciones, los tokens y el catálogo de carteras.</p>
+                    <p>Al exportar se te ofrece <em>ponerle una contraseña</em>, que se pedirá al importar. Es opcional:
+                        sin ella todo va en claro y <strong>el archivo pasa a ser un secreto</strong>, porque quien lo
+                        tenga ve tus claves y tus direcciones.</p>
+                </div>
             </div>
 
             <div class="ajustesSection">
@@ -2427,9 +2521,12 @@
 <script defer src="js/cartera/assets.js"></script>
 <script defer src="js/cartera/assets-todos.js"></script>
 <script defer src="js/cartera/assets-grafico.js"></script>
+<script defer src="js/cartera/assets-grafico-modos.js"></script>
 <script defer src="js/cartera/assets-sidebar.js"></script>
 <script defer src="js/cartera/assets-resumen.js"></script>
 <script defer src="js/cartera/assets-ficha.js"></script>
+<script defer src="js/cartera/assets-mercado.js"></script>
+<script defer src="js/cartera/assets-detalle-mercado.js"></script>
 <script defer src="js/cartera/assets-modales.js"></script>
 <script defer src="js/cartera/assets-wallets.js"></script>
 <script defer src="js/cartera/activos-pagina.js"></script>
@@ -2438,6 +2535,7 @@
 <script defer src="js/finanzas/dividendos.js"></script>
 <script defer src="js/finanzas/gastos.js"></script>
 <script defer src="js/finanzas/ingresos.js"></script>
+<script defer src="js/finanzas/pagos-fraccionados.js"></script>
 <script defer src="js/finanzas/categorias.js"></script>
 <script defer src="js/finanzas/ventas.js"></script>
 <script defer src="js/cripto/transacciones.js"></script>
@@ -2480,6 +2578,7 @@
 <script defer src="js/ajustes/ajustes-telegram.js"></script>
 <script defer src="js/ajustes/ajustes-general.js"></script>
 <script defer src="js/ajustes/ajustes-copias.js"></script>
+<script defer src="js/ajustes/ajustes-exportar-csv.js"></script>
 <script defer src="js/ajustes/ajustes-acceso.js"></script>
 <script defer src="js/ajustes/ajustes-actualizacion.js"></script>
 <script defer src="js/ajustes/ajustes-registro.js"></script>
@@ -2516,6 +2615,11 @@
 <script defer src="js/finanzas/cuenta-ahorro.js"></script>
 <script defer src="js/finanzas/cuenta-remunerada.js"></script>
 <script defer src="js/finanzas/cuentas.js"></script>
+<script defer src="js/finanzas/prestamos-comun.js"></script>
+<script defer src="js/finanzas/hipotecas.js"></script>
+<script defer src="js/finanzas/patrimonio.js"></script>
+<script defer src="js/finanzas/financiadas.js"></script>
+<script defer src="js/finanzas/microcreditos.js"></script>
 <script defer src="js/finanzas/cuentas-graficos.js"></script>
 <script defer src="js/finanzas/cuentas-detalle.js"></script>
 <script defer src="js/finanzas/cuentas-movimientos.js"></script>

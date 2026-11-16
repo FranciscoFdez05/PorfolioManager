@@ -280,7 +280,7 @@ function segListasPintarPestanas() {
                 (l) =>
                     `<button type="button" class="segListaTab${l.id === _segListaEditada ? " active" : ""}" role="tab" aria-selected="${l.id === _segListaEditada}" data-lista="${escapeAttr(l.id)}"><span class="segListaTabNombre">${escapeHtml(l.nombre)}</span><small>${cuantos(l)}</small></button>`
             )
-            .join("") + `<button type="button" class="segListaTab segListaTabNueva" data-accion="nueva">+ Nueva</button>`
+            .join("") + `<button type="button" class="segListaTab segListaTabNueva" data-accion="nueva">Nueva</button>`
     const actual = listas.find((l) => l.id === _segListaEditada)
     if (contador) contador.textContent = actual ? `${cuantos(actual)} de ${vivos.size}` : ""
 }

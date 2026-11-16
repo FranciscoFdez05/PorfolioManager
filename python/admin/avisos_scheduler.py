@@ -187,19 +187,25 @@ def _pasadaDisco() -> bool:
 def _pasadaWallets() -> int:
     """Revisa las wallets de Cripto > Seguimiento con el intervalo elegido en esa página."""
     from core import settings, wallets_vigilancia
-    from core.db import getActiveDbPath
     from providers.blockchain_clients import lectorPara
 
     minutos = wallets_vigilancia.minutosVigilancia()
     if minutos <= 0 or not reclamo.reclamar("wallets-vigilancia", minutos * 60 * 0.9):
         return 0
-    # Las wallets son de la instalación, pero el precio en euros de los avisos
-    # sale del activo asociado en el portfolio activo.
-    # Cada red se revisa en su hilo y useDbPath es por hilo: cada uno lo abre.
-    ruta = getActiveDbPath()
     plazo = settings.walletsPlazoVigilanciaSegundos()
-    vigilante = wallets_vigilancia.VigilanteWallets(fabricaLectores=lambda red: lectorPara(red, plazo))
-    return vigilante.revisarTodas(contexto=lambda: useDbPath(ruta))
+    avisos = 0
+    # Las wallets son de cada portfolio y el precio en euros de los avisos sale del
+    # activo asociado en ese mismo portfolio. Cada red se revisa en su hilo y
+    # useDbPath es por hilo: cada uno lo abre.
+    for pid, _nombre, ruta in rutasDePortfolios():
+        try:
+            with useDbPath(ruta):
+                vigilante = wallets_vigilancia.VigilanteWallets(fabricaLectores=lambda red: lectorPara(red, plazo))
+                avisos += vigilante.revisarTodas(contexto=lambda ruta=ruta: useDbPath(ruta))
+        except Exception as error:
+            # Un portfolio con problemas no puede impedir vigilar los demás.
+            log.warning("[avisos] Wallets de %s: %s", pid, error)
+    return avisos
 
 
 def _pasadaSatoshi() -> int:

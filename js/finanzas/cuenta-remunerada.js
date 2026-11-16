@@ -106,6 +106,8 @@ function construirMovimientosCuenta({ interesRows, dividendoRows, cuentaId, cuen
 
     if (cuentaId) {
         ;(dividendoRows || []).forEach((row) => {
+            // Un reinvertido se gasta en comprar participaciones: no llega a la cuenta.
+            if (row.reinvertido) return
             if (crCuentaDeDividendo(row, cuentasApp || []) !== cuentaId) return
             const t = crFechaATiempo(row.fecha)
             if (t === null) return
@@ -394,6 +396,11 @@ function crSeleccionarAnio(anio) {
 function crRenderCuentas() {
     const list = document.getElementById("crCuentasList")
     if (!list) return
+    if (!crCuentas.length) {
+        list.innerHTML = `<span class="crBarraVacia">Sin cuentas remuneradas</span>`
+        refrescarTiraPestanas(list)
+        return
+    }
     list.innerHTML = crCuentas
         .map(
             (c) =>
@@ -406,6 +413,11 @@ function crRenderCuentas() {
 function crRenderAnios(anios) {
     const list = document.getElementById("crYearList")
     if (!list) return
+    if (!anios.length) {
+        list.innerHTML = `<span class="crBarraVacia">Sin intereses ni dividendos todavía</span>`
+        refrescarTiraPestanas(list)
+        return
+    }
     // El más reciente a la izquierda, como en el resto de barras de años.
     list.innerHTML = [...anios]
         .reverse()

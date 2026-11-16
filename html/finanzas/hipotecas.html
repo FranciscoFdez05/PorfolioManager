@@ -1,0 +1,100 @@
+<div class="hipotecasPage">
+
+    <div class="hipotecasToolbar">
+        <div class="hipotecasToolbarLeft">
+            <label class="hipotecasSelectorLabel" for="hipotecasSelector">Hipoteca</label>
+            <select id="hipotecasSelector" class="assetModalSelect hipotecasSelector"></select>
+        </div>
+        <div class="hipotecasToolbarRight">
+            <button id="hipotecasEditBtn" class="cancelButton" type="button">Editar</button>
+            <button id="hipotecasDeleteBtn" class="cancelButton" type="button">Eliminar</button>
+            <button id="hipotecasAddBtn" class="primaryButton" type="button" data-no-autohide="true">Añadir hipoteca</button>
+        </div>
+    </div>
+
+    <p class="overviewEmpty hidden" id="hipotecasEmptyMsg">No hay hipotecas registradas.</p>
+
+    <div id="hipotecasContenido" class="hipotecasContenido hidden">
+
+        <p class="hipotecasError hidden" id="hipotecasError"></p>
+
+        <div class="hipotecasTotales" id="hipotecasTotales"></div>
+
+        <div class="hipotecasProgreso">
+            <div class="hipotecasProgresoCabecera">
+                <span id="hipotecasProgresoTexto"></span>
+                <span id="hipotecasProgresoFin"></span>
+            </div>
+            <div class="hipotecasBarra"><div class="hipotecasBarraRelleno" id="hipotecasBarra"></div></div>
+        </div>
+
+        <div class="hipotecasMetricas" id="hipotecasMetricas"></div>
+
+        <div class="hipotecasGrafico">
+            <canvas id="hipotecasChart"></canvas>
+        </div>
+
+        <div class="hipotecasListas">
+            <section class="hipotecasPanel" id="hipotecasPanelEuribor">
+                <header class="hipotecasPanelCabecera">
+                    <h3>Revisiones de Euríbor</h3>
+                    <button id="hipotecasAddEuriborBtn" class="primaryButton" type="button" data-no-autohide="true">Añadir</button>
+                </header>
+                <table class="hipotecasTabla">
+                    <thead><tr><th>Fecha</th><th>Euríbor %</th><th></th></tr></thead>
+                    <tbody id="hipotecasEuriborBody"></tbody>
+                </table>
+                <p class="hipotecasVacio hidden" id="hipotecasEuriborVacio">Sin revisiones: se aplica el tipo inicial.</p>
+            </section>
+
+            <section class="hipotecasPanel">
+                <header class="hipotecasPanelCabecera">
+                    <h3>Amortizaciones anticipadas</h3>
+                    <button id="hipotecasAddAmortBtn" class="primaryButton" type="button" data-no-autohide="true">Añadir</button>
+                </header>
+                <table class="hipotecasTabla">
+                    <thead><tr><th>Fecha</th><th>Importe</th><th>Efecto</th><th></th></tr></thead>
+                    <tbody id="hipotecasAmortBody"></tbody>
+                </table>
+                <p class="hipotecasVacio hidden" id="hipotecasAmortVacio">Sin amortizaciones anticipadas.</p>
+            </section>
+        </div>
+
+        <section class="hipotecasPanel" id="hipotecasPanelSimulador">
+            <header class="hipotecasPanelCabecera">
+                <h3>Simular amortización anticipada</h3>
+            </header>
+            <form class="hipotecasSimuladorForm" id="hipotecasSimuladorForm" novalidate>
+                <label class="assetModalLabel" for="hipSimImporte">Importe (€)</label>
+                <input id="hipSimImporte" class="assetModalInput" type="text" inputmode="decimal" placeholder="10000">
+                <label class="assetModalLabel" for="hipSimFecha">Fecha</label>
+                <input id="hipSimFecha" class="assetModalInput" type="date">
+                <button id="hipotecasSimularBtn" class="primaryButton" type="submit" data-no-autohide="true">Simular</button>
+            </form>
+            <p class="hipotecasError hidden" id="hipotecasSimuladorError"></p>
+            <table class="hipotecasTabla hidden" id="hipotecasSimuladorTabla">
+                <thead><tr><th></th><th>Sin amortizar</th><th>Reducir plazo</th><th>Reducir cuota</th></tr></thead>
+                <tbody id="hipotecasSimuladorBody"></tbody>
+            </table>
+            <p class="hipotecasVacio">No se guarda nada: para aplicarla, añádela en «Amortizaciones anticipadas».</p>
+        </section>
+
+        <section class="hipotecasPanel">
+            <header class="hipotecasPanelCabecera">
+                <h3>Cuadro de amortización</h3>
+            </header>
+            <div class="hipotecasCuadroWrapper">
+                <table class="hipotecasTabla hipotecasCuadro">
+                    <thead>
+                        <tr>
+                            <th>Nº</th><th>Fecha</th><th>Tipo %</th><th>Cuota</th>
+                            <th>Intereses</th><th>Capital</th><th>Amort. extra</th><th>Pendiente</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hipotecasCuadroBody"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+</div>

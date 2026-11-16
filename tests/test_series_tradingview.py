@@ -59,6 +59,36 @@ def testPideLaResolucionDelPeriodoYSoloDevuelveSeriesUtiles(reloj):
     assert feed.llamadas == [(["SP:SPX", "TVC:UKOIL", "FOO:NOPE"], "240", 200)]
 
 
+def testEstacionalPideVelasDiariasDeTresAnyosNaturales(reloj):
+    feed = FeedFalso({"BITVAVO:ETHEUR": [(1, 10.0), (2, 11.0)]})
+
+    series_tradingview.seriesDeSimbolos(["BITVAVO:ETHEUR"], "estacional", fetch=feed, clock=reloj)
+
+    resolucion, velas = feed.llamadas[0][1:]
+    # Una cripto cotiza 365 días al año: hacen falta al menos dos años completos
+    # más lo que va del actual, y 1150 cubre hasta el 31 de diciembre.
+    assert resolucion == "1D"
+    assert velas >= 2 * 366 + 366
+
+
+def testHistoricoPideTodasLasVelasDiariasQueDaElFeed(reloj):
+    feed = FeedFalso({"BITSTAMP:BTCUSD": [(1, 10.0), (2, 11.0)]})
+
+    series = series_tradingview.seriesDeSimbolos(["BITSTAMP:BTCUSD"], "historico", fetch=feed, clock=reloj)
+
+    assert series == {"BITSTAMP:BTCUSD": [[1, 10.0], [2, 11.0]]}
+    assert feed.llamadas == [(["BITSTAMP:BTCUSD"], "1D", series_tradingview.MAX_VELAS_DIARIAS)]
+
+
+def testMensualPideVelasDeUnMesParaLaTablaPorAnyos(reloj):
+    feed = FeedFalso({"BITSTAMP:BTCUSD": [(1, 10.0), (2, 11.0)]})
+
+    series = series_tradingview.seriesDeSimbolos(["BITSTAMP:BTCUSD"], "mensual", fetch=feed, clock=reloj)
+
+    assert series == {"BITSTAMP:BTCUSD": [[1, 10.0], [2, 11.0]]}
+    assert feed.llamadas == [(["BITSTAMP:BTCUSD"], "1M", 300)]
+
+
 def testLaCacheEvitaVolverAPedirIncluidosLosQueNoTienenVelas(reloj):
     feed = FeedFalso({"SP:SPX": [(1, 10.0), (2, 11.0)]})
 
@@ -220,3 +250,55 @@ def testVelasDelGraficoFalloDelFeedNoSeCachea(reloj):
 def testVelasDelGraficoRangoInvalido(reloj):
     with pytest.raises(series_tradingview.PeriodoInvalido):
         series_tradingview.velasDelGrafico("X:A", "5A", fetch=FeedConDivisa(), clock=reloj)
+
+
+# --- Ruta /api/market/historico --------------------------------------------------
+
+
+@pytest.fixture
+def clienteHistorico(clienteAutenticado, monkeypatch):
+    from providers import tradingview_feed
+    from routes.market import marketBp
+
+    feed = FeedConDivisa(
+        {"BITSTAMP:BTCUSD": [(1, 10.0, 10.5, 9.5), (2, 11.0, 11.5, 10.5)]}, {"BITSTAMP:BTCUSD": "USD"}
+    )
+    monkeypatch.setattr(tradingview_feed, "fetchSeriesWithCurrency", feed)
+    client, _cabeceras, _app = clienteAutenticado(marketBp)
+    return client, feed
+
+
+def testRutaHistoricoDevuelveTodasLasVelasDiariasConSuDivisa(clienteHistorico):
+    client, feed = clienteHistorico
+
+    respuesta = client.get("/api/market/historico?symbol=bitstamp:btcusd")
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json() == {
+        "ok": True,
+        "simbolo": "BITSTAMP:BTCUSD",
+        "divisa": "USD",
+        "data": [[1, 10.0], [2, 11.0]],
+    }
+    # Los estacionales dejan elegir cualquier año: se pide el máximo que da el feed.
+    assert feed.llamadas == [(["BITSTAMP:BTCUSD"], "1D", series_tradingview.MAX_VELAS_DIARIAS)]
+
+
+def testRutaHistoricoSinVelasRespondeVacio(clienteHistorico):
+    client, _feed = clienteHistorico
+
+    respuesta = client.get("/api/market/historico?symbol=FOO:NOPE")
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json() == {"ok": True, "simbolo": "FOO:NOPE", "divisa": None, "data": []}
+
+
+@pytest.mark.parametrize("consulta", ["", "symbol=", "symbol=mal%20ticker", "symbol=X:%3Cscript%3E"])
+def testRutaHistoricoRechazaTickersNoValidos(clienteHistorico, consulta):
+    client, feed = clienteHistorico
+
+    respuesta = client.get(f"/api/market/historico?{consulta}")
+
+    assert respuesta.status_code == 400
+    assert respuesta.get_json()["ok"] is False
+    assert feed.llamadas == []

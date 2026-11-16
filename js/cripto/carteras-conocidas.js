@@ -74,7 +74,7 @@ function renderCarterasModal() {
             <p class="assetModalHint">Direcciones públicas de exchanges, fundadores, gobiernos y fondos, incluidas en la aplicación con su fuente. Elige una y marca qué direcciones seguir: se abre la ventana de enlazar con ellas como seguimiento ajeno, que solo se vigila.</p>
             <div class="carterasBuscador">
                 <input id="carterasBuscar" class="assetRowModalInput" type="search" autocomplete="off" spellcheck="false" placeholder="Buscar: Binance, Satoshi, gobierno, una dirección…" aria-label="Buscar carteras">
-                <button type="button" id="carterasNuevaBtn" class="cancelButton">+ Nueva cartera</button>
+                <button type="button" id="carterasNuevaBtn" class="cancelButton">Nueva cartera</button>
             </div>
             <div id="carterasContenido" class="carterasContenido"><p class="assetModalHint">Cargando…</p></div>
             <div class="assetRowModalFooter">
@@ -418,7 +418,7 @@ function carterasEditorHtml() {
                 <textarea id="carterasEditorNota" class="assetRowModalInput carterasEditorNota" maxlength="500" rows="2" data-campo="nota">${escapeHtml(cartera.nota || "")}</textarea>
             </div>
             <ul id="carterasEditorFilas" class="carterasEditorFilas">${cartera.direcciones.map(carterasEditorFilaHtml).join("")}</ul>
-            <button type="button" class="cancelButton walletsAnadirFilaBtn" data-accion="editor-anadir">+ Añadir dirección</button>
+            <button type="button" class="cancelButton walletsAnadirFilaBtn" data-accion="editor-anadir">Añadir dirección</button>
             <div class="carterasSeleccionAcciones">
                 <button type="button" class="cancelButton" data-accion="editor-cancelar">Cancelar</button>
                 <button type="button" class="primaryButton" data-accion="editor-guardar" data-no-autohide="true">Guardar</button>

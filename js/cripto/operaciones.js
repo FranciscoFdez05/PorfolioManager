@@ -1499,7 +1499,7 @@ function bindOperationsPersistenceGuards() {
     })
 }
 
-function openOperacionRowModal(rowId) {
+function openOperacionRowModal(rowId, presetAssetId = "") {
     document.getElementById("operacionRowModalOverlay")?.remove()
 
     const rowIndex = (currentOperationsData.rows || []).findIndex((r) => r.id === rowId)
@@ -1507,6 +1507,9 @@ function openOperacionRowModal(rowId) {
     const rowData = isEdit
         ? normalizeOperationRow({ ...currentOperationsData.rows[rowIndex] })
         : createEmptyOperationRow()
+    if (!isEdit && presetAssetId) {
+        rowData.assetId = presetAssetId
+    }
 
     const assetOptions = getScopedOperationAssets()
         .map(
@@ -1631,6 +1634,35 @@ function openOperacionRowModal(rowId) {
     modal.appendChild(footer)
     overlay.appendChild(modal)
     document.body.appendChild(overlay)
+}
+
+// Alta de una operación desde la ficha de un activo, sin pasar por la página de
+// Operaciones: se carga el mismo estado que ella (ámbito según el tipo del
+// activo, filas, stablecoins) y se abre el mismo formulario con el activo ya
+// elegido. El guardado y el refresco de la ficha los hace saveOperacionRowFromModal.
+async function openOperacionDesdeActivo(asset) {
+    const scope = OPERATION_SCOPES.bolsa.assetTypes.includes(String(asset?.type || "").toLowerCase())
+        ? "bolsa"
+        : "cripto"
+    try {
+        operationsScope = scope
+        const { operationsPayload, assets, stablecoinsPayload, transaccionesPayload } =
+            await loadOperacionesDependencies()
+        operationsAssets = assets
+        operationsStablecoinsData = normalizeOperationsStablecoinsPayload(stablecoinsPayload)
+        operationsTransaccionesRows = Array.isArray(transaccionesPayload?.rows) ? transaccionesPayload.rows : []
+        currentOperationsData = {
+            rows: Array.isArray(operationsPayload?.rows)
+                ? operationsPayload.rows.map((row, index) => normalizeOperationRow(row, index, true))
+                : []
+        }
+        operationsRevision = Number.isInteger(operationsPayload?.revision) ? operationsPayload.revision : null
+        operationsBaseRows = JSON.parse(JSON.stringify(currentOperationsData.rows))
+    } catch (error) {
+        showError("No se pudieron cargar las operaciones", error)
+        return
+    }
+    openOperacionRowModal("", asset.id)
 }
 
 function closeOperacionRowModal() {

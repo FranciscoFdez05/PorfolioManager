@@ -431,6 +431,77 @@
         </div>
     </div>
 
+    <!-- -- Dividendos reinvertidos --------------------------- -->
+    <div class="metricasSection hidden" id="mSectionDivReinvertidos" data-mcat="finanzas">
+        <div class="metricasSectionHeader">
+            <div class="mGastosHeaderLeft">
+                <span class="metricasSectionTitle">Dividendos reinvertidos</span>
+            </div>
+        </div>
+        <div class="metricasKpiCards mDivReinvKpis">
+            <div class="metricasKpiCard">
+                <div class="mkpiLabel">Reinvertido (neto)</div>
+                <div class="mkpiValue" id="mkpiDivReinvTotal">---</div>
+            </div>
+            <div class="metricasKpiCard">
+                <div class="mkpiLabel">Participaciones compradas</div>
+                <div class="mkpiValue" id="mkpiDivReinvPart">---</div>
+            </div>
+            <div class="metricasKpiCard">
+                <div class="mkpiLabel">Reinversiones</div>
+                <div class="mkpiValue" id="mkpiDivReinvNum">---</div>
+            </div>
+            <div class="metricasKpiCard">
+                <div class="mkpiLabel">% de los dividendos</div>
+                <div class="mkpiValue" id="mkpiDivReinvPct">---</div>
+            </div>
+        </div>
+        <div class="metricasChartsGrid2 mFinFila">
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Reinvertido por año y participaciones acumuladas</div>
+                <div class="metricasChartWrap" style="height:280px">
+                    <canvas id="mChartDivReinvAnual"></canvas>
+                </div>
+            </div>
+            <div class="metricasChartCard metricasTableCard">
+                <div class="metricasChartTitle mFinTablaTitulo">Por instrumento</div>
+                <div class="mFinTablaScroll">
+                    <table class="metricasTable mFinTabla" id="mDivReinvInstrumentoTable">
+                        <thead>
+                            <tr>
+                                <th>Instrumento</th>
+                                <th>Reinversiones</th>
+                                <th>Participaciones</th>
+                                <th>Reinvertido</th>
+                                <th>% de sus dividendos</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mDivReinvInstrumentoBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="metricasChartsGrid1 mFinFila">
+            <div class="metricasChartCard metricasTableCard">
+                <div class="metricasChartTitle mFinTablaTitulo">Histórico de reinversiones</div>
+                <div class="mFinTablaScroll">
+                    <table class="metricasTable mFinTabla" id="mDivReinvHistoricoTable">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Instrumento</th>
+                                <th>Participaciones</th>
+                                <th>Precio de compra</th>
+                                <th>Dividendo neto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mDivReinvHistoricoBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- -- Intereses ----------------------------------------- -->
     <div class="metricasSection" id="mSectionIntereses" data-mcat="finanzas">
         <div class="metricasSectionHeader">

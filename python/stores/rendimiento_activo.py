@@ -20,6 +20,7 @@ from decimal import Decimal
 
 from core import dinero
 from core.cache_foto import CachePorFoto
+from core.centimos import importeSql
 from core.fifo import FifoError, parseFecha
 
 CERO = Decimal("0")
@@ -131,10 +132,13 @@ def _fechaOrden(texto) -> date:
 
 _CONSULTAS_DE_POSICION = (
     ("filas", "SELECT asset_id, fecha_operacion, tipo_operacion, participaciones, precio_participacion, "
-              "capital_invertido_bruto, comisiones, comisiones_fiat, comisiones_cripto, currency, fx_rate "
+              f"{importeSql('capital_invertido_bruto')} AS capital_invertido_bruto, "
+              f"{importeSql('comisiones')} AS comisiones, {importeSql('comisiones_fiat')} AS comisiones_fiat, "
+              "comisiones_cripto, currency, fx_rate "
               "FROM activo_rows ORDER BY id"),
     ("operaciones", "SELECT asset_id, fecha_apertura, orden, cantidad, precio_orden, precio_currency, "
-                    "comisiones_cripto, comisiones_fiat, total, currency, fx_rate "
+                    f"comisiones_cripto, {importeSql('comisiones_fiat')} AS comisiones_fiat, "
+                    f"{importeSql('total')} AS total, currency, fx_rate "
                     "FROM activo_operation_rows WHERE estado = 'Completado' ORDER BY rowid"),
     ("ventas", "SELECT asset_id, fecha, cantidad FROM ventas ORDER BY year, rowid"),
     ("transacciones", "SELECT asset_id, fecha_operacion, total, comision_red, wallet_tipo "

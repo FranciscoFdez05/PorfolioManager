@@ -146,7 +146,7 @@ body.pnPantallaCompleta {
     border-radius: 8px;
     background: var(--btn-bg);
     color: var(--text-primary);
-    font-size: 0.82rem;
+    font-size: 17px;
     font-weight: 600;
     cursor: pointer;
     transition:
@@ -1097,7 +1097,7 @@ body.pnPantallaCompleta {
 }
 
 .pnSelMas {
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
@@ -2491,4 +2491,10 @@ body.money-hidden .pnMoney {
     .pnWTitulo {
         max-width: 50%;
     }
+}
+
+#pnNuevoBtn {
+    width: auto;
+    padding: 0 10px;
+    font-size: 0.82rem;
 }

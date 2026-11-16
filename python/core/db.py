@@ -7,7 +7,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from core import paths, settings
+from core import centimos, paths, settings
 from core.bloqueo import exclusivo
 from core.paths import LEGACY_DB
 
@@ -111,9 +111,12 @@ CREATE TABLE IF NOT EXISTS activo_rows (
     participaciones        TEXT NOT NULL DEFAULT '',
     precio_participacion   TEXT NOT NULL DEFAULT '',
     capital_invertido_bruto TEXT NOT NULL DEFAULT '',
+    capital_invertido_bruto_cent INTEGER,
     coste_anual            TEXT NOT NULL DEFAULT '',
     comisiones             TEXT NOT NULL DEFAULT '',
+    comisiones_cent INTEGER,
     comisiones_fiat        TEXT NOT NULL DEFAULT '',
+    comisiones_fiat_cent INTEGER,
     comisiones_cripto      TEXT NOT NULL DEFAULT '',
     comisiones_satoshis    TEXT NOT NULL DEFAULT '',
     -- Tipo de cambio de `currency` a EUR EN LA FECHA DE LA OPERACIÓN, no hoy.
@@ -158,7 +161,9 @@ CREATE TABLE IF NOT EXISTS activo_operation_rows (
     cantidad         TEXT NOT NULL DEFAULT '',
     comisiones_cripto TEXT NOT NULL DEFAULT '',
     comisiones_fiat  TEXT NOT NULL DEFAULT '',
+    comisiones_fiat_cent INTEGER,
     total            TEXT NOT NULL DEFAULT '',
+    total_cent INTEGER,
     currency         TEXT NOT NULL DEFAULT 'EUR',
     estado           TEXT NOT NULL DEFAULT 'Activo',
     fecha_cierre     TEXT NOT NULL DEFAULT '',
@@ -174,8 +179,10 @@ CREATE TABLE IF NOT EXISTS activo_conversion_rows (
     cantidad TEXT NOT NULL DEFAULT '',
     cantidad_contraparte TEXT NOT NULL DEFAULT '',
     comision TEXT NOT NULL DEFAULT '',
+    comision_cent INTEGER,
     comision_moneda TEXT NOT NULL DEFAULT '',
     valor_eur TEXT NOT NULL DEFAULT '',
+    valor_eur_cent INTEGER,
     PRIMARY KEY (id, asset_id)
 );
 
@@ -192,7 +199,9 @@ CREATE TABLE IF NOT EXISTS operaciones (
     cantidad         TEXT NOT NULL DEFAULT '',
     comisiones_cripto TEXT NOT NULL DEFAULT '',
     comisiones_fiat  TEXT NOT NULL DEFAULT '',
+    comisiones_fiat_cent INTEGER,
     total            TEXT NOT NULL DEFAULT '',
+    total_cent INTEGER,
     currency         TEXT NOT NULL DEFAULT 'EUR',
     estado           TEXT NOT NULL DEFAULT 'Activo',
     fecha_cierre     TEXT NOT NULL DEFAULT ''
@@ -216,7 +225,9 @@ CREATE TABLE IF NOT EXISTS intereses_v2 (
     cuenta_id TEXT NOT NULL REFERENCES cuentas_remuneradas(id) ON DELETE CASCADE,
     fecha     TEXT NOT NULL DEFAULT '',
     acumulado TEXT NOT NULL DEFAULT '',
-    impuestos TEXT NOT NULL DEFAULT ''
+    acumulado_cent INTEGER,
+    impuestos TEXT NOT NULL DEFAULT '',
+    impuestos_cent INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS dividendos (
@@ -226,7 +237,9 @@ CREATE TABLE IF NOT EXISTS dividendos (
     acciones         TEXT NOT NULL DEFAULT '',
     dividendo_accion TEXT NOT NULL DEFAULT '',
     impuestos        TEXT NOT NULL DEFAULT '',
-    total            TEXT NOT NULL DEFAULT ''
+    impuestos_cent INTEGER,
+    total            TEXT NOT NULL DEFAULT '',
+    total_cent INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS transacciones (
@@ -263,7 +276,9 @@ CREATE TABLE IF NOT EXISTS stablecoins_rows (
     cantidad         TEXT NOT NULL DEFAULT '',
     precio           TEXT NOT NULL DEFAULT '',
     total            TEXT NOT NULL DEFAULT '',
+    total_cent INTEGER,
     comisiones       TEXT NOT NULL DEFAULT '',
+    comisiones_cent INTEGER,
     currency         TEXT NOT NULL DEFAULT 'USD',
     nota             TEXT NOT NULL DEFAULT ''
 );
@@ -283,7 +298,10 @@ CREATE TABLE IF NOT EXISTS gastos_rows (
     fecha    TEXT NOT NULL DEFAULT '',
     nombre   TEXT NOT NULL DEFAULT '',
     tipo     TEXT NOT NULL DEFAULT '',
+    -- Importe en céntimos enteros (ver core/centimos.py). `cantidad` solo guarda
+    -- lo que no se pudo convertir a céntimos exactos.
     cantidad TEXT NOT NULL DEFAULT '',
+    cantidad_cent INTEGER,
     nota     TEXT NOT NULL DEFAULT '',
     cuenta   TEXT NOT NULL DEFAULT ''
 );
@@ -296,6 +314,7 @@ CREATE TABLE IF NOT EXISTS cuentas (
     nombre        TEXT NOT NULL,
     tipo          TEXT NOT NULL DEFAULT 'banco',
     saldo_inicial TEXT NOT NULL DEFAULT '',
+    saldo_inicial_cent INTEGER,
     sort_order    INTEGER NOT NULL DEFAULT 0,
     -- 1 en la cuenta donde se cobran los dividendos (como mucho una).
     dividendos    INTEGER NOT NULL DEFAULT 0,
@@ -321,9 +340,11 @@ CREATE TABLE IF NOT EXISTS transferencias (
     origen   TEXT NOT NULL DEFAULT '',
     destino  TEXT NOT NULL DEFAULT '',
     cantidad TEXT NOT NULL DEFAULT '',
+    cantidad_cent INTEGER,
     concepto TEXT NOT NULL DEFAULT '',
     nota     TEXT NOT NULL DEFAULT '',
-    comision TEXT NOT NULL DEFAULT ''
+    comision TEXT NOT NULL DEFAULT '',
+    comision_cent INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS mensualidades (
@@ -331,19 +352,32 @@ CREATE TABLE IF NOT EXISTS mensualidades (
     year        TEXT NOT NULL,
     nombre      TEXT NOT NULL,
     enero       TEXT NOT NULL DEFAULT '',
+    enero_cent INTEGER,
     febrero     TEXT NOT NULL DEFAULT '',
+    febrero_cent INTEGER,
     marzo       TEXT NOT NULL DEFAULT '',
+    marzo_cent INTEGER,
     abril       TEXT NOT NULL DEFAULT '',
+    abril_cent INTEGER,
     mayo        TEXT NOT NULL DEFAULT '',
+    mayo_cent INTEGER,
     junio       TEXT NOT NULL DEFAULT '',
+    junio_cent INTEGER,
     julio       TEXT NOT NULL DEFAULT '',
+    julio_cent INTEGER,
     agosto      TEXT NOT NULL DEFAULT '',
+    agosto_cent INTEGER,
     septiembre  TEXT NOT NULL DEFAULT '',
+    septiembre_cent INTEGER,
     octubre     TEXT NOT NULL DEFAULT '',
+    octubre_cent INTEGER,
     noviembre   TEXT NOT NULL DEFAULT '',
+    noviembre_cent INTEGER,
     diciembre   TEXT NOT NULL DEFAULT '',
+    diciembre_cent INTEGER,
     categoria   TEXT NOT NULL DEFAULT '',
     importe     TEXT NOT NULL DEFAULT '',
+    importe_cent INTEGER,
     frecuencia  TEXT NOT NULL DEFAULT 'mensual',
     dia_cobro   TEXT NOT NULL DEFAULT '',
     dias_cobro  TEXT NOT NULL DEFAULT '',
@@ -366,7 +400,10 @@ CREATE TABLE IF NOT EXISTS ingresos_rows (
     fecha    TEXT NOT NULL DEFAULT '',
     nombre   TEXT NOT NULL DEFAULT '',
     tipo     TEXT NOT NULL DEFAULT '',
+    -- Importe en céntimos enteros (ver core/centimos.py). `cantidad` solo guarda
+    -- lo que no se pudo convertir a céntimos exactos.
     cantidad TEXT NOT NULL DEFAULT '',
+    cantidad_cent INTEGER,
     nota     TEXT NOT NULL DEFAULT '',
     cuenta   TEXT NOT NULL DEFAULT ''
 );
@@ -376,19 +413,32 @@ CREATE TABLE IF NOT EXISTS ingresos_recurrentes (
     year        TEXT NOT NULL,
     nombre      TEXT NOT NULL,
     enero       TEXT NOT NULL DEFAULT '',
+    enero_cent INTEGER,
     febrero     TEXT NOT NULL DEFAULT '',
+    febrero_cent INTEGER,
     marzo       TEXT NOT NULL DEFAULT '',
+    marzo_cent INTEGER,
     abril       TEXT NOT NULL DEFAULT '',
+    abril_cent INTEGER,
     mayo        TEXT NOT NULL DEFAULT '',
+    mayo_cent INTEGER,
     junio       TEXT NOT NULL DEFAULT '',
+    junio_cent INTEGER,
     julio       TEXT NOT NULL DEFAULT '',
+    julio_cent INTEGER,
     agosto      TEXT NOT NULL DEFAULT '',
+    agosto_cent INTEGER,
     septiembre  TEXT NOT NULL DEFAULT '',
+    septiembre_cent INTEGER,
     octubre     TEXT NOT NULL DEFAULT '',
+    octubre_cent INTEGER,
     noviembre   TEXT NOT NULL DEFAULT '',
+    noviembre_cent INTEGER,
     diciembre   TEXT NOT NULL DEFAULT '',
+    diciembre_cent INTEGER,
     categoria   TEXT NOT NULL DEFAULT '',
     importe     TEXT NOT NULL DEFAULT '',
+    importe_cent INTEGER,
     frecuencia  TEXT NOT NULL DEFAULT 'mensual',
     dia_cobro   TEXT NOT NULL DEFAULT '',
     mes_inicio  TEXT NOT NULL DEFAULT 'enero',
@@ -416,7 +466,9 @@ CREATE TABLE IF NOT EXISTS ventas (
     cantidad       TEXT NOT NULL DEFAULT '',
     valor_compra   TEXT NOT NULL DEFAULT '',
     valor_venta    TEXT NOT NULL DEFAULT '',
+    valor_venta_cent INTEGER,
     comision_venta TEXT NOT NULL DEFAULT '',
+    comision_venta_cent INTEGER,
     dinero_declarar TEXT NOT NULL DEFAULT '',
     tramo1         TEXT NOT NULL DEFAULT '',
     tramo2         TEXT NOT NULL DEFAULT '',
@@ -457,8 +509,11 @@ CREATE TABLE IF NOT EXISTS renta_fija (
     rentabilidad      TEXT NOT NULL DEFAULT '',
     vencimiento       TEXT NOT NULL DEFAULT '',
     invertido         TEXT NOT NULL DEFAULT '',
+    invertido_cent INTEGER,
     interes_acumulado TEXT NOT NULL DEFAULT '',
-    impuestos         TEXT NOT NULL DEFAULT ''
+    interes_acumulado_cent INTEGER,
+    impuestos         TEXT NOT NULL DEFAULT '',
+    impuestos_cent INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS bonos (
@@ -470,8 +525,57 @@ CREATE TABLE IF NOT EXISTS bonos (
     cupon             TEXT NOT NULL DEFAULT '',
     vencimiento       TEXT NOT NULL DEFAULT '',
     invertido         TEXT NOT NULL DEFAULT '',
+    invertido_cent INTEGER,
     interes_acumulado TEXT NOT NULL DEFAULT '',
+    interes_acumulado_cent INTEGER,
     impuestos         TEXT NOT NULL DEFAULT '',
+    impuestos_cent INTEGER,
+    nota              TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS hipotecas (
+    id               TEXT PRIMARY KEY,
+    alias            TEXT NOT NULL DEFAULT '',
+    tipo             TEXT NOT NULL DEFAULT 'fija',
+    capital          TEXT NOT NULL DEFAULT '0',
+    capital_cent INTEGER,
+    fecha_inicio     TEXT NOT NULL DEFAULT '',
+    plazo_meses      INTEGER NOT NULL DEFAULT 0,
+    tin              TEXT NOT NULL DEFAULT '0',
+    diferencial      TEXT NOT NULL DEFAULT '0',
+    revision_meses   INTEGER NOT NULL DEFAULT 12,
+    euribor          TEXT NOT NULL DEFAULT '[]',
+    amortizaciones   TEXT NOT NULL DEFAULT '[]',
+    nota             TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS financiaciones (
+    id               TEXT PRIMARY KEY,
+    articulo         TEXT NOT NULL DEFAULT '',
+    precio           TEXT NOT NULL DEFAULT '0',
+    precio_cent INTEGER,
+    entrada          TEXT NOT NULL DEFAULT '0',
+    entrada_cent INTEGER,
+    cuotas           INTEGER NOT NULL DEFAULT 0,
+    tin              TEXT NOT NULL DEFAULT '0',
+    fecha_inicio     TEXT NOT NULL DEFAULT '',
+    nota             TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS microcreditos (
+    id                TEXT PRIMARY KEY,
+    nombre            TEXT NOT NULL DEFAULT '',
+    modo              TEXT NOT NULL DEFAULT 'unico',
+    importe           TEXT NOT NULL DEFAULT '0',
+    importe_cent INTEGER,
+    comision          TEXT NOT NULL DEFAULT '0',
+    comision_cent INTEGER,
+    fecha_inicio      TEXT NOT NULL DEFAULT '',
+    fecha_vencimiento TEXT NOT NULL DEFAULT '',
+    devuelto          INTEGER NOT NULL DEFAULT 0,
+    fecha_devolucion  TEXT NOT NULL DEFAULT '',
+    cuotas            INTEGER NOT NULL DEFAULT 0,
+    tin               TEXT NOT NULL DEFAULT '0',
     nota              TEXT NOT NULL DEFAULT ''
 );
 
@@ -483,10 +587,13 @@ CREATE TABLE IF NOT EXISTS trading (
     direccion        TEXT NOT NULL DEFAULT 'LONG',
     resultado        TEXT NOT NULL DEFAULT 'PROFIT',
     capital          TEXT NOT NULL DEFAULT '',
+    capital_cent INTEGER,
     capital_currency TEXT NOT NULL DEFAULT 'EUR',
     roi              TEXT NOT NULL DEFAULT '',
     ganancia         TEXT NOT NULL DEFAULT '',
-    ganancia_neta    TEXT NOT NULL DEFAULT ''
+    ganancia_cent INTEGER,
+    ganancia_neta    TEXT NOT NULL DEFAULT '',
+    ganancia_neta_cent INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS staking_criptos (
@@ -529,9 +636,13 @@ CREATE TABLE IF NOT EXISTS private_market (
     vintage      TEXT NOT NULL DEFAULT '',
     currency     TEXT NOT NULL DEFAULT 'EUR',
     comprometido TEXT NOT NULL DEFAULT '',
+    comprometido_cent INTEGER,
     llamado      TEXT NOT NULL DEFAULT '',
+    llamado_cent INTEGER,
     distribuido  TEXT NOT NULL DEFAULT '',
+    distribuido_cent INTEGER,
     valor_actual TEXT NOT NULL DEFAULT '',
+    valor_actual_cent INTEGER,
     nota         TEXT NOT NULL DEFAULT ''
 );
 
@@ -743,7 +854,7 @@ CREATE TABLE IF NOT EXISTS muestras_cartera (
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 31
+ESQUEMA_VERSION = 41
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1928,6 +2039,166 @@ def _esquema31(conn):
     columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(ingresos_recurrentes)")}
     if "pagas_extra" not in columnas:
         conn.execute("ALTER TABLE ingresos_recurrentes ADD COLUMN pagas_extra TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(32)
+def _esquema32(conn):
+    """Las compras financiadas se cobran como mensualidades.
+
+    `financiaciones` gana la cuenta de cobro, el día de cobro, la categoría y
+    los pagos anticipados (JSON, como en `hipotecas`). `mensualidades` gana
+    `financiacion_id`: las filas que genera la compra financiada llevan aquí su
+    id y las gestiona el servidor, no el formulario de mensualidades. Vacío = una
+    mensualidad normal, que es lo que son todas las que ya existen. Son columnas
+    con DEFAULT: no reescriben la tabla y la imagen anterior las ignora.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(financiaciones)")}
+    for nombre, definicion in (
+        ("cuenta", "TEXT NOT NULL DEFAULT ''"),
+        ("dia_cobro", "TEXT NOT NULL DEFAULT ''"),
+        ("categoria", "TEXT NOT NULL DEFAULT ''"),
+        ("amortizaciones", "TEXT NOT NULL DEFAULT '[]'"),
+    ):
+        if nombre not in columnas:
+            conn.execute(f"ALTER TABLE financiaciones ADD COLUMN {nombre} {definicion}")
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(mensualidades)")}
+    if "financiacion_id" not in columnas:
+        conn.execute("ALTER TABLE mensualidades ADD COLUMN financiacion_id TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(33)
+def _esquema33(conn):
+    """Tabla `microcreditos`.
+
+    Una base ya en la versión 32 no vuelve a ejecutar `_SCHEMA`, así que la tabla
+    se crea también aquí. Es una tabla nueva: la imagen anterior la ignora.
+    """
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS microcreditos ("
+        "id TEXT PRIMARY KEY, nombre TEXT NOT NULL DEFAULT '', "
+        "modo TEXT NOT NULL DEFAULT 'unico', importe TEXT NOT NULL DEFAULT '0', "
+        "comision TEXT NOT NULL DEFAULT '0', fecha_inicio TEXT NOT NULL DEFAULT '', "
+        "fecha_vencimiento TEXT NOT NULL DEFAULT '', devuelto INTEGER NOT NULL DEFAULT 0, "
+        "fecha_devolucion TEXT NOT NULL DEFAULT '', cuotas INTEGER NOT NULL DEFAULT 0, "
+        "tin TEXT NOT NULL DEFAULT '0', nota TEXT NOT NULL DEFAULT '')"
+    )
+
+
+@_migracion(34)
+def _esquema34(conn):
+    """Hipotecas y microcréditos se cobran como mensualidades.
+
+    Igual que `financiaciones` en la 32: ganan la cuenta de cobro, el día de
+    cobro y la categoría. Son columnas con DEFAULT: no reescriben la tabla y la
+    imagen anterior las ignora. Las filas que generan en `mensualidades` llevan
+    `financiacion_id` con un prefijo (`hipoteca:`, `microcredito:`).
+    """
+    for tabla in ("hipotecas", "microcreditos"):
+        columnas = {fila[1] for fila in conn.execute(f"PRAGMA table_info({tabla})")}
+        for nombre in ("cuenta", "dia_cobro", "categoria"):
+            if nombre not in columnas:
+                conn.execute(f"ALTER TABLE {tabla} ADD COLUMN {nombre} TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(35)
+def _esquema35(conn):
+    """Fase A de los importes en céntimos: cuentas, transferencias, gastos e ingresos.
+
+    Añade `<col>_cent INTEGER` a `gastos_rows.cantidad`, `ingresos_rows.cantidad`,
+    `transferencias.cantidad` y `.comision` y `cuentas.saldo_inicial`, y pasa a
+    céntimos todo lo que se puede convertir exacto (ver `core/centimos.py`). Lo
+    que no (texto ilegible, más de dos decimales, otra divisa) se deja en su
+    columna de texto, que sigue leyéndose: la migración no pierde ni redondea
+    nada. Si la suma convertida no cuadra con la original lanza
+    `MigracionImportesError`: el paso se revierte entero y el arranque se detiene,
+    con la copia `pre-esquema-34-a-35` intacta.
+
+    Las columnas nuevas no llevan DEFAULT y admiten NULL: no reescriben la tabla.
+    """
+    centimos.anadirColumnasCentimos(conn, centimos.COLUMNAS_FASE_A)
+    centimos.convertirImportes(conn, centimos.COLUMNAS_FASE_A)
+
+
+@_migracion(36)
+def _esquema36(conn):
+    """Fase B de los importes en céntimos: mensualidades e ingresos recurrentes.
+
+    Igual que el paso 35 (ver `core/centimos.py`), sobre el importe habitual y
+    los doce importes mensuales de `mensualidades` e `ingresos_recurrentes`. Lo
+    que no cabe en céntimos exactos se queda en su columna de texto y se sigue
+    leyendo; si la suma convertida no cuadra, el paso se revierte entero.
+    """
+    centimos.anadirColumnasCentimos(conn, centimos.COLUMNAS_FASE_B)
+    centimos.convertirImportes(conn, centimos.COLUMNAS_FASE_B)
+
+@_migracion(37)
+def _esquema37(conn):
+    """Fase C de los importes en céntimos: dividendos, intereses, renta fija y bonos.
+
+    Como los pasos 35 y 36 (ver `core/centimos.py`). Dividendos, renta fija y bonos
+    guardan cada importe en la divisa de su fila: solo se convierten las filas en
+    euros, y el resto sigue como texto.
+    """
+    centimos.anadirColumnasCentimos(conn, centimos.COLUMNAS_FASE_C)
+    centimos.convertirImportes(conn, centimos.COLUMNAS_FASE_C)
+
+
+@_migracion(38)
+def _esquema38(conn):
+    """Fase D de los importes en céntimos: hipotecas, financiaciones, microcréditos y ventas.
+
+    De las ventas solo `valor_venta` y `comision_venta` (lo que se teclea, y solo
+    en euros): las columnas calculadas son una copia que se recalcula en cada
+    lectura. Los importes que van dentro del JSON de amortizaciones no se tocan.
+    """
+    centimos.anadirColumnasCentimos(conn, centimos.COLUMNAS_FASE_D)
+    centimos.convertirImportes(conn, centimos.COLUMNAS_FASE_D)
+
+@_migracion(39)
+def _esquema39(conn):
+    """Fase E de los importes en céntimos: trading, mercado privado y stablecoins.
+
+    Como los pasos 35 a 38 (ver `core/centimos.py`): solo se convierten las filas
+    en euros, y el resto sigue como texto. Staking y earn no tienen importes en
+    moneda, solo cantidades de cripto y precios unitarios, y no se tocan.
+    """
+    centimos.anadirColumnasCentimos(conn, centimos.COLUMNAS_FASE_E)
+    centimos.convertirImportes(conn, centimos.COLUMNAS_FASE_E)
+
+
+@_migracion(40)
+def _esquema40(conn):
+    """Dividendos reinvertidos: sus datos y la marca de las compras que generan.
+
+    El dividendo guarda cuántas participaciones se compraron con él y a qué
+    precio (en la divisa del activo, en formato canónico: un precio unitario no
+    cabe en céntimos). Las compras de la ficha que salen de ahí llevan
+    `reinvertido = 1`; se regeneran desde los dividendos, ver
+    `stores/reinversion_dividendos.py`.
+    """
+    divCols = {row[1] for row in conn.execute("PRAGMA table_info(dividendos)")}
+    for columna, definicion in (
+        ("reinvertido", "INTEGER NOT NULL DEFAULT 0"),
+        ("reinv_participaciones", "TEXT NOT NULL DEFAULT ''"),
+        ("reinv_precio", "TEXT NOT NULL DEFAULT ''"),
+    ):
+        if columna not in divCols:
+            conn.execute(f"ALTER TABLE dividendos ADD COLUMN {columna} {definicion}")
+
+    filaCols = {row[1] for row in conn.execute("PRAGMA table_info(activo_rows)")}
+    if "reinvertido" not in filaCols:
+        conn.execute("ALTER TABLE activo_rows ADD COLUMN reinvertido INTEGER NOT NULL DEFAULT 0")
+
+@_migracion(41)
+def _esquema41(conn):
+    """Fase F de los importes en céntimos: el núcleo de inversión.
+
+    Como los pasos 35 a 39 (ver `core/centimos.py`): solo los importes en moneda
+    de las filas en euros. Cantidades, precios, comisiones en cripto y tipos de
+    cambio siguen en texto; `transacciones` solo tiene cantidades de cripto.
+    """
+    centimos.anadirColumnasCentimos(conn, centimos.COLUMNAS_FASE_F)
+    centimos.convertirImportes(conn, centimos.COLUMNAS_FASE_F)
 
 
 class _CerrarAlTerminarElHilo:

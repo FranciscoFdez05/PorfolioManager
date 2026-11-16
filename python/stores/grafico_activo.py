@@ -22,10 +22,11 @@ import bisect
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from core import dinero
+from core.centimos import importeSql
 from core.db import getDb
 from core.fifo import FifoError, parseFecha
 from stores import rendimiento_activo, series_tradingview
@@ -34,6 +35,7 @@ from stores.fx_historico import tasa, tipoActualConMemo
 log = logging.getLogger(__name__)
 
 _DIA = 86400
+_MARGEN_INICIO_DIAS = 30
 _HORA = 3600
 
 # `cubeta` son los segundos que resume cada punto: un año de snapshots son decenas
@@ -231,7 +233,8 @@ def _operacionesCompletadas(conn, assetId: str, moneda: str) -> list[dict | None
     # La fecha de cierre tampoco está en `cargarPosiciones`, que no la necesita. Si
     # la de apertura no se entiende, es la que dice cuándo se ejecutó la orden.
     filas = conn.execute(
-        "SELECT fecha_apertura, fecha_cierre, orden, cantidad, precio_orden, precio_currency, total, currency "
+        "SELECT fecha_apertura, fecha_cierre, orden, cantidad, precio_orden, precio_currency, "
+        f"{importeSql('total')} AS total, currency "
         "FROM activo_operation_rows WHERE asset_id = ? AND estado = 'Completado' ORDER BY rowid",
         (assetId,),
     ).fetchall()
@@ -254,7 +257,8 @@ def _operacionesCompletadas(conn, assetId: str, moneda: str) -> list[dict | None
 def _ventasRegistradas(conn, assetId: str, moneda: str) -> list[dict | None]:
     # El precio no está en `cargarPosiciones`, que solo necesita la cantidad.
     filas = conn.execute(
-        "SELECT fecha, cantidad, valor_venta, currency FROM ventas WHERE asset_id = ? ORDER BY year, rowid",
+        f"SELECT fecha, cantidad, {importeSql('valor_venta')} AS valor_venta, currency FROM ventas "
+        "WHERE asset_id = ? ORDER BY year, rowid",
         (assetId,),
     ).fetchall()
     return [
@@ -511,7 +515,8 @@ def _desdeParaVelas(rango: str, desdeTs: int, tramos: list[_Tramo], primerSnapsh
         return desdeTs
     primerMovimiento = next((tramo.dia for tramo in tramos if tramo.dia != date.max), None)
     if primerMovimiento is not None:
-        return int(datetime.combine(primerMovimiento, time.min).timestamp())
+        # Un mes de cotización previa para que la primera compra no quede pegada al borde.
+        return int(datetime.combine(primerMovimiento - timedelta(days=_MARGEN_INICIO_DIAS), time.min).timestamp())
     return primerSnapshot or 0
 
 

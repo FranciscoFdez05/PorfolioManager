@@ -642,6 +642,7 @@ function segRenderGrid() {
 
     if (_segViewMode === "table") {
         grid.classList.add("hidden")
+        document.getElementById("seguimientoGridEmpty")?.classList.add("hidden")
         tableWrap?.classList.remove("hidden")
         segRenderTable(filtered)
         return

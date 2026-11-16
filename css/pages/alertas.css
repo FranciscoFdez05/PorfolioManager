@@ -19,8 +19,15 @@
     content: none;
 }
 
+.alertasPrincipal {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+}
+
 .alertasIntro {
-    margin: 0 0 12px;
+    margin: 0;
     max-width: 760px;
     font-size: 0.84rem;
     line-height: 1.5;
@@ -33,7 +40,7 @@
    guía de tipos). Por debajo de 1100px el lateral pasa debajo del panel. */
 
 .alertasPage--lateral {
-    max-width: 1500px;
+    max-width: 1640px;
 }
 
 .alertasLayout {
@@ -300,16 +307,43 @@
     padding: 0 16px;
 }
 
+/* En la página de Alertas el botón sube a la línea del título, al extremo
+   derecho de la página; el panel no es posicionado, así que se ancla a
+   .alertasPage. En pantallas estrechas vuelve al flujo normal. */
+.alertasPage--lateral {
+    position: relative;
+}
+
+@media (min-width: 1101px) {
+    .alertasPage--lateral .alPanelNueva {
+        position: absolute;
+        top: 0;
+        right: 0;
+    }
+
+    /* El botón queda sobre la columna lateral; el margen la separa de él. */
+    .alertasPage--lateral .alertasLateral,
+    .alertasPage--lateral .alertasPrincipal {
+        margin-top: 14px;
+    }
+
+    /* Sin alertas la barra se queda sin contenido en flujo; se quita su gap. */
+    .alertasPage--lateral .alPanelBarra:has(> .alPanelFiltros[hidden]) {
+        margin-bottom: -14px;
+    }
+}
+
 /* ── Formulario ── */
 
 .alPanelForm {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 18px 20px;
+    gap: 18px;
+    padding: 20px 24px 22px;
     background: var(--bg-surface);
-    border: 1px solid var(--border-soft);
-    border-radius: 12px;
+    border: 1px solid var(--border-mid);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
 
 .alPanelFormCabecera {
@@ -317,11 +351,42 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+/* Atajos: mismas plantillas que el estado vacío, a un clic dentro del formulario. */
+.alPanelAtajos {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 16px;
+    border-bottom: 1px dashed var(--border-soft);
+}
+
+.alPanelAtajosBotones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.alPanelAtajos .alPanelSugerencia {
+    height: 30px;
+    padding: 0 12px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    background: var(--bg-inset);
+}
+
+.alPanelAtajos .alPanelSugerencia:hover {
+    color: var(--text-primary);
 }
 
 .alPanelFormTitulo {
-    font-size: 0.95rem;
+    font-size: 1.05rem;
     font-weight: 700;
+    letter-spacing: 0.01em;
     color: var(--text-primary);
 }
 
@@ -344,10 +409,24 @@
     color: var(--text-primary);
 }
 
+/* Selector de tipo agrupado en un bloque propio: separa «qué vigilar» de los
+   datos de la alerta y evita que todo parezca una sola lista de píldoras. */
 .alPanelTipos {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    padding: 14px 16px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+}
+
+.alPanelTipos .alPanelTipo {
+    background: var(--bg-surface);
+}
+
+.alPanelTipos .alPanelTipo[aria-pressed="true"] {
+    background: var(--accent);
 }
 
 .alPanelTiposGrupo {
@@ -401,8 +480,9 @@
 
 .alPanelAyuda {
     margin: 0;
-    padding: 9px 12px;
+    padding: 10px 14px;
     border-radius: 8px;
+    border-left: 3px solid var(--accent);
     background: var(--bg-inset);
     font-size: 0.8rem;
     line-height: 1.45;
@@ -411,8 +491,8 @@
 
 .alPanelCampos {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 12px 14px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px 16px;
 }
 
 .alCampo {
@@ -424,6 +504,12 @@
 
 .alCampoAncho {
     grid-column: span 2;
+}
+
+/* La nota ocupa siempre la fila entera, tenga la cantidad de campos que tenga
+   el tipo elegido. */
+.alCampo[data-campo="Nota"] {
+    grid-column: 1 / -1;
 }
 
 .alCampoEtiqueta {
@@ -459,6 +545,26 @@
     display: flex;
     justify-content: flex-end;
     gap: 10px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border-soft);
+}
+
+/* Cancelar como acción secundaria: sin relleno azul, para que «Crear alerta»
+   sea la única llamada a la acción. */
+.alPanelFormPie .secondaryButton {
+    background: transparent;
+    border: 1px solid var(--border-mid);
+    color: var(--text-muted);
+}
+
+.alPanelFormPie .secondaryButton:hover {
+    border-color: var(--border-hard);
+    color: var(--text-primary);
+    background: var(--btn-bg-hover);
+}
+
+.alPanelFormPie .primaryButton {
+    min-width: 130px;
 }
 
 /* ── Lista ── */
@@ -616,6 +722,39 @@
     background: rgba(231, 76, 60, 0.1);
 }
 
+/* ── Últimos avisos: ocupa toda la pantalla ──
+   El alto útil se calcula con --vh (zoom.js) y no con vh, que se descuadra en
+   pantallas grandes. El 200px descuenta la barra superior y el título. */
+
+.alertasPage--avisos {
+    max-width: none;
+}
+
+.alertasPage--avisos .alPanel {
+    padding-bottom: 0;
+}
+
+.alertasPage--avisos .alPanelLista {
+    min-height: calc(100 * var(--vh, 1vh) - 230px);
+}
+
+.alertasPage--avisos .alPanelLista:has(> .alPanelVacio:only-child) {
+    display: flex;
+}
+
+.alertasPage--avisos .alPanelVacio {
+    flex: 1;
+    justify-content: center;
+    gap: 8px;
+    background: var(--bg-surface);
+    border-style: solid;
+    border-color: var(--border-soft);
+}
+
+.alertasPage--avisos .alPanelVacio strong {
+    font-size: 1.05rem;
+}
+
 /* ── Vacío y sugerencias ── */
 
 .alPanelVacio {
@@ -680,6 +819,7 @@
         width: 100%;
     }
 
+    .alPanelAtajos,
     .alPanelTiposGrupo {
         grid-template-columns: 1fr;
         gap: 6px;

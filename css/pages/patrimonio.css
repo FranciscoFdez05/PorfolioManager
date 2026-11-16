@@ -1,0 +1,374 @@
+/* Patrimonio
+   ─────────────────────────────────────────────────────────────────
+   Tarjetas de resumen, composición de cada lado en una barra y desglose por
+   grupo. Cada grupo lleva siempre el mismo color (patrimonioColor0..6). */
+
+.patrimonioPage {
+    --pat-c0: #3b82f6;
+    --pat-c1: #22c55e;
+    --pat-c2: #a78bfa;
+    --pat-c3: #f97316;
+    --pat-c4: #ef4444;
+    --pat-c5: #eab308;
+    --pat-c6: #64748b;
+
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    min-width: 0;
+}
+
+.patrimonioError,
+.patrimonioAviso {
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+
+.patrimonioError {
+    color: var(--color-neg);
+}
+
+.patrimonioAviso {
+    color: var(--text-subtle);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+}
+
+/* ── Colores por grupo ── */
+.patrimonioColor0 { --pat-color: var(--pat-c0); }
+.patrimonioColor1 { --pat-color: var(--pat-c1); }
+.patrimonioColor2 { --pat-color: var(--pat-c2); }
+.patrimonioColor3 { --pat-color: var(--pat-c3); }
+.patrimonioColor4 { --pat-color: var(--pat-c4); }
+.patrimonioColor5 { --pat-color: var(--pat-c5); }
+.patrimonioColor6 { --pat-color: var(--pat-c6); }
+
+.patrimonioSegmento,
+.patrimonioPunto {
+    background: var(--pat-color, var(--pat-c6));
+}
+
+/* ── Tarjetas ── */
+.patrimonioResumen {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+}
+
+.patrimonioCard {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    padding: 14px 18px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+}
+
+.patrimonioCardEtiqueta {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.patrimonioCardValor {
+    font-size: 1.45rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--text-bright);
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+.patrimonioCardNota {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+
+.patrimonioCardNeto {
+    border-left-width: 4px;
+}
+
+.patrimonioCardNeto .patrimonioCardValor {
+    font-size: 1.8rem;
+}
+
+.patrimonioCardNeto.positivo {
+    border-left-color: var(--color-pos);
+}
+
+.patrimonioCardNeto.positivo .patrimonioCardValor {
+    color: var(--color-pos);
+}
+
+.patrimonioCardNeto.negativo {
+    border-left-color: var(--color-neg);
+}
+
+.patrimonioCardNeto.negativo .patrimonioCardValor {
+    color: var(--color-neg);
+}
+
+/* ── Composición ── */
+.patrimonioComposicion {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
+}
+
+.patrimonioBarraBloque {
+    min-width: 0;
+    padding: 14px 18px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+    border-radius: 10px;
+}
+
+.patrimonioBarraBloque h3,
+.patrimonioPanelCabecera h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--text-subtle);
+}
+
+.patrimonioBarra {
+    display: flex;
+    height: 14px;
+    margin: 10px 0 12px;
+    overflow: hidden;
+    border-radius: 7px;
+    background: var(--bg-elevated);
+}
+
+.patrimonioSegmento {
+    display: block;
+    height: 100%;
+    min-width: 2px;
+}
+
+.patrimonioSegmento + .patrimonioSegmento {
+    box-shadow: -1px 0 0 var(--bg-surface);
+}
+
+.patrimonioBarraVacia {
+    margin: auto;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+}
+
+.patrimonioLeyenda {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.8rem;
+    color: var(--text-subtle);
+}
+
+.patrimonioLeyenda li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.patrimonioLeyenda strong {
+    color: var(--text-bright);
+    font-variant-numeric: tabular-nums;
+}
+
+.patrimonioPunto {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    flex-shrink: 0;
+    border-radius: 50%;
+}
+
+/* ── Desglose ── */
+.patrimonioColumnas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 16px;
+    align-items: stretch;
+}
+
+.patrimonioPanel {
+    min-width: 0;
+    padding: 14px 18px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+    border-radius: 10px;
+}
+
+.patrimonioPanelCabecera {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.patrimonioPanelTotal {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    font-variant-numeric: tabular-nums;
+}
+
+.patrimonioGrupo {
+    border-bottom: 1px solid var(--border-inset);
+}
+
+.patrimonioGrupo:last-child {
+    border-bottom: 0;
+}
+
+.patrimonioGrupo > summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 2px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.patrimonioGrupo > summary::-webkit-details-marker {
+    display: none;
+}
+
+.patrimonioGrupo > summary::before {
+    content: "▸";
+    width: 10px;
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    transition: transform 0.15s ease;
+}
+
+.patrimonioGrupo[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.patrimonioGrupoNombre {
+    flex: 1;
+    font-weight: 600;
+    color: var(--text-bright);
+}
+
+.patrimonioGrupoPct {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.patrimonioGrupoTotal {
+    min-width: 110px;
+    text-align: right;
+    font-weight: 700;
+    color: var(--text-bright);
+    font-variant-numeric: tabular-nums;
+}
+
+.patrimonioPartidas {
+    margin: 0 0 10px;
+    padding: 0 0 0 20px;
+    list-style: none;
+}
+
+.patrimonioPartida {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(60px, 1fr) 54px 110px;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 0;
+    font-size: 0.85rem;
+    color: var(--text-subtle);
+}
+
+.patrimonioPartida:hover {
+    background: var(--bg-elevated);
+}
+
+.patrimonioPartidaNombre {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.patrimonioPartidaBarra {
+    height: 5px;
+    overflow: hidden;
+    border-radius: 3px;
+    background: var(--bg-elevated);
+}
+
+.patrimonioPartidaBarra > span {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: var(--pat-color, var(--pat-c6));
+}
+
+.patrimonioPartidaPct {
+    text-align: right;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.patrimonioPartidaImporte {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.patrimonioPartida.negativa .patrimonioPartidaImporte {
+    color: var(--color-neg);
+}
+
+.patrimonioCeros {
+    padding: 4px 0 0;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    cursor: help;
+}
+
+.patrimonioVacio,
+.patrimonioNota {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--text-dim);
+}
+
+/* ── Modo privacidad: los importes se desenfocan como en el resto de la app ── */
+body.money-hidden .patrimonioImporte {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+    color: var(--text-muted) !important;
+}
+
+
+@media (max-width: 820px) {
+    .patrimonioColumnas,
+    .patrimonioComposicion {
+        grid-template-columns: 1fr;
+    }
+
+    .patrimonioPartida {
+        grid-template-columns: minmax(0, 1fr) 54px 100px;
+    }
+
+    .patrimonioPartidaBarra {
+        display: none;
+    }
+}

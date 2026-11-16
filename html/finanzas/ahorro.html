@@ -11,13 +11,7 @@
                 <!-- Tira desplazable: los años de Gastos e Ingresos, del más reciente al más antiguo. -->
                 <div class="ahorroYearList" id="ahorroYearList" role="group" aria-label="Año"></div>
             </div>
-            <button id="ahorroConfigBtn" class="ahorroConfigBtn" type="button" title="Objetivo de ahorro y presupuesto por categoría">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true">
-                    <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
-                    <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-                Presupuesto
-            </button>
+            <button id="ahorroConfigBtn" class="primaryButton" type="button" title="Objetivo de ahorro y presupuesto por categoría">Presupuesto</button>
         </div>
     </header>
 
@@ -106,6 +100,16 @@
                     <svg id="ahorroDonutSvg" class="ahorroDonutSvg" viewBox="0 0 180 180" role="img" aria-label="Reparto del gasto por categoría"></svg>
                     <div class="ahorroDonutLegend" id="ahorroDonutLegend"></div>
                 </div>
+            </article>
+
+            <article class="ahorroCard">
+                <header class="ahorroCardHeader">
+                    <div>
+                        <h3 class="ahorroCardTitle">Pagos de deudas</h3>
+                        <p class="ahorroCardSub" id="ahorroDeudasSub"></p>
+                    </div>
+                </header>
+                <div class="ahorroDeudas" id="ahorroDeudas"></div>
             </article>
 
             <article class="ahorroCard">

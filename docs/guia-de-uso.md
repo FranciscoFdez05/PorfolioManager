@@ -7,6 +7,7 @@ Cómo se usa cada parte de la aplicación. La instalación y la configuración d
 - [Primeros pasos](#primeros-pasos)
 - [Módulos del menú](#módulos-del-menú)
 - [Gráfico de un activo](#gráfico-de-un-activo)
+- [Mercado de un activo](#mercado-de-un-activo)
 - [Mi dinero](#mi-dinero)
 - [Cripto: wallets enlazadas](#cripto-wallets-enlazadas)
   - [Enlazar una wallet](#enlazar-una-wallet)
@@ -45,7 +46,11 @@ Cómo se usa cada parte de la aplicación. La instalación y la configuración d
 
 ## Gráfico de un activo
 
-La ficha de cada activo tiene una pestaña **Gráfico** con dos vistas:
+La propia pestaña **Gráfico ▾** es un desplegable: al pulsarla se abre el menú que elige qué se ve: **Compras / ventas** (lo descrito abajo), **Comparativa anual** (barras con la rentabilidad del precio en cada año natural), **Comparativa índices** (el precio del activo frente a S&P 500, Nasdaq 100 y los demás índices que actives, en % desde el inicio del rango o de las fechas elegidas; el índice va en su divisa de cotización) y **Estacionales** (una línea por año sobre un eje de enero a diciembre, en % desde el cierre del año anterior, con el año en curso resaltado; al pasar el ratón ves, para cada año, el % y el precio de ese día). En **Estacionales** hay un botón por cada año con datos: pulsa los que quieras ver, sueltos y en cualquier combinación. Por defecto salen los cinco más recientes, y la elección se recuerda para todos los activos (si un activo no tiene ninguno de los años elegidos, vuelve a los cinco más recientes). El selector **Lineal / Log** cambia la escala del eje: en **Log** una subida del 100 % y una caída del 50 % ocupan lo mismo, así que un año extremo (+1000 %) ya no aplasta a los demás contra el 0. Los precios salen de las velas diarias de TradingView del activo, en su divisa de cotización y con todo el histórico que da el feed (unos 13 años en cripto y 20 en bolsa); sin ticker de TradingView usa el histórico propio en euros, que empieza en la primera compra. Los botones **Gráfico** y **Tabla** alternan entre las líneas y la tabla de rendimiento mensual por años (cada mes sobre el cierre del anterior, la columna **Año** sobre el cierre del año anterior y una fila final con cuántos años subió y cayó cada mes), sacada de las velas mensuales de TradingView; la vista elegida se recuerda.
+
+En la ficha lateral, el bloque **Estacionales** abre al pulsarlo un popup grande con el mismo gráfico de años (con todo el histórico y los mismos botones por año, cuya elección comparte con la pestaña) y la tabla mensual, con **Gráfico** y **Tabla** para alternar; el botón **Tabla** del bloque lo abre directamente en la tabla.
+
+En **Compras / ventas** hay dos vistas:
 
 | Vista | Qué enseña | Unidades |
 | --- | --- | --- |
@@ -61,6 +66,21 @@ Limitaciones:
 - Los datos salen solo de las valoraciones que guarda la propia aplicación (`asset_snapshots`), sin llamar a proveedores externos. El gráfico empieza en la primera valoración guardada y los importes van en euros.
 - Las operaciones anteriores a esa valoración no tienen punto; la nota del gráfico dice cuántas quedan fuera.
 - El precio se reconstruye a partir del valor y el coste de la posición, así que queda en blanco donde el coste guardado no coincide con ninguna posición que haya tenido el activo.
+
+## Mercado de un activo
+
+La pestaña **Mercado** de la ficha enseña cómo está el activo, no tu posición. Los datos se piden al abrirla y se guardan unos minutos.
+
+| Tipo de activo | Qué enseña |
+| --- | --- |
+| **Cripto** | Capitalización, volumen de 24 h, volumen / capitalización, FDV, suministro en circulación, total y máximo, y categorías. Derivados: precio de marca y base frente al índice, tasa de financiación, interés abierto y volumen de futuros del perpetuo USDT de Binance |
+| **Acciones, ETF, índices y materias primas** | Capitalización (o patrimonio del fondo), acciones en circulación, volumen y volumen medio, mercado donde cotiza, sector, industria y fundamentales (márgenes, flujo de caja, EV / EBITDA, próximos resultados) |
+| **Todos** | Rendimiento por periodo, rango de 52 semanas y volatilidad, y tendencia técnica (valoración global, medias móviles, osciladores, RSI y distancia a las medias de 50 y 200) |
+
+- Las cifras salen del scanner de TradingView y, para los derivados, de la API pública de futuros de Binance. Ninguna necesita clave.
+- Hace falta que el activo tenga un ticker de TradingView con mercado (`MERCADO:TICKER`); se asigna en **Editar activo**. Si no lo tiene, la pestaña lo avisa.
+- Lo que un proveedor no publica se muestra como «—» o se omite: nada se estima. Si Binance no tiene un perpetuo USDT de esa moneda (o bloquea tu región), el bloque de derivados lo dice.
+- La capitalización y el volumen de una cripto son de la moneda, en dólares, no del par concreto en el que cotiza tu activo.
 
 ## Mi dinero
 
@@ -94,6 +114,69 @@ Todas las transferencias entre cuentas, con filtros por año y por cuenta, búsq
 ### Cuenta remunerada
 
 Lo que gana cada cuenta remunerada sin ser una aportación tuya (intereses y dividendos cobrados en ella), con el acumulado del año y la lista de movimientos. Es de solo lectura: los intereses se apuntan en **Bolsa e Inversión › Cuenta Remunerada** y los dividendos en su ventana.
+
+### Hipotecas
+
+Una ventana por hipoteca elegida en el desplegable, con su cuadro de amortización (sistema francés) y sus métricas. **Añadir hipoteca** pide nombre, capital, fecha de inicio, plazo en meses y tipo:
+
+- **Plazo fijo:** un TIN que no cambia.
+- **Plazo variable:** un tipo inicial (hasta la primera revisión), el diferencial y la revisión (anual o semestral). El Euríbor lo introduces tú en **Revisiones de Euríbor**; en cada revisión la cuota se recalcula sobre el capital pendiente y los meses que quedan, con el último Euríbor con fecha igual o anterior al inicio del periodo más el diferencial. Los periodos futuros sin Euríbor propio arrastran el último conocido, así que son una proyección.
+
+**Amortizaciones anticipadas** admite pagos parciales o totales, reduciendo el plazo (mantiene la cuota) o la cuota (mantiene el plazo). Las métricas son la cuota actual, el tipo vigente, el capital pendiente y amortizado, los intereses pagados, pendientes y totales, el coste total, las cuotas restantes y la fecha de fin, además de los intereses que ahorran las amortizaciones. Un recibo cuenta como pagado cuando su fecha es hoy o anterior. Con varias hipotecas se suma la deuda y la cuota mensual. Los datos van en `GET`/`POST /api/hipotecas`.
+
+Las hipotecas también piden **cuenta de cobro**, **día de cobro** y **categoría**, y cada cuota del cuadro (con las amortizaciones anticipadas y la proyección del Euríbor) se cobra como una mensualidad con la etiqueta **Hipoteca**. Al guardar una hipoteca se crean los años de Gastos que falten desde su primera cuota hasta el actual, y esos pagos descuentan de la cuenta elegida: si ya los apuntabas a mano como gastos, quita los apuntes para no contarlos dos veces.
+
+#### Simular una amortización anticipada
+
+El panel **Simular amortización anticipada** (bajo las amortizaciones) pregunta qué pasaría con un pago hipotético sin guardar nada: indica el importe y, si quieres, la fecha (hoy por defecto; no puede ser pasada ni superar el capital pendiente). Compara tres columnas: la hipoteca actual, reduciendo el plazo y reduciendo la cuota, con la cuota tras el pago, las cuotas restantes, la fecha de fin, los intereses pendientes, los intereses ahorrados y los meses ahorrados. Para aplicarla de verdad, añádela en **Amortizaciones anticipadas**.
+
+### Patrimonio
+
+**Mi dinero › Patrimonio** resume lo que tienes y lo que debes. **Lo que tengo** suma las inversiones (con el último precio conocido, sin refrescar cotizaciones), el saldo de cada cuenta y la renta fija y los bonos que aún no han vencido (capital más intereses netos). **Lo que debo** suma el capital pendiente de hipotecas y compras financiadas y lo que queda por pagar de los microcréditos. Una cuenta en descubierto resta de lo que tienes. Si una deuda no se puede calcular, queda fuera del total y la página lo avisa. Todavía no hay gráfico de evolución. Los datos van en `GET /api/patrimonio`.
+
+### Calendario: vencimientos
+
+El filtro **Vencimientos** del calendario muestra el día en que vence cada renta fija o bono, con el capital más los intereses netos. No cuenta en el balance, porque es capital que vuelve y no un ingreso. Las cuotas de hipotecas, compras financiadas y microcréditos salen en **Mensualidades**.
+
+### Ingresos pasivos en Dividendos
+
+Bajo las tarjetas de la ventana **Dividendos** hay un resumen de los últimos 12 meses: lo cobrado, la media mensual y la rentabilidad sobre coste, global y por activo (cobrado en 12 meses entre lo invertido). El dividendo se asocia al activo por nombre: si el activo se vendió, sale sin rentabilidad; si se renombra, sus dividendos pasan al nombre nuevo. La proyección a 12 meses es lo cobrado en el último año, no una previsión. Los datos van en `GET /api/dividendos/resumen`.
+
+### Dividendos reinvertidos
+
+Al apuntar un cobro, marca **Reinvertir automáticamente** e indica las participaciones compradas y el precio de compra (en la divisa del activo). El dividendo guarda esos datos y la ficha del activo muestra una compra marcada **Reinvertido**, con la fecha del cobro, que cuenta en la posición y en el cálculo FIFO de las ventas como cualquier otra compra.
+
+- La compra se edita o se borra desde el dividendo, no desde la ficha: se vuelve a generar cada vez que se guarda cualquiera de las dos, así que una pestaña con la ficha antigua no la duplica ni la pierde.
+- Hace falta la fecha completa (dd-mm-aaaa) y que el instrumento sea un activo existente; si el nombre no coincide con ningún activo no se genera compra.
+- Si cambias la divisa del activo, el precio de la reinversión se convierte con el mismo tipo que el resto de compras.
+- Desmarcar la casilla o borrar el dividendo quita la compra.
+- **No suma a la cuenta**: un dividendo reinvertido no entra en el saldo ni en lo que rinde la cuenta que cobra los dividendos, porque no llega a ella.
+- En **Métricas › Dividendos reinvertidos** (debajo de «Dividendos por mes») hay el total reinvertido, las participaciones compradas, el número de reinversiones y el porcentaje de tus dividendos que reinviertes, con el histórico por año (y las participaciones acumuladas), el resumen por instrumento y la lista de reinversiones. Siguen contando también en los totales de dividendos del resto de Métricas, porque se cobraron.
+
+### Exportar a CSV
+
+**Ajustes › Datos › Exportar a CSV** descarga gastos e ingresos (de un año), dividendos, operaciones y cuentas con sus saldos. El fichero usa «;» como separador y coma decimal, y se abre en Excel con los acentos bien. El texto que empieza como una fórmula se neutraliza. Ruta: `GET /api/exportar/<módulo>.csv` (con `?anio=` en gastos e ingresos).
+
+### Compras financiadas
+
+Una tabla con cada compra a plazos: precio, entrada, cuota, cuotas pagadas y totales, TIN (o «Sin intereses»), fechas de inicio y fin, tiempo restante, lo que queda por pagar y una barra de progreso. Las compras liquidadas se ocultan salvo con **Mostrar liquidadas**. Arriba, las compras activas, la cuota mensual conjunta y lo pendiente. Se financia `precio - entrada` con cuotas mensuales iguales (hasta 240); con TIN 0 es un reparto lineal. Los datos van en `GET`/`POST /api/financiaciones`.
+
+Cada compra pide además la **cuenta de cobro**, un **día de cobro** (vacío = el día de la fecha de inicio) y una **categoría**. Cada cuota se cobra como una mensualidad con la etiqueta **Financiada**: descuenta cada mes de su cuenta y suma en Métricas, el calendario y los saldos. Esas filas las genera el servidor al guardar la compra o un año; en Mensualidades no se editan (el menú lleva de vuelta a esta ventana) y se crean los años que falten hasta el actual. La entrada no se registra como mensualidad: anótala como un gasto el día de la compra. Pulsa una compra para ver su detalle: coste total, intereses, lo ya pagado y el calendario de cuotas con la próxima marcada. **Añadir pago anticipado** acorta el plazo o baja la cuota, y el pago se suma al cobro de ese mes. Encima de la tabla, **Próximos cobros** lista lo que se carga en los próximos 45 días.
+
+### Microcréditos
+
+Una tabla con cada microcrédito: importe, coste, TAE equivalente, vencimiento, estado (**Activo**, **Vencido** o **Devuelto**), lo pendiente y una barra de progreso. Los devueltos se ocultan salvo con **Mostrar devueltos**. Arriba, los activos, lo pendiente, el próximo vencimiento, los vencidos sin devolver y el coste total; debajo, **Próximos vencimientos** lista lo que vence en los próximos 45 días o ya venció. Los datos van en `GET`/`POST /api/microcreditos`.
+
+Cada microcrédito tiene una de dos modalidades:
+
+- **Pago único:** se devuelve de una vez, en la fecha de vencimiento, el importe más una **comisión** fija. La TAE equivalente es `(1 + comisión / importe) ^ (365 / días) - 1`, y en plazos cortos sale muy alta: es lo que conviene ver al comparar. Pasa a **Vencido** si llega la fecha sin marcarlo como devuelto; **Marcar devuelto** lo cierra con la fecha de hoy.
+- **En cuotas mensuales:** hasta 60 cuotas iguales a un TIN fijo (0 = sin intereses). La TAE es la del TIN capitalizado mensualmente. Pulsa el microcrédito para ver el calendario de cuotas con la próxima marcada.
+
+Cada pago se cobra como una mensualidad, igual que las compras financiadas: pide **cuenta de cobro**, **día de cobro** (en cuotas; vacío = el de la concesión) y **categoría**. El pago único cae el día del vencimiento, o el de la devolución si ya lo marcaste como devuelto con su fecha. Sale en **Gastos** con la etiqueta **Microcrédito** y resta de su cuenta; se gestiona solo desde esta ventana.
+
+### Pagos de deudas en Ahorro
+
+**Ahorro** incluye una tarjeta **Pagos de deudas** que desglosa, para el mes o el año elegido, lo que sale en hipotecas, compras financiadas y microcréditos y qué parte del gasto suponen. Ya está dentro del gasto (son mensualidades generadas): la tarjeta solo lo separa.
 
 ## Cripto: wallets enlazadas
 
@@ -306,7 +389,7 @@ La lista **Seguimiento** de la Watchlist enseña la moneda de cada red que sigue
 
 - Las copias llevan siempre las wallets enlazadas (wallets, libreta, marcas, tokens y lo que añadas al catálogo) dentro del paquete cifrado, protegidas con la contraseña de las copias o, si no la hay, con la de acceso a la web.
 - **Incluir las claves de API en las copias**, en **Ajustes**, decide solo sobre las claves de API.
-- Una exportación manual solo lleva las wallets si tiene contraseña.
+- Una exportación manual (**Ajustes › Datos › Exportar como ZIP**) lleva las wallets si marcas **Incluir wallets y claves públicas**, y las claves de API si marcas **Incluir APIs**. Al exportar se ofrece una contraseña opcional: con ella van cifradas y se pide al importar; sin ella van en claro y el ZIP es un secreto. El botón **?** junto a las casillas lo explica.
 - Al restaurar se vuelven a cifrar con la `SECRET_KEY` de este servidor, y la primera revisión de cada wallet solo memoriza lo que hay, sin avisos.
 
 ### Límites y avisos de la tarjeta

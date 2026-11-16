@@ -701,7 +701,7 @@ function buildRecurrenteFormHtml(row) {
         <div class="recFormMonths recPagasExtra">
             <div class="recFormMonthsHead">
                 <span class="recFormMonthsTitle">Pagas extra</span>
-                <button type="button" class="recGhostBtn" id="ingresosRecurrenteAddPagaBtn">+ Añadir paga extra</button>
+                <button type="button" class="recGhostBtn" id="ingresosRecurrenteAddPagaBtn">Añadir paga extra</button>
             </div>
             <p class="recFormMonthsHint">Un añadido puntual en un mes, como la extra de verano o de Navidad. Se suma al cobro de ese mes.</p>
             <div class="recPagasList" id="ingresosRecurrentePagas">${row.pagasExtra.map(buildPagaExtraRowHtml).join("")}</div>
@@ -1746,6 +1746,10 @@ function renderIngresosAnnualTable() {
 
     const incomeTotals = buildMonthlyIncomeTotals()
     const availableTypes = getAvailableIngresosTypes()
+    // Las devoluciones de un pago fraccionado no son ingresos tuyos: se ven en
+    // su página y no suman aquí. Los índices de las acciones siguen siendo los
+    // de la lista completa.
+    const shownTypes = availableTypes.filter((type) => !mismoTipoGasto(type, TIPO_GASTO_FRACCIONADO))
 
     const recurrentesRow = document.createElement("tr")
     recurrentesRow.className = "ingresosSectionRow"
@@ -1811,6 +1815,7 @@ function renderIngresosAnnualTable() {
 
     const totalIngresosTypes = availableTypes.length
     availableTypes.forEach((type, rowIndex) => {
+        if (!shownTypes.includes(type)) return
         const tr = document.createElement("tr")
         tr.innerHTML = `
             <td>${escapeIngresosHtml(type)}</td>
@@ -1832,12 +1837,20 @@ function renderIngresosAnnualTable() {
         annualBody.appendChild(tr)
     })
 
+    // Botón temporal: solo existe mientras no haya ninguna categoría.
+    if (!shownTypes.length) {
+        const emptyRow = document.createElement("tr")
+        emptyRow.className = "categoriasVaciasRow"
+        emptyRow.innerHTML = `<td colspan="14"><button type="button" class="catAddBtn catAddBtnTabla" data-abrir-categorias="ingreso">Añadir categorías</button></td>`
+        annualBody.appendChild(emptyRow)
+    }
+
     const ingresosTotalRow = document.createElement("tr")
     ingresosTotalRow.className = "ingresosTotalRow"
     ingresosTotalRow.innerHTML = `
         <td>Total</td>
         ${INGRESOS_MONTHS.map((month) => {
-            const total = availableTypes.reduce((sum, type) => sum + incomeTotals[type][month.key], 0)
+            const total = shownTypes.reduce((sum, type) => sum + incomeTotals[type][month.key], 0)
             return `<td>${total ? formatEuro(total) : "- €"}</td>`
         }).join("")}
         <td></td>
@@ -1853,7 +1866,7 @@ function renderIngresosAnnualTable() {
                 (sum, row) => sum + parseEuroNumber(row.meses?.[month.key] || ""),
                 0
             )
-            const totalIngresos = availableTypes.reduce((sum, type) => sum + incomeTotals[type][month.key], 0)
+            const totalIngresos = shownTypes.reduce((sum, type) => sum + incomeTotals[type][month.key], 0)
             return `<td>${formatEuro(totalRecurrentes + totalIngresos)}</td>`
         }).join("")}
         <td></td>
@@ -2673,8 +2686,17 @@ function renderIngresosMonthTable() {
     const indexed = (currentIngresosData.months?.[currentIngresosMonth]?.rows || [])
         .map((row, index) => ({ row, index }))
         .sort((a, b) => ingresoParseDate(a.row.fecha) - ingresoParseDate(b.row.fecha))
-    const rows = indexed.map(({ row }) => row)
-    indexed.forEach(({ row, index }) => body.appendChild(buildIngresoMovementRow(row, index)))
+    // Las devoluciones de un pago fraccionado no se enseñan ni suman aquí (están
+    // en su página), pero siguen en la tabla oculta: el guardado reconstruye las
+    // filas desde el DOM y, si no estuvieran, se perderían.
+    const esDevolucion = (row) => mismoTipoGasto(row.tipo, TIPO_GASTO_FRACCIONADO)
+    const rows = indexed.map(({ row }) => row).filter((row) => !esDevolucion(row))
+    indexed.forEach(({ row, index }) => {
+        const tr = buildIngresoMovementRow(row, index)
+        // Estilo en línea: ni el filtro de búsqueda ni las hojas de estilo lo vuelven a mostrar.
+        if (esDevolucion(row)) tr.style.display = "none"
+        body.appendChild(tr)
+    })
 
     const total = rows.reduce((sum, row) => sum + parseEuroNumber(row.cantidad || ""), 0)
     const totalTr = document.createElement("tr")

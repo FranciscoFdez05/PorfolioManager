@@ -339,7 +339,7 @@ function resetAssetDetailView() {
     const detFinnhub = document.getElementById("detFinnhub")
 
     if (detSymbol) {
-        detSymbol.textContent = "---"
+        detSymbol.textContent = ""
     }
 
     if (detName) {
@@ -351,12 +351,12 @@ function resetAssetDetailView() {
     }
 
     if (detChange) {
-        detChange.textContent = "---"
+        detChange.textContent = ""
         detChange.classList.remove("negative")
     }
 
     if (detType) {
-        detType.textContent = "---"
+        detType.textContent = ""
     }
 
     if (detPosition) {
@@ -387,7 +387,7 @@ function resetAssetDetailView() {
     }
 
     if (detFinnhub) {
-        detFinnhub.textContent = "Ticker mercado: ---"
+        detFinnhub.textContent = ""
     }
 
     const detChangeAbs = document.getElementById("detChangeAbs")
@@ -398,7 +398,7 @@ function resetAssetDetailView() {
 
     const detWeight = document.getElementById("detWeight")
     if (detWeight) {
-        detWeight.textContent = "---"
+        detWeight.textContent = ""
     }
 
     _sidebarAssetActual = null

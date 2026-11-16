@@ -11,7 +11,9 @@ from pathlib import Path
 
 from core import paths, settings
 from core.bloqueo import exclusivo
+from core.centimos import COLUMNAS_FASE_B, MESES, convertirImportes, importeLegible
 from core.escritura import escribirJsonAtomico
+from core.wallets_carpeta import carpetaWalletsDe
 from core.paths import (
     DELETED_DIR as _DELETED_DIR,
     LEGACY_DB as _LEGACY_DB,
@@ -220,6 +222,11 @@ def _activoSegunMeta(actual: Path):
         return destino
 
 
+def _mesesLegibles(conn, tabla: str) -> str:
+    """Los doce meses de `tabla` como importes legibles, esté la base migrada o no."""
+    return ", ".join(f"{importeLegible(conn, tabla, mes)} AS {mes}" for mes in MESES)
+
+
 def _migrateLegacyGastos(activeDbPath: Path):
     """Copia datos de gastos de portfolio.db (legacy) al DB activo si el activo está vacío."""
     if not _LEGACY_DB.exists():
@@ -262,8 +269,7 @@ def _migrateLegacyGastos(activeDbPath: Path):
         # Migrar mensualidades
         dst.execute("DELETE FROM mensualidades")
         srcMens = src.execute(
-            "SELECT year, nombre, enero, febrero, marzo, abril, mayo, junio, "
-            "julio, agosto, septiembre, octubre, noviembre, diciembre FROM mensualidades"
+            f"SELECT year, nombre, {_mesesLegibles(src, 'mensualidades')} FROM mensualidades"
         ).fetchall()
         dst.executemany(
             "INSERT INTO mensualidades (year, nombre, enero, febrero, marzo, abril, mayo, junio, "
@@ -277,7 +283,8 @@ def _migrateLegacyGastos(activeDbPath: Path):
         # Migrar gastos_rows
         dst.execute("DELETE FROM gastos_rows")
         srcRows = src.execute(
-            "SELECT year, month, fecha, nombre, tipo, cantidad FROM gastos_rows"
+            f"SELECT year, month, fecha, nombre, tipo, {importeLegible(src, 'gastos_rows', 'cantidad')} AS cantidad "
+            "FROM gastos_rows"
         ).fetchall()
         dst.executemany(
             "INSERT INTO gastos_rows (year, month, fecha, nombre, tipo, cantidad) VALUES (?, ?, ?, ?, ?, ?)",
@@ -304,15 +311,16 @@ def _migrateLegacyGastos(activeDbPath: Path):
             hasIng = dst.execute("SELECT 1 FROM ingresos_rows LIMIT 1").fetchone()
             if not hasIng:
                 srcIng = src.execute(
-                    "SELECT year, month, fecha, nombre, tipo, cantidad FROM ingresos_rows ORDER BY id"
+                    "SELECT year, month, fecha, nombre, tipo, "
+                    f"{importeLegible(src, 'ingresos_rows', 'cantidad')} AS cantidad FROM ingresos_rows ORDER BY id"
                 ).fetchall()
                 dst.executemany(
                     "INSERT INTO ingresos_rows (year, month, fecha, nombre, tipo, cantidad) VALUES (?,?,?,?,?,?)",
                     [(r["year"], r["month"], r["fecha"], r["nombre"], r["tipo"], r["cantidad"]) for r in srcIng]
                 )
                 srcRec = src.execute(
-                    "SELECT year, nombre, enero, febrero, marzo, abril, mayo, junio, "
-                    "julio, agosto, septiembre, octubre, noviembre, diciembre FROM ingresos_recurrentes ORDER BY id"
+                    f"SELECT year, nombre, {_mesesLegibles(src, 'ingresos_recurrentes')} "
+                    "FROM ingresos_recurrentes ORDER BY id"
                 ).fetchall()
                 dst.executemany(
                     "INSERT OR IGNORE INTO ingresos_recurrentes "
@@ -326,6 +334,12 @@ def _migrateLegacyGastos(activeDbPath: Path):
         except Exception as e:
             log.warning(f"[gastos migration] No se pudieron migrar ingresos: {e}")
 
+        # Lo copiado entra como texto: si la base de destino ya está en céntimos,
+        # se convierte ahora para no dejar filas sueltas en el formato antiguo.
+        if importeLegible(dst, "gastos_rows", "cantidad") != "cantidad":
+            convertirImportes(dst, (("gastos_rows", "cantidad"), ("ingresos_rows", "cantidad")))
+        if importeLegible(dst, "mensualidades", "enero") != "enero":
+            convertirImportes(dst, COLUMNAS_FASE_B)
         dst.commit()
         dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         dst.commit()
@@ -433,6 +447,19 @@ def _recoverMissingDb(dbPath: Path):
     log.warning(f"[portfolios] No se pudo recuperar {dbPath.name}. Se creará vacío.")
 
 
+def leerIndice() -> dict | None:
+    """El índice de portfolios tal como está en disco, sin inicializar nada.
+
+    A diferencia de `getPortfolios`, no crea el índice si falta: quien solo
+    consulta (copias de seguridad, exportaciones) no debe cambiar la BD activa
+    ni lanzar la copia de arranque como efecto lateral.
+
+    Returns:
+        El contenido de portfolios.json, o None si no existe o no se puede leer.
+    """
+    return _readMeta()
+
+
 def getPortfolios():
     meta = _readMeta()
     if meta is None:
@@ -530,6 +557,27 @@ def getPortfolioDbPath(pid: str) -> Path:
 
 
 @_conIndiceBloqueado
+def _apartarWallets(pid: str, ts: str) -> None:
+    """Mueve a data/deleted/ la carpeta de wallets de un portfolio que se borra.
+
+    Por lo mismo que sus preferencias: el id sale del nombre, y una cartera
+    nueva con ese nombre heredaba las wallets, la libreta y las lecturas de la
+    borrada, y la vigilancia en segundo plano las seguía revisando.
+
+    Args:
+        pid: Id del portfolio que se borra.
+        ts: Marca de tiempo del borrado, la misma que lleva su .db apartado.
+    """
+    try:
+        carpeta = carpetaWalletsDe(pid)
+    except ValueError:
+        # Un id con otra forma nunca ha podido tener carpeta de wallets.
+        return
+    if carpeta.exists():
+        _DELETED_DIR.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(carpeta), str(_DELETED_DIR / f"wallets_{pid}_{ts}"))
+
+
 def deletePortfolio(pid: str):
     meta = getPortfolios()
     if pid not in {p["id"] for p in meta["portfolios"]}:
@@ -561,6 +609,8 @@ def deletePortfolio(pid: str):
     if prefsFile.exists():
         _DELETED_DIR.mkdir(parents=True, exist_ok=True)
         shutil.move(str(prefsFile), str(_DELETED_DIR / f"prefs_{pid}_{ts}.json"))
+
+    _apartarWallets(pid, ts)
 
     meta["portfolios"] = [p for p in meta["portfolios"] if p["id"] != pid]
     _writeMeta(meta)

@@ -528,8 +528,16 @@ function renderStablecoinsEnabledMenu() {
     const catalog = getStablecoinCatalog()
     menu.innerHTML = ""
 
+    // Sin ninguna stablecoin el hueco se quedaba vacío: se ofrece dar de alta la
+    // primera aquí, con la misma acción que la opción del menú «···».
     if (!catalog.length) {
-        menu.classList.add("hidden")
+        menu.classList.remove("hidden")
+        const nueva = document.createElement("button")
+        nueva.type = "button"
+        nueva.className = "cuentaItem cuentaItemNueva"
+        nueva.textContent = "Añadir stablecoins"
+        nueva.addEventListener("click", openStablecoinModal)
+        menu.appendChild(nueva)
         return
     }
 

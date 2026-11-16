@@ -104,7 +104,8 @@ describe("pestañas de la ficha", () => {
         document.getElementById("planesTabBtn").click()
 
         expect(document.querySelector('.assetTabPanel[data-tab="planes"]').classList.contains("hidden")).toBe(false)
-        expect(document.getElementById("assetAddPlanNavBtn").classList.contains("hidden")).toBe(false)
+        expect(document.querySelector(".assetAddRowBar").classList.contains("hidden")).toBe(false)
+        expect(document.getElementById("addAssetRowBtn").textContent).toBe("Nuevo plan")
     })
 
     it("la pestaña lleva en el rótulo cuántos planes tiene el activo", () => {
@@ -171,7 +172,8 @@ describe("filtro por estado", () => {
 
 describe("edición", () => {
     it("el botón de alta abre la ficha vacía y sin campos de activo", () => {
-        document.getElementById("assetAddPlanNavBtn").click()
+        document.getElementById("planesTabBtn").click()
+        document.getElementById("addAssetRowBtn").click()
 
         expect(document.getElementById("planModalOverlay")).not.toBeNull()
         expect(document.getElementById("planFormNombre").value).toBe("")
@@ -185,7 +187,8 @@ describe("edición", () => {
     })
 
     it("un plan nuevo cuelga del activo de la ficha", async () => {
-        document.getElementById("assetAddPlanNavBtn").click()
+        document.getElementById("planesTabBtn").click()
+        document.getElementById("addAssetRowBtn").click()
         document.getElementById("planFormSalida").value = "200"
         document.getElementById("planModalSaveBtn").click()
         await vi.waitFor(() => expect(guardados).toHaveLength(1))

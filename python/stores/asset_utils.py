@@ -151,7 +151,10 @@ def sanitizeAssetRows(rows):
             "comisiones": fiatFee,
             "comisionesFiat": fiatFee,
             "comisionesCripto": cryptoFee,
-            "comisionesSatoshis": cryptoFee
+            "comisionesSatoshis": cryptoFee,
+            # La marca viaja hasta el guardado para que `writeAssetFile` descarte
+            # estas filas: se derivan de los dividendos, no del cliente.
+            "reinvertido": bool(row.get("reinvertido"))
         })
 
     return sanitizedRows

@@ -1,0 +1,520 @@
+/* Hipotecas y compras financiadas
+   ─────────────────────────────────────────────────────────────────
+   Las dos ventanas comparten tarjetas, barra de progreso y tablas, de ahí
+   que las clases `prestamos*` sirvan a ambas y `hipotecas*` solo a la suya. */
+
+.hipotecasPage,
+.financiadasPage {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
+    min-width: 0;
+}
+
+.hipotecasToolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.hipotecasToolbarLeft,
+.hipotecasToolbarRight {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.hipotecasSelectorLabel {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+/* El <select> lo sustituye el desplegable propio (.csWrapper/.csTrigger, ver
+   _buildCustomSelect), así que el tamaño se da a esos, no al select. La altura
+   iguala la de los botones de la barra (38 px). */
+.hipotecasToolbarLeft .csWrapper {
+    min-width: 260px;
+}
+
+.hipotecasToolbarLeft .csTrigger {
+    height: 38px;
+    padding: 0 14px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-bright);
+}
+
+.hipotecasContenido {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.hipotecasError {
+    color: var(--color-neg);
+    margin: 0;
+}
+
+.hipotecasTotales,
+.hipotecasMetricas {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
+    gap: 8px;
+}
+
+/* Sin préstamos no hay totales: vacía, la fila sumaría otro gap de la página
+   entre la barra de botones y el contenido. */
+.hipotecasTotales:empty {
+    display: none;
+}
+
+.hipotecasCard {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 7px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    transition:
+        border-color 0.15s ease,
+        background 0.15s ease;
+}
+
+.hipotecasCard:hover {
+    border-color: var(--accent);
+    background: var(--bg-elevated);
+}
+
+.hipotecasCardLabel {
+    font-size: 0.64rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+}
+
+.hipotecasCardValor {
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--text-bright);
+    font-variant-numeric: tabular-nums;
+}
+
+.hipotecasCardValor.positivo {
+    color: var(--color-pos);
+}
+
+.hipotecasCardNota {
+    font-size: 0.66rem;
+    line-height: 1.2;
+    color: var(--text-dim);
+}
+
+.hipotecasProgreso {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+    border-radius: 8px;
+    padding: 8px 14px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.hipotecasProgresoCabecera {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Pista y relleno con colores propios y sólidos: un degradado que partía de
+   --accent-deep dejaba el relleno casi negro, y con un 14 % amortizado la barra
+   no se veía. La pista lleva borde para que se distinga en los tres temas. */
+.hipotecasBarra {
+    flex: none;
+    height: 10px;
+    border-radius: 5px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-mid);
+    overflow: hidden;
+}
+
+.hipotecasBarraRelleno {
+    height: 100%;
+    min-width: 4px;
+    background: var(--accent);
+    border-radius: 5px;
+    transition: width 0.3s;
+}
+
+.hipotecasGrafico {
+    position: relative;
+    height: 300px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.hipotecasListas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 14px;
+}
+
+.hipotecasPanel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+    border-radius: 10px;
+    padding: 14px 18px;
+    min-width: 0;
+}
+
+.hipotecasPanelCabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.hipotecasPanelCabecera h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--text-subtle);
+}
+
+.hipotecasTabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.hipotecasTabla th {
+    text-align: left;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.hipotecasTabla td {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border-inset);
+    color: var(--text-subtle);
+    font-variant-numeric: tabular-nums;
+}
+
+.hipotecasTabla tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.hipotecasTabla tbody tr:hover td {
+    background: var(--bg-elevated);
+}
+
+/* El nombre de la compra es lo que se busca con la vista: más peso que las cifras. */
+.financiadasPage .hipotecasTabla td:first-child {
+    color: var(--text-bright);
+    font-weight: 600;
+}
+
+.hipotecasTabla tr.pagado td {
+    color: var(--text-dim);
+}
+
+.hipotecasTabla .acciones {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.hipotecasCuadroWrapper {
+    max-height: 420px;
+    overflow: auto;
+}
+
+.hipotecasCuadro th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-surface);
+}
+
+.hipotecasVacio {
+    margin: 8px 0 0;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+}
+
+.hipotecasLinkBtn {
+    background: none;
+    border: none;
+    border-radius: 6px;
+    padding: 3px 8px;
+    color: var(--accent-soft);
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.15s ease;
+}
+
+.hipotecasLinkBtn:hover {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.financiadasBarra {
+    min-width: 90px;
+}
+
+.financiadasTablaWrapper {
+    max-height: none;
+}
+
+/* Campo de fecha de los modales: el calendario nativo no admite CSS, así que se
+   oculta su icono y el botón abre el de la aplicación (prestamoActivarCalendarios). */
+.prestamoFechaWrap {
+    position: relative;
+}
+
+.prestamoFechaWrap input[type="date"] {
+    width: 100%;
+    padding-right: 36px;
+    font-variant-numeric: tabular-nums;
+}
+
+.prestamoFechaWrap input[type="date"]::-webkit-calendar-picker-indicator {
+    display: none;
+}
+
+.prestamoFechaWrap input[type="date"].vacio:not(:focus) {
+    color: var(--text-muted) !important;
+}
+
+.prestamoFechaBtn {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
+}
+
+.prestamoFechaBtn:hover,
+.prestamoFechaBtn.abierto {
+    background: color-mix(in srgb, var(--text-bright) 10%, transparent);
+    color: var(--text-bright);
+}
+
+.prestamoFechaBtn .icono {
+    width: 14px;
+    height: 14px;
+}
+
+/* Compras financiadas: chips, próximos cobros y detalle
+   ───────────────────────────────────────────────────────────────── */
+.financiadasFila {
+    cursor: pointer;
+}
+
+.financiadasChips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.financiadasChip {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-mid);
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.financiadasSub {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 400;
+    color: var(--text-dim);
+}
+
+.financiadasProximos {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.financiadasProximosCabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.financiadasProximosTitulo {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.financiadasProximosTotal {
+    font-size: 0.8rem;
+    color: var(--text-subtle);
+    font-variant-numeric: tabular-nums;
+}
+
+.financiadasProximosLista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 6px 14px;
+}
+
+.financiadasProximosItem {
+    display: grid;
+    grid-template-columns: 72px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-inset);
+    font-size: 0.85rem;
+    color: var(--text-subtle);
+}
+
+.financiadasProximosItem small {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+}
+
+.financiadasProximosNombre {
+    color: var(--text-bright);
+    font-weight: 600;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.financiadasProximosImporte {
+    font-weight: 700;
+    color: var(--text-bright);
+    font-variant-numeric: tabular-nums;
+}
+
+.financiadasDetalle {
+    width: min(860px, 94vw);
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.financiadasProgresoTexto {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.financiadasSeccion {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.financiadasSeccion h4,
+.financiadasSeccionTitulo {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.financiadasAnticipados {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.85rem;
+    color: var(--text-subtle);
+}
+
+.financiadasAnticipados li {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 4px 0;
+}
+
+.financiadasDetalle .hipotecasCuadroWrapper {
+    max-height: 300px;
+}
+
+.hipotecasTabla tr.financiadasProxima td {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--text-bright);
+    font-weight: 600;
+}
+
+.hipotecasSimuladorForm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-bottom: 12px;
+}
+
+.hipotecasSimuladorForm .assetModalLabel {
+    margin: 0;
+}
+
+.hipotecasSimuladorForm .assetModalInput {
+    width: auto;
+    max-width: 180px;
+}
+
+.hipotecasSimuladorForm .prestamoFechaWrap {
+    width: 180px;
+}

@@ -10,9 +10,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding-right: 18px;
     flex: 1;
-    margin-top: -6px;
 }
 
 .gastosYearBar {
@@ -76,7 +74,8 @@
 }
 
 .gastosYearList > .gastosYearBtn {
-    flex: 0 0 calc((100% - 55px) / 12);
+    flex: 0 0 auto;
+    min-width: 68px;
 }
 
 .gastosYearBtn,
@@ -85,7 +84,6 @@
     text-align: center;
 }
 
-.gastosYearBtn,
 .gastosAddYearBtn,
 .gastosMonthTab {
     min-width: 78px;
@@ -105,7 +103,6 @@
         transform 0.15s ease;
 }
 
-.gastosYearBtn:hover,
 .gastosAddYearBtn:hover,
 .gastosMonthTab:hover {
     background: var(--btn-bg-hover);
@@ -113,11 +110,38 @@
     transform: translateY(-1px);
 }
 
-.gastosYearBtn.active,
 .gastosMonthTab.active {
     background: var(--btn-active-bg);
     border-color: var(--btn-active-border);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Botón de año con el mismo aspecto que .interesesYearBtn (Cuenta remunerada,
+   Dividendos...). El ancho lo sigue fijando la lista. */
+.gastosYearBtn {
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-bright);
+    font-size: 13px;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        border-color 0.15s;
+}
+
+.gastosYearBtn:hover {
+    background: var(--bg-elevated);
+    border-color: var(--accent);
+}
+
+.gastosYearBtn.active {
+    background: var(--bg-elevated);
+    border-color: var(--accent);
+    color: var(--text-subtle);
+    box-shadow: inset 0 0 0 1px var(--accent-glow);
 }
 
 .gastosYearBtn.yearViewActive {
@@ -328,11 +352,14 @@
     background: var(--bg-surface);
     border: 1px solid var(--btn-border);
     border-radius: 10px;
-    overflow: hidden;
+    /* El JS le pone max-width y max-height según el hueco que queda en la
+       ventana: si no cabe, se desplaza en vez de dejar opciones fuera. */
+    overflow-x: hidden;
+    overflow-y: auto;
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
     min-width: 130px;
     padding: 4px;
-    white-space: nowrap;
+    white-space: normal;
     opacity: 0;
     visibility: hidden;
     transform: translateY(-6px) scale(0.97);
@@ -717,6 +744,7 @@
 .ingresosMonthTab.ingresosRecurrentesTab {
     flex: 0 0 auto;
     height: 36px;
+    width: 132px;
     min-width: 132px;
     padding: 0 14px;
     border-color: rgba(96, 165, 250, 0.35);
@@ -910,6 +938,20 @@
     overflow: hidden;
 }
 
+/* Sin filas, la tabla se reduce al mismo recuadro vacío que el resto de la app
+   (.overviewEmpty): sin cabecera, marco discontinuo y el mensaje a la izquierda. */
+.mensTableWrapper:has(.mensEmptyRow),
+.recTableWrapper:has(.recEmptyRow) {
+    border: 1px dashed var(--btn-border);
+    border-radius: 8px;
+    background: var(--bg-surface);
+}
+
+.mensTableWrapper:has(.mensEmptyRow) thead,
+.recTableWrapper:has(.recEmptyRow) thead {
+    display: none;
+}
+
 .mensTable,
 .recTable {
     width: 100%;
@@ -1006,12 +1048,14 @@
     opacity: 0.55;
 }
 
-.mensEmptyRow td,
-.recEmptyRow td {
-    padding: 34px 16px;
-    color: var(--text-muted);
-    font-size: 13px;
-    text-align: center;
+.mensTable tbody .mensEmptyRow td,
+.recTable tbody .recEmptyRow td {
+    padding: 16px 18px;
+    border-bottom: 0;
+    background: transparent;
+    color: #cbd5e1;
+    font-size: 14px;
+    text-align: left;
     white-space: normal;
 }
 
@@ -1042,6 +1086,12 @@
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.02em;
+}
+
+.mensBadge-financiada {
+    margin-left: 6px;
+    background: rgba(244, 114, 182, 0.14);
+    color: #f9a8d4;
 }
 
 .mensBadge-anual,
@@ -1375,13 +1425,12 @@
 .mensCalEmpty {
     grid-column: 1 / -1;
     margin: 0;
-    padding: 34px 16px;
-    border: 1px solid var(--border-mid);
-    border-radius: 12px;
-    background: var(--bg-panel);
-    color: var(--text-muted);
-    font-size: 13px;
-    text-align: center;
+    padding: 16px 18px;
+    border: 1px dashed var(--btn-border);
+    border-radius: 8px;
+    background: var(--bg-surface);
+    color: #cbd5e1;
+    font-size: 14px;
 }
 
 @media (max-width: 1400px) {
@@ -1465,7 +1514,13 @@
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    min-width: 180px;
+    /* Ancho de pestaña (132) + gap de la barra (16) + botón ··· (36): el menú
+       cubre de borde a borde Mensualidades/Recurrentes y ···; crece a la izquierda si el texto es más largo. */
+    /* Ancho fijo: los textos largos pasan a otra línea en vez de ensanchar el menú. */
+    width: 184px;
+    min-width: 184px;
+    max-width: 184px;
+    box-sizing: border-box;
     padding: 6px;
     border: 1px solid var(--btn-border);
     border-radius: 12px;
@@ -1482,11 +1537,32 @@
     animation: assetMenuIn 0.15s ease;
 }
 
+/* Todo lo que va dentro de un menú ··· se ajusta a su ancho: un selector con
+   ancho mínimo o una palabra larga no pueden asomar por el borde. */
+.pageActionsDropdown,
+.interesesMenuDropdown,
+.assetMenuDropdown,
+.rowMenuDropdown {
+    overflow-wrap: anywhere;
+}
+
+.pageActionsDropdown > *,
+.interesesMenuDropdown > *,
+.assetMenuDropdown > *,
+.rowMenuDropdown > *,
+.pageActionsDropdown select,
+.pageActionsDropdown .csWrapper,
+.interesesMenuDropdown select,
+.interesesMenuDropdown .csWrapper {
+    min-width: 0;
+    max-width: 100%;
+}
+
 .pageActionsItem {
     display: block;
     width: 100%;
     padding: 8px 12px;
-    white-space: nowrap;
+    white-space: normal;
     border: none;
     border-radius: 7px;
     background: transparent;
@@ -1811,4 +1887,97 @@
     .fitPageActive .ingresosActions {
         margin-top: auto;
     }
+}
+
+/* Pagos fraccionados
+   Tabla de solo lectura con anchos propios (colgroup en el HTML): las columnas de
+   importe son estrechas y a la derecha, y las de texto se reparten el resto. No
+   reutiliza .mensTable porque sus reglas por posición (nth-child) son de otra tabla. */
+.pfTable {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    background: var(--bg-panel);
+}
+
+.pfTable thead th {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-mid);
+    background: var(--bg-panel);
+    color: var(--text-bright);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.pfTable tbody td,
+.pfTable tfoot td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border-mid);
+    background: var(--bg-surface);
+    color: var(--text-bright);
+    font-size: 13px;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pfTable tbody tr {
+    cursor: pointer;
+}
+
+.pfTable tbody tr:hover td {
+    background: var(--bg-elevated);
+}
+
+.pfTable .pfNum {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.pfTable tfoot td {
+    border-bottom: 0;
+    background: var(--bg-panel);
+    font-weight: 700;
+}
+
+/* Anchos por columna (no en línea: la CSP no admite style=""). */
+.pfTable col:nth-child(1) {
+    width: 11%;
+}
+
+.pfTable col:nth-child(2) {
+    width: 21%;
+}
+
+.pfTable col:nth-child(3) {
+    width: 15%;
+}
+
+.pfTable col:nth-child(4) {
+    width: 14%;
+}
+
+.pfTable col:nth-child(5) {
+    width: 10%;
+}
+
+.pfTable col:nth-child(6) {
+    width: 10%;
+}
+
+.pfTable col:nth-child(7) {
+    width: 10%;
+}
+
+.pfTable col:nth-child(8) {
+    width: 9%;
+}
+
+.gastosMensualidadTag.esFinanciada {
+    background: rgba(244, 114, 182, 0.14);
+    color: #f9a8d4;
 }

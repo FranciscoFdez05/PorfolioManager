@@ -115,6 +115,7 @@ function renderAssetTodosSection(asset) {
                 <p class="assetVentasEmptyText">Este activo todavía no tiene compras ni operaciones.</p>
             </div>
         `
+        if (typeof syncAssetSideColumn === "function") syncAssetSideColumn()
         return
     }
 
@@ -133,9 +134,9 @@ function renderAssetTodosSection(asset) {
                 <td class="todosColFecha">${escapeHtml(fila.fecha || "")}</td>
                 <td class="todosColTipo ${tipoClass}">${escapeHtml(tipo)}</td>
                 <td class="todosColNum todosColParticipaciones">${fila.participaciones || ""}</td>
-                <td class="todosColNum todosColPrecio">${fila.precio || ""}</td>
-                <td class="todosColNum todosColImporte">${fila.importe || ""}</td>
-                <td class="todosColNum todosColComisiones">${fila.comisiones || ""}</td>
+                <td class="todosColNum todosColPrecio">${fila.precio || "—"}</td>
+                <td class="todosColNum todosColImporte">${fila.importe || "—"}</td>
+                <td class="todosColNum todosColComisiones">${fila.comisiones || "—"}</td>
             </tr>
         `
         })
@@ -162,7 +163,39 @@ function renderAssetTodosSection(asset) {
     bindTableSort(section.querySelector("table"), "assetTodos")
     applyAssetTodosGrid()
     renderAssetTodosChartsColumn(asset)
+    if (typeof syncAssetSideColumn === "function") syncAssetSideColumn()
+    fitAssetTodosTableHeight()
 }
+
+// Tarjeta que cuenta como plegada en la vista base: la del medio. El alto de la
+// tabla se calcula siempre contra esa disposición, de modo que desplegar o
+// plegar otros gráficos no la estire ni la encoja.
+const ASSET_TODOS_BASE_COLLAPSED_CHART = "todosChartVentas"
+
+// Limita el alto de la tabla al de la columna de gráficos en su vista base. Se
+// mide plegando/desplegando las tarjetas un instante y restaurándolas antes de
+// que el navegador pinte, así que no hay parpadeo.
+function fitAssetTodosTableHeight() {
+    const columna = document.getElementById("assetTodosChartsCol")
+    const layout = document.getElementById("assetTodosLayout")
+    const contenedor = document.querySelector(".assetTabsContainer")
+    const wrapper = document.querySelector("#assetTodosSection .assetTableWrapper")
+    if (!columna || !layout || !contenedor || !wrapper || columna.offsetParent === null) return
+
+    const tarjetas = [...columna.querySelectorAll(".todosChartCard")]
+    const estadoPrevio = tarjetas.map((tarjeta) => tarjeta.classList.contains("todosChartCardPlegada"))
+    tarjetas.forEach((tarjeta) => {
+        tarjeta.classList.toggle("todosChartCardPlegada", tarjeta.dataset.chart === ASSET_TODOS_BASE_COLLAPSED_CHART)
+    })
+    const altoBase = columna.offsetHeight
+    tarjetas.forEach((tarjeta, i) => tarjeta.classList.toggle("todosChartCardPlegada", estadoPrevio[i]))
+
+    const marco = contenedor.offsetHeight - wrapper.offsetHeight
+    const altoMax = altoBase - marco
+    if (altoMax > 0) layout.style.setProperty("--todosTablaAltoMax", `${altoMax}px`)
+}
+
+window.addEventListener("resize", fitAssetTodosTableHeight)
 
 // Los quesitos viven fuera del recuadro de la tabla, en su propia columna al
 // lado: dentro alargaban el panel muy por debajo de la última fila. Siguen
@@ -615,6 +648,7 @@ function renderAssetVentasSection(asset) {
                 <p class="assetVentasEmptyText">No hay ventas registradas para este activo.</p>
             </div>
         `
+        if (typeof syncAssetSideColumn === "function") syncAssetSideColumn()
         return
     }
 
@@ -660,6 +694,7 @@ function renderAssetVentasSection(asset) {
         </div>
     `
     bindTableSort(section.querySelector("table"), "assetVentas")
+    if (typeof syncAssetSideColumn === "function") syncAssetSideColumn()
 }
 
 function openAssetAddVentaModal(asset) {

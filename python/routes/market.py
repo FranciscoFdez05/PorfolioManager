@@ -38,6 +38,7 @@ from stores.helpers import (
     parseLooseNumber,
 )
 from stores.market_data import fetchAssetQuote
+from stores.mercado_ficha import fichaMercado
 
 log = logging.getLogger(__name__)
 
@@ -461,6 +462,27 @@ def getTradingViewStats():
     return jsonify({"ok": True, "data": stats})
 
 
+@marketBp.route("/api/market/ficha", methods=["GET"])
+def getMarketFicha():
+    """Información de mercado de un activo (pestaña "Mercado" de su ficha).
+
+    El ticker llega ya resuelto por el frontend (`buildTVSymbol`): aquí no se
+    adivina ni se completa.
+    """
+    ticker = str(request.args.get("symbol", "")).strip().upper()
+    if ":" not in ticker:
+        return jsonify({"ok": False, "error": "symbol requerido con mercado (MERCADO:TICKER)"}), 400
+
+    try:
+        data = fichaMercado(ticker)
+    except HTTPError as error:
+        return jsonify({"ok": False, "error": f"TradingView devolvió HTTP {error.code}"}), 503
+    except URLError as error:
+        return jsonify({"ok": False, "error": f"No se pudo conectar con TradingView: {motivoConexion(error, 'TradingView')}"}), 503
+
+    return jsonify({"ok": True, **data})
+
+
 @marketBp.route("/api/market/quote", methods=["GET"])
 def getMarketQuote():
     symbol = str(request.args.get("symbol", "")).strip().upper()
@@ -501,3 +523,29 @@ def getMarketSeries():
     except (series_tradingview.PeriodoInvalido, series_tradingview.SimbolosInvalidos) as error:
         return jsonify({"ok": False, "error": str(error)}), 400
     return jsonify({"ok": True, "periodo": periodo, "series": series})
+
+
+@marketBp.route("/api/market/historico", methods=["GET"])
+def getMarketHistorico():
+    """Todas las velas diarias de un ticker con su divisa, para los estacionales de la ficha.
+
+    `?symbol=BITSTAMP:BTCUSD` -> `{"ok": true, "simbolo", "divisa", "data": [[ts, cierre], ...]}`.
+    Sin velas (ticker desconocido o feed caído) responde `divisa: null` y `data: []`:
+    el frontend usa entonces el histórico propio del activo.
+    """
+    try:
+        simbolos = series_tradingview.normalizarSimbolos([str(request.args.get("symbol", ""))])
+    except series_tradingview.SimbolosInvalidos as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
+    if not simbolos:
+        return jsonify({"ok": False, "error": "Ticker no válido"}), 400
+    simbolo = simbolos[0]
+    # «TODO» sin fecha de inicio pide el máximo de velas diarias que da el feed.
+    velas = series_tradingview.velasDelGrafico(simbolo, "TODO")
+    divisa, cierres = velas if velas else (None, [])
+    return jsonify({
+        "ok": True,
+        "simbolo": simbolo,
+        "divisa": divisa,
+        "data": [[vela[0], vela[1]] for vela in cierres],
+    })

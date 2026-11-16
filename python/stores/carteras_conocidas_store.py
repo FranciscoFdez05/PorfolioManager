@@ -29,8 +29,9 @@ from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from core import bloqueo, paths
+from core import bloqueo
 from core.escritura import escribirAtomico
+from core.wallets_carpeta import carpetaWalletsActiva
 from stores.wallets_store import LARGO_MINIMO_SECRET_KEY, AlmacenIlegible, CifradoNoDisponible, fernetWallets
 
 log = logging.getLogger(__name__)
@@ -144,7 +145,7 @@ class CarterasUsuarioRepository:
 
     @property
     def ruta(self) -> Path:
-        return self._ruta if self._ruta is not None else paths.API_DIR / NOMBRE_FICHERO
+        return self._ruta if self._ruta is not None else carpetaWalletsActiva() / NOMBRE_FICHERO
 
     def _fernet(self) -> Fernet:
         fernet = self._proveedorFernet()

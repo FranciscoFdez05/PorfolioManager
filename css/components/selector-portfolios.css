@@ -24,6 +24,14 @@
         inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
+/* Abierto: el botón se ensancha al ancho del menú (lo fija portfolios.js). */
+.portfolioSwitcherBtn.portfolioSwitcherBtnOpen {
+    max-width: none;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+}
+
 .portfolioSwitcherBtn:hover {
     background: linear-gradient(135deg, #1e3a5f 0%, #142640 100%) !important;
     border-color: #4f96f0 !important;

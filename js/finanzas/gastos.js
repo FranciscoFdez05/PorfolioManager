@@ -73,6 +73,10 @@ function normalizeMensualidad(row = {}) {
         nota: String(row.nota || ""),
         // Vacía = cuenta bancaria, como en los gastos.
         cuenta: String(row.cuenta || ""),
+        // Pago de una deuda (compra financiada, hipoteca o microcrédito): lo genera
+        // el servidor y no se edita aquí.
+        financiacionId: String(row.financiacionId || ""),
+        origen: String(row.origen || ""),
         // Meses que se cobran con otra cuenta que la habitual: {marzo: "tarjeta"}.
         cuentasCobro: normalizeMensualidadCuentas(row.cuentasCobro),
         meses
@@ -405,7 +409,8 @@ function getMensualidadesParaCopiar(origen, destino) {
     let omitidas = 0
     ;(origen || []).forEach((row) => {
         const clave = normalizeComparableGastoText(row?.nombre || "")
-        if (!clave) {
+        // Las cuotas financiadas ya las genera el servidor en cada año.
+        if (!clave || row?.financiacionId) {
             return
         }
         if (existentes.has(clave)) {
@@ -1803,7 +1808,7 @@ async function openGastoFraccionadoModal(rowIndex = -1) {
 
             <span class="assetModalLabel">Lo que te devuelven</span>
             <div id="gastosFraccionadoDevoluciones" class="fraccionadoDevoluciones"></div>
-            <button type="button" class="cancelButton" id="gastosFraccionadoAnadir">+ Añadir devolución</button>
+            <button type="button" class="cancelButton" id="gastosFraccionadoAnadir">Añadir devolución</button>
             <p class="assetModalLabelHint" id="gastosFraccionadoResumen"></p>
 
             <label class="assetModalLabel" for="gastosFraccionadoNota">Nota <span class="assetModalLabelHint">opcional</span></label>
@@ -2475,7 +2480,10 @@ function renderGastosAnnualTable() {
             if (!row.activa && !gastosMostrarPausadas) {
                 return
             }
-            const meta = [getMensualidadFrecuencia(row.frecuencia).short, row.diaCobro ? `día ${row.diaCobro}` : ""]
+            const meta = [
+                row.financiacionId ? origenDeudaDeFila(row).etiqueta : getMensualidadFrecuencia(row.frecuencia).short,
+                row.diaCobro ? `día ${row.diaCobro}` : ""
+            ]
                 .filter(Boolean)
                 .join(" · ")
             const tr = document.createElement("tr")
@@ -2497,12 +2505,16 @@ function renderGastosAnnualTable() {
                     <div class="rowMenu">
                         <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                         <div class="rowMenuDropdown">
-                            <button type="button" class="rowMenuItem" data-gastos-move-manual-row="${rowIndex}" data-gastos-move-dir="up" ${rowIndex === 0 ? "disabled" : ""}>▲ Subir</button>
+                            ${
+                                row.financiacionId
+                                    ? `<button type="button" class="rowMenuItem" data-mens-ir-deuda="${origenDeudaDeFila(row).pagina}">Ver en ${origenDeudaDeFila(row).ventana}</button>`
+                                    : `<button type="button" class="rowMenuItem" data-gastos-move-manual-row="${rowIndex}" data-gastos-move-dir="up" ${rowIndex === 0 ? "disabled" : ""}>▲ Subir</button>
                             <button type="button" class="rowMenuItem" data-gastos-move-manual-row="${rowIndex}" data-gastos-move-dir="down" ${rowIndex === totalMensualidades - 1 ? "disabled" : ""}>▼ Bajar</button>
                             <hr>
                             <button type="button" class="rowMenuItem assetRowEditBtn gastosAnnualEditBtn" data-annual-edit-manual="${rowIndex}">Editar</button>
                             <hr>
-                            <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn" data-gastos-delete-manual-row="${rowIndex}">Eliminar</button>
+                            <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn" data-gastos-delete-manual-row="${rowIndex}">Eliminar</button>`
+                            }
                         </div>
                     </div>
                 </td>
@@ -2517,10 +2529,13 @@ function renderGastosAnnualTable() {
     gastosRow.innerHTML = `<td colspan="14">Gastos</td>`
     annualBody.appendChild(gastosRow)
 
-    const typesWithData = visibleTypes.filter((type) =>
+    // «Pagos fraccionados» ni se enseña ni suma: lo adelantado a otros no es un
+    // gasto tuyo (tu parte ya está en su categoría) y se consulta en su página.
+    const shownTypes = visibleTypes.filter((type) => !mismoTipoGasto(type, TIPO_GASTO_FRACCIONADO))
+    const typesWithData = shownTypes.filter((type) =>
         GASTOS_MONTHS.some((month) => expenseTotals[type][month.key] > 0)
     )
-    const typesEmpty = visibleTypes.filter((type) => GASTOS_MONTHS.every((month) => !expenseTotals[type][month.key]))
+    const typesEmpty = shownTypes.filter((type) => GASTOS_MONTHS.every((month) => !expenseTotals[type][month.key]))
 
     // Los índices de las acciones apuntan a la lista completa de tipos guardados.
     const storedTypes = getAvailableGastosTypes()
@@ -2560,13 +2575,21 @@ function renderGastosAnnualTable() {
 
     typesEmpty.forEach(renderTypeRow)
 
+    // Botón temporal: solo existe mientras no haya ninguna categoría.
+    if (!shownTypes.length) {
+        const emptyRow = document.createElement("tr")
+        emptyRow.className = "categoriasVaciasRow"
+        emptyRow.innerHTML = `<td colspan="14"><button type="button" class="catAddBtn catAddBtnTabla" data-abrir-categorias="gasto">Añadir categorías</button></td>`
+        annualBody.appendChild(emptyRow)
+    }
+
     // Las mensualidades son una categoría más, así que el total del año ya las incluye.
     const grandTotalRow = document.createElement("tr")
     grandTotalRow.className = "gastosTotalRow"
     grandTotalRow.innerHTML = `
         <td>TOTAL</td>
         ${GASTOS_MONTHS.map((month) => {
-            const totalGastos = visibleTypes.reduce((sum, type) => sum + expenseTotals[type][month.key], 0)
+            const totalGastos = shownTypes.reduce((sum, type) => sum + expenseTotals[type][month.key], 0)
             return `<td>${formatEuro(mensualidadesMonthTotals[month.key] + totalGastos)}</td>`
         }).join("")}
         <td></td>
@@ -2650,6 +2673,11 @@ function handleGastosEyeClick(event) {
 }
 
 function handleGastosAnnualEditClick(event) {
+    const irDeudaBtn = event.target.closest("[data-mens-ir-deuda]")
+    if (irDeudaBtn) {
+        irAVentanaDeDeuda(irDeudaBtn.dataset.mensIrDeuda)
+        return
+    }
     const editManualBtn = event.target.closest("[data-annual-edit-manual]")
     if (editManualBtn) {
         openMensualidadEditModal(Number(editManualBtn.dataset.annualEditManual))
@@ -3021,7 +3049,7 @@ function renderMensualidadesTable() {
             return `
             <tr class="movDetailRow${row.activa ? "" : " mensRowPaused"}" data-mens-index="${index}">
                 <td class="mensColName">
-                    <span class="mensNameMain">${escapeGastosHtml(row.nombre)}</span>
+                    <span class="mensNameMain">${escapeGastosHtml(row.nombre)}${row.financiacionId ? ` <span class="mensBadge mensBadge-financiada">${origenDeudaDeFila(row).etiqueta}</span>` : ""}</span>
                     ${row.nota ? `<span class="mensNameNote" title="${escapeGastosHtml(row.nota)}">${escapeGastosHtml(row.nota)}</span>` : ""}
                 </td>
                 <td title="${escapeGastosHtml(cuentasTitle)}">${escapeGastosHtml(nombreDeCuenta(row.cuenta))}${cuentasAparte ? `<span class="mensNextHint">${cuentasAparte} mes${cuentasAparte === 1 ? "" : "es"} aparte</span>` : ""}</td>
@@ -3036,13 +3064,17 @@ function renderMensualidadesTable() {
                     <div class="rowMenu">
                         <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                         <div class="rowMenuDropdown">
-                            <button type="button" class="rowMenuItem" data-mens-edit="${index}">Editar</button>
+                            ${
+                                row.financiacionId
+                                    ? `<button type="button" class="rowMenuItem" data-mens-ir-deuda="${origenDeudaDeFila(row).pagina}">Ver en ${origenDeudaDeFila(row).ventana}</button>`
+                                    : `<button type="button" class="rowMenuItem" data-mens-edit="${index}">Editar</button>
                             <button type="button" class="rowMenuItem" data-mens-move="${index}" data-mens-swap="${prevIndex ?? ""}" ${prevIndex === null ? "disabled" : ""}>▲ Subir</button>
                             <button type="button" class="rowMenuItem" data-mens-move="${index}" data-mens-swap="${nextIndex ?? ""}" ${nextIndex === null ? "disabled" : ""}>▼ Bajar</button>
                             <button type="button" class="rowMenuItem" data-mens-toggle="${index}">${row.activa ? "Pausar" : "Reactivar"}</button>
                             <button type="button" class="rowMenuItem" data-mens-duplicate="${index}">Duplicar</button>
                             <hr>
-                            <button type="button" class="rowMenuItem rowMenuItemDanger" data-mens-delete="${index}">Eliminar</button>
+                            <button type="button" class="rowMenuItem rowMenuItemDanger" data-mens-delete="${index}">Eliminar</button>`
+                            }
                         </div>
                     </div>
                 </td>
@@ -3270,9 +3302,41 @@ function renderMensualidadesCalendar() {
     `
 }
 
+// Los pagos de las deudas solo se cambian desde su ventana: aquí se regeneran en
+// cada guardado, así que cualquier edición se perdería.
+function esMensualidadFinanciada(index) {
+    return Boolean(currentGastosData?.mensualidades?.[index]?.financiacionId)
+}
+
+const GASTOS_ORIGENES_DEUDA = {
+    financiada: { etiqueta: "Financiada", pagina: "financiadas", ventana: "Compras financiadas", tipo: "Compra financiada" },
+    hipoteca: { etiqueta: "Hipoteca", pagina: "hipotecas", ventana: "Hipotecas", tipo: "Hipoteca" },
+    microcredito: { etiqueta: "Microcrédito", pagina: "microcreditos", ventana: "Microcréditos", tipo: "Microcrédito" }
+}
+
+// De qué deuda viene una mensualidad generada, o null si es una normal. Sin
+// `origen` (servidor antiguo) se trata como compra financiada, que era lo único.
+function origenDeudaDeFila(row) {
+    if (!row?.financiacionId) return null
+    return GASTOS_ORIGENES_DEUDA[row.origen] || GASTOS_ORIGENES_DEUDA.financiada
+}
+
+function irAVentanaDeDeuda(pagina) {
+    document.querySelector(`.navBtn[data-page="${pagina}"]`)?.click()
+}
+
 function handleMensualidadesActionClick(event) {
+    const irDeudaBtn = event.target.closest("[data-mens-ir-deuda]")
+    if (irDeudaBtn) {
+        irAVentanaDeDeuda(irDeudaBtn.dataset.mensIrDeuda)
+        return
+    }
+
     const editBtn = event.target.closest("[data-mens-edit]")
     if (editBtn) {
+        if (esMensualidadFinanciada(Number(editBtn.dataset.mensEdit))) {
+            return
+        }
         openMensualidadFormModal(Number(editBtn.dataset.mensEdit))
         return
     }
@@ -3298,7 +3362,7 @@ function handleMensualidadesActionClick(event) {
     if (toggleBtn) {
         const index = Number(toggleBtn.dataset.mensToggle)
         const row = currentGastosData?.mensualidades?.[index]
-        if (!row) {
+        if (!row || row.financiacionId) {
             return
         }
 
@@ -3315,7 +3379,7 @@ function handleMensualidadesActionClick(event) {
     if (duplicateBtn) {
         const index = Number(duplicateBtn.dataset.mensDuplicate)
         const row = currentGastosData?.mensualidades?.[index]
-        if (!row) {
+        if (!row || row.financiacionId) {
             return
         }
 
@@ -3352,7 +3416,7 @@ function handleMensualidadesActionClick(event) {
     const index = Number(deleteBtn.dataset.mensDelete)
     const row = currentGastosData?.mensualidades?.[index]
 
-    if (!row) {
+    if (!row || row.financiacionId) {
         return
     }
 
@@ -3517,7 +3581,8 @@ function getMensualidadesDelMes(monthKey) {
                 cargo: {
                     fecha: cargo.sinDia ? "" : formatGastoCargoDate(cargo.date),
                     nombre: row.nombre,
-                    tipo: row.categoria || "Mensualidad",
+                    tipo: row.categoria || origenDeudaDeFila(row)?.tipo || "Mensualidad",
+                    deuda: origenDeudaDeFila(row),
                     importe: row.meses[monthKey],
                     cuenta: row.cuentasCobro[monthKey] || row.cuenta,
                     activa: row.activa,
@@ -3532,11 +3597,13 @@ function buildMensualidadCargoRow(cargo) {
     tr.className = cargo.realizada ? "gastosMensualidadRow isRealizada" : "gastosMensualidadRow"
     // Que ni el guardado ni la ordenación la tomen por un gasto del mes.
     tr.dataset.mensualidad = "true"
-    tr.title = "Mensualidad: se gestiona en la pestaña Mensualidades y no suma al total del mes"
+    tr.title = cargo.deuda
+        ? `${cargo.deuda.tipo}: se gestiona en ${cargo.deuda.ventana} y no suma al total del mes`
+        : "Mensualidad: se gestiona en la pestaña Mensualidades y no suma al total del mes"
     tr.innerHTML = `
         <td data-field="fecha">${escapeGastosHtml(cargo.fecha)}</td>
         <td data-field="cuenta">${escapeGastosHtml(nombreDeCuenta(cargo.cuenta))}</td>
-        <td data-field="nombre">${escapeGastosHtml(cargo.nombre)}<span class="gastosMensualidadTag">Mensualidad</span></td>
+        <td data-field="nombre">${escapeGastosHtml(cargo.nombre)}<span class="gastosMensualidadTag${cargo.deuda ? " esFinanciada" : ""}">${cargo.deuda ? cargo.deuda.etiqueta : "Mensualidad"}</span></td>
         <td data-field="tipo">${escapeGastosHtml(cargo.tipo)}</td>
         <td data-field="cantidad">${formatCellEuroValue(cargo.importe)}</td>
         <td class="rowActionsCell"></td>

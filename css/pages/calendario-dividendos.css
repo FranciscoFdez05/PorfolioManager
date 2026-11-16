@@ -152,9 +152,10 @@
     background: var(--btn-active-bg);
     border: 1px solid var(--btn-active-border);
     color: var(--btn-active-text);
-    font-size: 18px;
+    font-size: 12px;
     line-height: 1;
-    width: 28px;
+    min-width: 28px;
+    padding: 0 8px;
     height: 28px;
     border-radius: 5px;
     cursor: pointer;

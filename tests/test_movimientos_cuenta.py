@@ -139,7 +139,9 @@ def testElConceptoPuedeIrEnBlanco(app, payload):
     tabla = "gastos_rows" if payload["tipo"] == "gasto" else "ingresos_rows"
     fila = _filas(tabla)[0]
     assert fila["nombre"] == ""
-    assert fila["cantidad"] == "5,00 €"
+    # El importe se guarda en céntimos; la columna de texto queda vacía.
+    assert fila["cantidad_cent"] == 500
+    assert fila["cantidad"] == ""
 
 
 def testPrepararAceptaUnMovimientoSinConcepto(app):

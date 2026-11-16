@@ -295,6 +295,12 @@ function _buildInlineSelect(sel) {
         buildOptions()
         menu.style.display = "flex"
         trigger.classList.add("open")
+        // Si no cabe debajo y arriba hay más sitio, se despliega hacia arriba.
+        menu.classList.remove("arriba")
+        const caja = menu.getBoundingClientRect()
+        const disparador = trigger.getBoundingClientRect()
+        const sitioAbajo = window.innerHeight - disparador.bottom
+        if (caja.bottom > window.innerHeight && disparador.top > sitioAbajo) menu.classList.add("arriba")
         // En un menú con scroll, la opción elegida tiene que verse al abrirlo.
         const activa = menu.querySelector(".ajustesDropOption.active")
         if (activa) menu.scrollTop = activa.offsetTop - (menu.clientHeight - activa.offsetHeight) / 2
@@ -380,6 +386,7 @@ async function initAjustesLogic() {
     _initAjustesTelegram()
     _initAjustesGeneral(settings, _fiatCurrencies)
     _initAjustesCopias()
+    _initAjustesExportarCsv()
     _initAjustesEstadoApis()
     _initAjustesAtajoHttps()
     _initAjustesCredenciales()
@@ -624,14 +631,127 @@ function initAjustesTema() {
     })
 }
 
+// Un temporizador por mensaje: con un setTimeout suelto por llamada, el cierre
+// de un aviso anterior borraba el siguiente antes de que se pudiera leer.
+const _temporizadoresMsg = new WeakMap()
+const _temporizadoresSeccion = new WeakMap()
+const _MSG_DURACION_MIN_MS = 3000
+const _MSG_DURACION_MAX_MS = 9000
+// Lectura media cómoda: los avisos largos (restauraciones parciales, errores
+// del servidor) no deben irse a los mismos 3 s que un «Guardado».
+const _MSG_MS_POR_CARACTER = 60
+const _SECCION_DESTELLO_MS = 1200
+
+/**
+ * Duración visible de un aviso terminado, según lo largo que sea.
+ *
+ * @param {string} text Texto del aviso.
+ * @returns {number} Milisegundos antes de cerrarlo.
+ */
+function _duracionMsg(text) {
+    const segunTexto = String(text).length * _MSG_MS_POR_CARACTER
+    return Math.min(_MSG_DURACION_MAX_MS, Math.max(_MSG_DURACION_MIN_MS, segunTexto))
+}
+
+/**
+ * Construye la píldora del aviso: icono de estado, texto y barra de progreso.
+ *
+ * @param {string} text Texto del aviso.
+ * @param {string} type "ok", "error" o vacío (operación en curso).
+ * @param {number} duracionMs Cuenta atrás de la barra en los avisos terminados.
+ * @returns {HTMLElement} Elemento listo para insertar.
+ */
+function _crearChipMsg(text, type, duracionMs) {
+    const chip = document.createElement("span")
+    chip.className = "ajustesStatusChip"
+    chip.style.setProperty("--ajustesMsgDuracion", `${duracionMs}ms`)
+
+    const icono = document.createElement("span")
+    icono.setAttribute("aria-hidden", "true")
+    if (type === "ok") icono.className = "ajustesStatusIcono icono iconoOk"
+    else if (type === "error") icono.className = "ajustesStatusIcono icono iconoError"
+    else icono.className = "ajustesStatusIcono ajustesStatusGiro"
+
+    const texto = document.createElement("span")
+    texto.className = "ajustesStatusTexto"
+    texto.textContent = text
+
+    const barra = document.createElement("span")
+    barra.className = "ajustesStatusBarra"
+    barra.setAttribute("aria-hidden", "true")
+    const relleno = document.createElement("span")
+    relleno.className = "ajustesStatusRelleno"
+    barra.appendChild(relleno)
+
+    chip.append(icono, texto, barra)
+    return chip
+}
+
+/**
+ * Refleja en la tarjeta de Ajustes que contiene el aviso si hay una operación
+ * en curso (barra indeterminada arriba) o si acaba de terminar (destello).
+ *
+ * @param {HTMLElement} el Contenedor del aviso.
+ * @param {string} estado "pendiente", "ok", "error" o vacío.
+ */
+function _marcarSeccionMsg(el, estado) {
+    const seccion = el.closest(".ajustesSection")
+    if (!seccion) return
+    // Una tarjeta puede tener varios avisos: sigue ocupada mientras quede alguno en curso.
+    seccion.classList.toggle(
+        "ajustesSeccionOcupada",
+        !!seccion.querySelector(".ajustesStatusMsg.pendiente:not(:empty)")
+    )
+    if (estado !== "ok" && estado !== "error") return
+
+    clearTimeout(_temporizadoresSeccion.get(seccion))
+    seccion.classList.remove("ajustesSeccionHecha", "ajustesSeccionFallo")
+    // Forzar el reflujo reinicia la animación si llegan dos avisos seguidos.
+    void seccion.offsetWidth
+    const clase = estado === "ok" ? "ajustesSeccionHecha" : "ajustesSeccionFallo"
+    seccion.classList.add(clase)
+    _temporizadoresSeccion.set(
+        seccion,
+        setTimeout(() => seccion.classList.remove(clase), _SECCION_DESTELLO_MS)
+    )
+}
+
+/**
+ * Muestra un aviso de estado en Ajustes.
+ *
+ * Con type vacío la operación sigue en curso (icono girando y barra
+ * indeterminada); con "ok" o "error" el aviso se cierra solo y la barra hace
+ * de cuenta atrás. Un texto vacío lo borra.
+ *
+ * @param {HTMLElement|null} el Contenedor .ajustesStatusMsg.
+ * @param {string} text Texto del aviso.
+ * @param {string} [type] "ok", "error" o vacío.
+ */
 function showMsg(el, text, type) {
     if (!el) return
-    el.textContent = text
-    el.className = "ajustesStatusMsg" + (type ? " " + type : "")
-    if (type === "ok" || type === "error") {
-        setTimeout(() => {
-            if (el) el.textContent = ""
-        }, 3000)
+    clearTimeout(_temporizadoresMsg.get(el))
+    const terminado = type === "ok" || type === "error"
+    const estado = text ? (terminado ? type : "pendiente") : ""
+    el.className = "ajustesStatusMsg" + (estado ? " " + estado : "")
+    el.setAttribute("aria-live", "polite")
+
+    if (!text) {
+        el.textContent = ""
+        _marcarSeccionMsg(el, "")
+        return
+    }
+
+    const duracionMs = _duracionMsg(text)
+    el.replaceChildren(_crearChipMsg(text, type, duracionMs))
+    _marcarSeccionMsg(el, estado)
+    if (terminado) {
+        _temporizadoresMsg.set(
+            el,
+            setTimeout(() => {
+                el.textContent = ""
+                el.className = "ajustesStatusMsg"
+            }, duracionMs)
+        )
     }
 }
 
@@ -746,7 +866,8 @@ const _MODULOS_PRESENTACION = {
     herramientas: { icono: "iconoDecimales", descripcion: "Calculadoras y utilidades" },
     metricas: { icono: "iconoGraficoBarras", descripcion: "Gráficos y análisis del portfolio" },
     alertas: { icono: "iconoAviso", descripcion: "Caídas bruscas y alertas de precio por Telegram" },
-    gastos: { icono: "iconoBillete" }
+    gastos: { icono: "iconoBillete" },
+    misFinanzas: { icono: "iconoEscudo" }
 }
 
 function _modulosDelMenu() {
@@ -765,7 +886,7 @@ function _modulosDelMenu() {
         const { icono, descripcion } = _MODULOS_PRESENTACION[el.dataset.module] ?? {}
         return {
             id: el.dataset.module,
-            nombre: boton.textContent.replace("▾", "").trim(),
+            nombre: boton.dataset.nombreBase ?? boton.textContent.replace("▾", "").trim(),
             icono: icono ?? "iconoModulos",
             detalle: secciones.join(" · ") || descripcion || ""
         }

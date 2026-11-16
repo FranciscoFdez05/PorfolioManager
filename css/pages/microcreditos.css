@@ -1,0 +1,195 @@
+/* Microcréditos
+   ─────────────────────────────────────────────────────────────────
+   Reutiliza tarjetas, tablas y barra de progreso de hipotecas.css
+   (`hipotecas*`); aquí solo lo propio: estados, chips y vencimientos. */
+
+.microcreditosPage {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
+    min-width: 0;
+}
+
+.microcreditosPage .hipotecasTabla td:first-child {
+    color: var(--text-bright);
+    font-weight: 600;
+}
+
+.microcreditosFila {
+    cursor: pointer;
+}
+
+.microcreditosBarra {
+    min-width: 90px;
+}
+
+.microcreditosTablaWrapper {
+    max-height: none;
+}
+
+.microcreditosChips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.microcreditosChip {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-mid);
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.microcreditosSub {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 400;
+    color: var(--text-dim);
+}
+
+/* Estado: el color solo no basta para distinguirlos, por eso el texto va siempre. */
+.microcreditosBadge {
+    display: inline-block;
+    padding: 1px 10px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+.microcreditosBadge.activo {
+    color: var(--accent-soft);
+}
+
+.microcreditosBadge.vencido {
+    color: var(--color-neg);
+}
+
+.microcreditosBadge.devuelto {
+    color: var(--color-pos);
+}
+
+.hipotecasCardValor.negativo {
+    color: var(--color-neg);
+}
+
+.microcreditosProximos {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.microcreditosProximosCabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.microcreditosProximosTitulo {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.microcreditosProximosTotal {
+    font-size: 0.8rem;
+    color: var(--text-subtle);
+    font-variant-numeric: tabular-nums;
+}
+
+.microcreditosProximosLista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 6px 14px;
+}
+
+.microcreditosProximosItem {
+    display: grid;
+    grid-template-columns: 72px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-inset);
+    font-size: 0.85rem;
+    color: var(--text-subtle);
+}
+
+.microcreditosProximosItem.vencido .microcreditosProximosFecha small,
+.microcreditosProximosItem.vencido .microcreditosProximosImporte {
+    color: var(--color-neg);
+}
+
+.microcreditosProximosItem small {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+}
+
+.microcreditosProximosNombre {
+    color: var(--text-bright);
+    font-weight: 600;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.microcreditosProximosImporte {
+    font-weight: 700;
+    color: var(--text-bright);
+    font-variant-numeric: tabular-nums;
+}
+
+.microcreditosDetalle {
+    width: min(820px, 94vw);
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.microcreditosProgresoTexto {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.microcreditosSeccionTitulo {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.microcreditosDetalle .hipotecasCuadroWrapper {
+    max-height: 300px;
+}
+
+.hipotecasTabla tr.microcreditosProxima td {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--text-bright);
+    font-weight: 600;
+}

@@ -238,7 +238,10 @@ def _safetyCopyBeforeRestore() -> Path | None:
         # Una copia con wallets las sustituye; aquí van tal como están en API/,
         # cifradas las propias, para poder volver atrás.
         for fichero in wallets_copia.ficherosGuardados():
-            shutil.copy2(str(fichero), str(destDir / fichero.name))
+            # Con su carpeta de portfolio: wallets.key se repite en cada uno.
+            destino = destDir / "API" / fichero.relative_to(paths.API_DIR)
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(str(fichero), str(destino))
         log.info(f"[backup] Copia previa al restore guardada en {destDir}")
         _podarCopiasPrevias(destDir.parent)
         return destDir

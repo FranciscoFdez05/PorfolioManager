@@ -1,0 +1,45 @@
+<section class="gastosPage pfPage">
+    <div class="gastosYearBar">
+        <div class="overviewSearch tablaBusqueda" data-busca-en="#pfBody">
+            <button class="overviewSearchBtn" type="button" aria-label="Buscar en los pagos" title="Buscar en los pagos">
+                <span class="icono iconoBuscar" aria-hidden="true"></span>
+            </button>
+            <input type="text" class="overviewSearchInput" aria-label="Buscar en los pagos" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        </div>
+        <div class="overviewDivider tablaBusquedaDivisor"></div>
+        <div class="gastosYearList" id="pfYearList"></div>
+    </div>
+
+    <div class="mensSummary" id="pfSummary"></div>
+
+    <p class="overviewEmpty hidden" id="pfEmptyMsg">No hay pagos fraccionados en este año. Se añaden desde Gastos › Añadir gasto › Gasto fraccionado.</p>
+
+    <div class="mensTableWrapper" id="pfTableWrapper">
+        <table class="pfTable">
+            <colgroup>
+                <col>
+                <col>
+                <col>
+                <col>
+                <col>
+                <col>
+                <col>
+                <col>
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Concepto</th>
+                    <th>Tipo</th>
+                    <th>Pagado con</th>
+                    <th class="pfNum">Total pagado</th>
+                    <th class="pfNum">Tu parte</th>
+                    <th class="pfNum">Te devuelven</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody id="pfBody"></tbody>
+            <tfoot id="pfFoot"></tfoot>
+        </table>
+    </div>
+</section>

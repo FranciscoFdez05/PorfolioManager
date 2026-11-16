@@ -9,6 +9,8 @@ from decimal import Decimal
 
 import pytest
 
+from core.wallets_carpeta import carpetaWalletsActiva
+
 from core.db import getDb
 from providers.blockchain_clients import (
     ENVIADA,
@@ -54,7 +56,7 @@ def testEnlazarListarYNoDevolverNuncaElValor(cliente):
     assert datos["cifradoDisponible"] is True
     assert [w["valorEnmascarado"] for w in datos["wallets"]] == ["zpub6rFR…tZYs"]
     assert {r["clave"] for r in datos["redes"]} == {"btc", "eth", "bnb", "sol", "xrp"}
-    assert _ZPUB.encode() not in (rutas["claves"] / "wallets.key").read_bytes()
+    assert _ZPUB.encode() not in (carpetaWalletsActiva() / "wallets.key").read_bytes()
 
 
 def testUnaClavePrivadaSeRechazaYNoSeGuarda(cliente):
@@ -64,7 +66,7 @@ def testUnaClavePrivadaSeRechazaYNoSeGuarda(cliente):
 
     assert respuesta.status_code == 400
     assert respuesta.get_json()["field"] == "valor"
-    assert not (rutas["claves"] / "wallets.key").exists()
+    assert not (carpetaWalletsActiva() / "wallets.key").exists()
 
 
 @pytest.mark.parametrize("cambios, campo", [
@@ -913,7 +915,7 @@ def testGuardarYOlvidarUnaDireccion(cliente):
     assert client.get("/api/wallets").get_json()["direcciones"] == [
         {"red": "btc", "direccion": _BECH32, "apodo": "Mi Exchange", "propia": False},
     ]
-    assert b"Mi Exchange" not in (rutas["claves"] / "wallets.key").read_bytes()
+    assert b"Mi Exchange" not in (carpetaWalletsActiva() / "wallets.key").read_bytes()
 
     olvidada = client.post("/api/wallets/direcciones/olvidar", json={"red": "btc", "direccion": _BECH32},
                            headers=cabeceras).get_json()

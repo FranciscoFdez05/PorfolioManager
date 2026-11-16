@@ -87,10 +87,11 @@ def testElValorViajaEnElExportYEnLaImportacionJson(cliente):
     assert _fichaConConversion(client, cabeceras, valorEur="150").status_code == 200
 
     exportado = client.get("/api/export/json").get_data(as_text=True)
-    assert json.loads(exportado)["tables"]["activo_conversion_rows"][0]["valor_eur"] == "150"
+    # El importe se guarda en céntimos; la columna de texto queda vacía.
+    assert json.loads(exportado)["tables"]["activo_conversion_rows"][0]["valor_eur_cent"] == 15000
 
     conn = getDb()
-    conn.execute("UPDATE activo_conversion_rows SET valor_eur = ''")
+    conn.execute("UPDATE activo_conversion_rows SET valor_eur = '', valor_eur_cent = NULL")
     conn.commit()
     respuesta = client.post(
         "/api/import/json", data={"file": (io.BytesIO(exportado.encode("utf-8")), "export.json")},
@@ -114,7 +115,7 @@ def testElValorViajaEnLaCopiaDeSeguridad(cliente, tmp_path):
 
     conexion = sqlite3.connect(copia)
     try:
-        assert conexion.execute("SELECT valor_eur FROM activo_conversion_rows").fetchone()[0] == "150"
+        assert conexion.execute("SELECT valor_eur_cent FROM activo_conversion_rows").fetchone()[0] == 15000
     finally:
         conexion.close()
 

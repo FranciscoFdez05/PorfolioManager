@@ -10,7 +10,6 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
-    padding-right: 18px;
     flex: 1;
 }
 
@@ -247,25 +246,32 @@
     margin-bottom: 12px;
 }
 
+/* Mismo aspecto que .interesesYearBtn (Cuenta remunerada, Dividendos...). */
 .tradingYearTab {
-    padding: 6px 14px;
+    min-width: 68px;
+    height: 34px;
+    padding: 0 12px;
     border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-dim);
-    font-size: 0.85rem;
-    font-weight: 600;
+    border: 1px solid var(--btn-border);
+    background: var(--btn-bg);
+    color: var(--text-bright);
+    font-size: 13px;
     cursor: pointer;
     transition:
         background 0.15s,
-        color 0.15s,
         border-color 0.15s;
 }
 
-.tradingYearTab.active {
-    background: var(--accent-dim, rgba(99, 102, 241, 0.2));
+.tradingYearTab:hover {
+    background: var(--bg-elevated);
     border-color: var(--accent);
-    color: var(--accent);
+}
+
+.tradingYearTab.active {
+    background: var(--bg-elevated);
+    border-color: var(--accent);
+    color: var(--text-subtle);
+    box-shadow: inset 0 0 0 1px var(--accent-glow);
 }
 
 .tradingHaciendaSummary {

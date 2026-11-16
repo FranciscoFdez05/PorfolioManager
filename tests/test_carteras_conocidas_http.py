@@ -2,6 +2,8 @@
 
 import pytest
 
+from core.wallets_carpeta import carpetaWalletsActiva
+
 _GENESIS = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
 
 
@@ -67,7 +69,7 @@ def testGuardarEditarYQuitarUnaPropia(cliente):
     assert [c["nombre"] for c in encontradas] == ["Ballena azul"]
     assert quitada.status_code == 200
     assert client.get("/api/wallets/catalogo?q=azul").get_json()["carteras"] == []
-    assert b"bc1qw508" not in (rutas["claves"] / "carteras.key").read_bytes()
+    assert b"bc1qw508" not in (carpetaWalletsActiva() / "carteras.key").read_bytes()
 
 
 def testOcultarYRestaurarUnaDeSerie(cliente):

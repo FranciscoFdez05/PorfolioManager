@@ -258,7 +258,7 @@ function walletsFormularioHtml() {
                 <span>Red</span><span>Enlazar con</span><span>Dirección o clave pública</span><span>Nombre</span><span>Cripto en Activos</span><span></span>
             </div>
             <ul id="walletsFilas" class="walletsFilas">${walletsFilaHtml()}</ul>
-            <button type="button" id="walletsAnadirFilaBtn" class="cancelButton walletsAnadirFilaBtn">+ Añadir otra wallet</button>
+            <button type="button" id="walletsAnadirFilaBtn" class="cancelButton walletsAnadirFilaBtn">Añadir otra wallet</button>
         </div>
         <div class="assetRowModalField walletsCampoAncho hidden" id="walletsEtherscanCampo">
             <label class="assetRowModalLabel" for="walletsEtherscan">Clave de API de Etherscan (gratuita para ETH; BNB requiere plan de pago o NodeReal, en Ajustes › API)</label>
@@ -1282,7 +1282,7 @@ function renderEditarSeguimientoModal(grupo) {
                         <span>Red</span><span>Enlazar con</span><span>Dirección o clave pública</span><span>Nombre</span><span>Cripto en Activos</span><span></span>
                     </div>
                     <ul id="walletsFilas" class="walletsFilas">${walletsFilaHtml()}</ul>
-                    <button type="button" id="walletsAnadirFilaBtn" class="cancelButton walletsAnadirFilaBtn">+ Añadir otra wallet</button>
+                    <button type="button" id="walletsAnadirFilaBtn" class="cancelButton walletsAnadirFilaBtn">Añadir otra wallet</button>
                 </div>
                 <div class="assetRowModalField walletsCampoAncho hidden" id="walletsEtherscanCampo">
                     <label class="assetRowModalLabel" for="walletsEtherscan">Clave de API de Etherscan (gratuita para ETH; BNB requiere plan de pago o NodeReal, en Ajustes › API)</label>

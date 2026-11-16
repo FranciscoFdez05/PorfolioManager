@@ -1,4 +1,4 @@
-// Calendario del dinero: gastos, ingresos y mensualidades del año, día a día.
+// Calendario del dinero: gastos, ingresos, mensualidades y vencimientos del año, día a día.
 //
 // No guarda nada. Lee el año de gastos y el de ingresos —los mismos JSON que
 // pintan sus pantallas— y coloca cada apunte en el día de su fecha. Los cargos
@@ -6,19 +6,30 @@
 // aritmética que usan sus tablas (getMensualidadCargos, normalizeRecurrente),
 // así que aquí no hay una segunda versión de "qué día se cobra".
 //
+// Los vencimientos de renta fija y bonos salen de sus propias tablas y no
+// dependen del año elegido: se cargan una vez y aquí solo se filtran por año.
+//
 // Los chips de arriba eligen qué se ve. Son excluyentes con "Todo" y
 // acumulables entre sí, igual que los filtros de tipo de Activos.
 
 const CAL_FIN_TIPOS = [
     { key: "gastos", label: "Gastos", sign: -1 },
     { key: "ingresos", label: "Ingresos", sign: 1 },
-    { key: "mensualidades", label: "Mensualidades", sign: -1 }
+    { key: "mensualidades", label: "Mensualidades", sign: -1 },
+    // sign 0: lo que vence es capital que vuelve, no un ingreso, así que se
+    // muestra pero no entra en el balance.
+    { key: "vencimientos", label: "Vencimientos", sign: 0 },
+    { key: "dividendos", label: "Dividendos", sign: 1 }
 ]
 
 let calFinYears = []
 let calFinYear = null
 let calFinGastosData = null
 let calFinIngresosData = null
+// Filas de renta fija y de bonos; se rellena al abrir la pantalla.
+let calFinVencimientosData = { rentaFija: [], bonos: [] }
+// Dividendos cobrados; como los vencimientos, no dependen del año y se filtran aquí.
+let calFinDividendosData = []
 // Tipos que se muestran. Con los tres dentro, el chip "Todo" es el activo.
 let calFinTipos = new Set(CAL_FIN_TIPOS.map((tipo) => tipo.key))
 // Día elegido ("mes-día"), que es lo que detalla el panel lateral.
@@ -55,6 +66,18 @@ async function calFinLoadYears(module) {
     }
 }
 
+// Una lista que falla al cargar deja el calendario sin vencimientos, no sin
+// calendario: el resto de la pantalla no depende de ella.
+async function calFinLoadFilas(url) {
+    try {
+        const data = await Api.get(url)
+        return Array.isArray(data?.rows) ? data.rows : []
+    } catch (error) {
+        console.error(`No se pudieron cargar los vencimientos de ${url}:`, error)
+        return []
+    }
+}
+
 async function initCalendarioLogic() {
     const [gastosYears, ingresosYears] = await Promise.all([calFinLoadYears("gastos"), calFinLoadYears("ingresos")])
     const years = ordenarAniosRecientesPrimero([...new Set([...gastosYears, ...ingresosYears].map(String))])
@@ -64,6 +87,13 @@ async function initCalendarioLogic() {
     calFinYear = calFinYears[0]
     calFinTipos = new Set(CAL_FIN_TIPOS.map((tipo) => tipo.key))
     calFinSelection = null
+    const [rentaFija, bonos, dividendos] = await Promise.all([
+        calFinLoadFilas("/api/rentafija"),
+        calFinLoadFilas("/api/bonos"),
+        calFinLoadFilas("/api/dividendos")
+    ])
+    calFinVencimientosData = { rentaFija, bonos }
+    calFinDividendosData = dividendos
 
     bindCalFinEvents()
     await renderCalFinYear(calFinYear)
@@ -271,6 +301,74 @@ function calFinMensualidadesApuntes(data, yearNumber) {
     return apuntes
 }
 
+// Capital más intereses netos que vuelven el día del vencimiento. Un
+// instrumento sin vencimiento válido en el año, o sin importe, no apunta nada.
+function calFinVencimientosApuntes(data, yearNumber) {
+    const origenes = [
+        { filas: data?.rentaFija, detalle: "Renta fija" },
+        { filas: data?.bonos, detalle: "Bono" }
+    ]
+    const apuntes = []
+    origenes.forEach(({ filas, detalle }) => {
+        ;(filas || []).forEach((row) => {
+            const fecha = calFinParseFecha(row?.vencimiento)
+            if (!fecha || fecha.year !== yearNumber) {
+                return
+            }
+
+            const amount =
+                parseEuroNumber(row.invertido || "") +
+                parseEuroNumber(row.interesAcumulado || "") -
+                parseEuroNumber(row.impuestos || "")
+            if (!amount) {
+                return
+            }
+
+            apuntes.push({
+                tipo: "vencimientos",
+                nombre: String(row.instrumento || "").trim() || "Sin nombre",
+                detalle: `${detalle} · capital e intereses netos`,
+                monthIndex: fecha.monthIndex,
+                sinDia: false,
+                date: new Date(yearNumber, fecha.monthIndex, fecha.day),
+                amount: Math.abs(amount),
+                activa: true
+            })
+        })
+    })
+    return apuntes
+}
+
+// Dividendos cobrados en el año. Solo los que se cobran en euros: `total` va en
+// la moneda de `monedaTotal` y sumar otra moneda falsearía el balance. Sin fecha
+// completa no hay día que colocar, así que se omiten.
+function calFinDividendosApuntes(filas, yearNumber) {
+    const apuntes = []
+    ;(filas || []).forEach((row) => {
+        const fecha = calFinParseFecha(row?.fecha)
+        if (!fecha || fecha.year !== yearNumber || String(row.monedaTotal || "EUR").toUpperCase() !== "EUR") {
+            return
+        }
+
+        const amount = parseEuroNumber(row.total || "")
+        if (!amount) {
+            return
+        }
+
+        apuntes.push({
+            tipo: "dividendos",
+            nombre: String(row.instrumento || "").trim() || "Sin nombre",
+            detalle: row.reinvertido ? "Dividendo · reinvertido" : "Dividendo",
+            monthIndex: fecha.monthIndex,
+            sinDia: false,
+            date: new Date(yearNumber, fecha.monthIndex, fecha.day),
+            amount: Math.abs(amount),
+            activa: true
+        })
+    })
+    return apuntes
+}
+
 // Todos los apuntes del año de los tipos elegidos, ordenados por fecha. Es la
 // lista que se pinta y de la que salen los totales del panel lateral.
 function getCalFinApuntes() {
@@ -290,6 +388,12 @@ function getCalFinApuntes() {
     if (calFinTipos.has("mensualidades")) {
         apuntes.push(...calFinMensualidadesApuntes(calFinGastosData, yearNumber))
     }
+    if (calFinTipos.has("vencimientos")) {
+        apuntes.push(...calFinVencimientosApuntes(calFinVencimientosData, yearNumber))
+    }
+    if (calFinTipos.has("dividendos")) {
+        apuntes.push(...calFinDividendosApuntes(calFinDividendosData, yearNumber))
+    }
 
     return apuntes.sort((a, b) => a.date - b.date || a.nombre.localeCompare(b.nombre))
 }
@@ -306,7 +410,8 @@ function calFinTotalesPorTipo(apuntes) {
     })
 }
 
-// Lo que queda: ingresos menos gastos menos mensualidades.
+// Lo que queda: ingresos menos gastos menos mensualidades. Los vencimientos
+// pesan 0: es capital que vuelve.
 function calFinBalance(apuntes) {
     return apuntes.reduce((sum, apunte) => sum + getCalFinTipo(apunte.tipo).sign * apunte.amount, 0)
 }
@@ -538,7 +643,9 @@ function buildCalFinDetalle(apuntes, today) {
     }
 
     // Sin día elegido, el panel cuenta el año de lo que se está viendo.
-    const pendientes = apuntes.filter((apunte) => apunte.tipo === "mensualidades" && apunte.date > today)
+    const pendientes = apuntes.filter(
+        (apunte) => (apunte.tipo === "mensualidades" || apunte.tipo === "vencimientos") && apunte.date > today
+    )
 
     return `
         <p class="calFinSideLabel">Resumen de ${escapeGastosHtml(calFinYear)}</p>
@@ -546,14 +653,14 @@ function buildCalFinDetalle(apuntes, today) {
         ${buildCalFinTotales(apuntes)}
         ${
             pendientes.length
-                ? `<p class="calFinSideLabel calFinSideLabelSpaced">Próximos cargos</p>
+                ? `<p class="calFinSideLabel calFinSideLabelSpaced">Próximos cargos y vencimientos</p>
                    <ul class="calFinSideList">
                         ${pendientes
                             .slice(0, 6)
                             .map(
                                 (apunte) => `
                             <li class="calFinSideItem">
-                                <span class="calFinSideDot calFinTipo-mensualidades" aria-hidden="true"></span>
+                                <span class="calFinSideDot calFinTipo-${apunte.tipo}" aria-hidden="true"></span>
                                 <span class="calFinSideName">${escapeGastosHtml(apunte.nombre)}</span>
                                 <span class="calFinSideDate">${apunte.sinDia ? GASTOS_MONTHS[apunte.monthIndex].label.toLowerCase() : formatMensualidadDate(apunte.date)}</span>
                                 <span class="calFinSideAmount">${formatEuro(apunte.amount)}</span>

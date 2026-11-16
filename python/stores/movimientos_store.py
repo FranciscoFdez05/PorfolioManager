@@ -14,6 +14,7 @@ una fila con otro formato se ordenaría y sumaría mal.
 from datetime import date, datetime
 
 from core import dinero
+from core.centimos import escribirImporte
 from core.db import getDb, transaction
 from stores import revisiones
 from stores.cuentas_store import CuentaInvalida, resolverCuenta
@@ -159,10 +160,11 @@ def _insertarMovimiento(conn, movimiento, tablas, year, month, fechaTabla, canti
     if movimiento["tipo"] == "gasto":
         conn.execute("INSERT OR IGNORE INTO gastos_years (year) VALUES (?)", (year,))
 
+    centimosFila, legado = escribirImporte(cantidad)
     cursor = conn.execute(
-        f"INSERT INTO {tablas['filas']} (year, month, fecha, nombre, tipo, cantidad, cuenta) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (year, month, fechaTabla, movimiento["nombre"], movimiento["categoria"], cantidad,
+        f"INSERT INTO {tablas['filas']} (year, month, fecha, nombre, tipo, cantidad, cantidad_cent, cuenta) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (year, month, fechaTabla, movimiento["nombre"], movimiento["categoria"], legado, centimosFila,
          movimiento.get("cuenta", "")),
     )
 

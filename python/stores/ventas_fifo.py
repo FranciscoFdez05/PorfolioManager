@@ -24,6 +24,7 @@ import threading
 from decimal import Decimal
 
 from core import dinero, fifo, fiscal_es
+from core.centimos import importeSql
 from core.db import getDb
 from core.fifo import ADQUISICION, TRANSMISION, Operacion
 from stores import rendimiento_activo
@@ -132,8 +133,9 @@ def _operacionesDeFichas(convertir=True):
 
     filas = conn.execute(
         "SELECT id, asset_id, fecha_operacion, tipo_operacion, participaciones, "
-        "precio_participacion, capital_invertido_bruto, comisiones, comisiones_fiat, comisiones_cripto, "
-        "currency, fx_rate "
+        f"precio_participacion, {importeSql('capital_invertido_bruto')} AS capital_invertido_bruto, "
+        f"{importeSql('comisiones')} AS comisiones, {importeSql('comisiones_fiat')} AS comisiones_fiat, "
+        "comisiones_cripto, currency, fx_rate "
         "FROM activo_rows ORDER BY asset_id, id"
     ).fetchall()
 
@@ -211,7 +213,8 @@ def _operacionesDeFichas(convertir=True):
 
     operaciones = conn.execute(
         "SELECT rowid AS seq, id, asset_id, fecha_apertura, orden, cantidad, "
-        "comisiones_fiat, comisiones_cripto, total, currency, fx_rate FROM activo_operation_rows "
+        f"{importeSql('comisiones_fiat')} AS comisiones_fiat, comisiones_cripto, "
+        f"{importeSql('total')} AS total, currency, fx_rate FROM activo_operation_rows "
         "WHERE estado = 'Completado' ORDER BY asset_id, rowid"
     ).fetchall()
 
@@ -312,7 +315,8 @@ def _leerConversiones(conn):
     """
     filas = [dict(f) for f in conn.execute(
         "SELECT rowid AS seq, id, asset_id, fecha, par, tipo, cantidad, cantidad_contraparte, "
-        "comision, comision_moneda, valor_eur FROM activo_conversion_rows ORDER BY rowid"
+        f"{importeSql('comision')} AS comision, comision_moneda, {importeSql('valor_eur')} AS valor_eur "
+        "FROM activo_conversion_rows ORDER BY rowid"
     )]
     for fila in conn.execute(
         "SELECT id, asset_id, fecha_operacion, tipo_operacion, participaciones FROM activo_rows ORDER BY id"
@@ -454,7 +458,8 @@ def _filaPermuta(resultado, meta):
 def _leerVentasCrudas():
     conn = getDb()
     return conn.execute(
-        "SELECT rowid AS seq, id, year, fecha, asset_id, cantidad, valor_venta, comision_venta, "
+        "SELECT rowid AS seq, id, year, fecha, asset_id, cantidad, "
+        f"{importeSql('valor_venta')} AS valor_venta, {importeSql('comision_venta')} AS comision_venta, "
         "currency, fx_rate FROM ventas ORDER BY year, rowid"
     ).fetchall()
 

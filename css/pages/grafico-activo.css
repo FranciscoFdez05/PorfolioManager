@@ -62,9 +62,14 @@
     color: var(--graficoVenta);
 }
 
+/* flex: 1 1 0 y min-width: 0: los controles ocupan el hueco que deja el resumen y se
+   reparten en varias filas por dentro, en vez de saltar enteros debajo de la cabecera. */
 .assetGraficoControles {
     display: flex;
+    flex: 1 1 0;
+    min-width: 0;
     flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 8px;
 }
 
@@ -134,4 +139,108 @@
 
 .assetGraficoNota:empty {
     display: none;
+}
+
+/* Desplegable del tipo de gráfico: el widget de select ocupa el 100 % por defecto y
+   aquí comparte fila con los botones de vista, unidad y rango. */
+.assetGraficoControles .csWrapper {
+    width: auto;
+    min-width: 190px;
+}
+
+/* Estacionales: un botón por año, y una acción puede tener veinte. Se reparten en
+   varias filas en vez de empujar la cabecera fuera de la pantalla. */
+.assetGraficoAnios {
+    flex-wrap: wrap;
+    max-width: 100%;
+}
+
+.assetGraficoControles .mToggleBtn .assetGraficoPunto {
+    margin-right: 2px;
+}
+
+/* Desplegable de tipo de gráfico: cada opción lleva un «?» que abre una ilustración. */
+.assetGraficoModoFila {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.assetGraficoModoFila .navDropdownItem {
+    flex: 1 1 auto;
+}
+
+.assetGraficoAyudaBtn {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid var(--btn-border);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.assetGraficoAyudaBtn:hover,
+.assetGraficoAyudaBtn[aria-expanded="true"] {
+    color: var(--text-bright);
+    border-color: var(--btn-active-border);
+}
+
+/* El menú es position: fixed, así que el panel se ancla a él y sale a su derecha. */
+.assetGraficoAyuda {
+    position: absolute;
+    top: 0;
+    left: calc(100% + 8px);
+    width: 250px;
+    padding: 10px;
+    box-sizing: border-box;
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    color: var(--text-primary);
+}
+
+.assetGraficoAyuda svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.assetGraficoAyuda p {
+    margin: 8px 0 0;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--text-muted);
+}
+
+.ayudaLinea {
+    fill: none;
+    stroke: var(--text-bright);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.ayudaLineaTenue {
+    stroke: var(--text-muted);
+}
+
+.ayudaLineaPunteada {
+    stroke-dasharray: 4 3;
+}
+
+.ayudaEje {
+    stroke: var(--text-muted);
+    stroke-width: 1;
+    opacity: 0.5;
+}
+
+.ayudaTexto {
+    fill: var(--text-muted);
+    font-size: 9px;
 }

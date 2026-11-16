@@ -395,7 +395,17 @@ html[data-theme="light"] #addGastoRowBtn,
 html[data-theme="light"] #addIngresoRowBtn,
 html[data-theme="light"] #cuentasAddRowBtn,
 html[data-theme="light"] #cuentaAhorroAddRowBtn,
-html[data-theme="light"] #mvcAddRowBtn {
+html[data-theme="light"] #mvcAddRowBtn,
+html[data-theme="light"] #cuentasNuevaCuentaBtn,
+html[data-theme="light"] #hipotecasAddBtn,
+html[data-theme="light"] #financiadasAddBtn,
+html[data-theme="light"] #microcreditosAddBtn,
+html[data-theme="light"] #ahorroConfigBtn,
+html[data-theme="light"] #pinvCrearBtn,
+html[data-theme="light"] #mensAddBtn,
+html[data-theme="light"] #recAddBtn,
+html[data-theme="light"] #pinvArchivoBtn,
+html[data-theme="light"] .alPanelNueva {
     background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%) !important;
     border: 1px solid var(--accent) !important;
     border-left: 3px solid var(--accent) !important;
@@ -425,7 +435,17 @@ html[data-theme="light"] #addGastoRowBtn:hover,
 html[data-theme="light"] #addIngresoRowBtn:hover,
 html[data-theme="light"] #cuentasAddRowBtn:hover,
 html[data-theme="light"] #cuentaAhorroAddRowBtn:hover,
-html[data-theme="light"] #mvcAddRowBtn:hover {
+html[data-theme="light"] #mvcAddRowBtn:hover,
+html[data-theme="light"] #cuentasNuevaCuentaBtn:hover,
+html[data-theme="light"] #hipotecasAddBtn:hover,
+html[data-theme="light"] #financiadasAddBtn:hover,
+html[data-theme="light"] #microcreditosAddBtn:hover,
+html[data-theme="light"] #ahorroConfigBtn:hover,
+html[data-theme="light"] #pinvCrearBtn:hover,
+html[data-theme="light"] #mensAddBtn:hover,
+html[data-theme="light"] #recAddBtn:hover,
+html[data-theme="light"] #pinvArchivoBtn:hover,
+html[data-theme="light"] .alPanelNueva:hover {
     background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%) !important;
     border-color: var(--accent-hover) !important;
     border-left-color: var(--accent-soft) !important;
@@ -915,6 +935,20 @@ html[data-theme="light"] .portfolioSwitcherBtn:hover {
     border-color: var(--accent-soft) !important;
     border-left-color: var(--accent) !important;
     color: var(--accent-dark) !important;
+}
+
+html[data-theme="light"] #walletsSegEnlazarBtn {
+    background: linear-gradient(135deg, var(--accent-tint-strong) 0%, var(--accent-tint) 100%);
+    border-color: var(--accent-soft);
+    border-left-color: var(--accent);
+    color: var(--accent-dark);
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.12);
+}
+
+html[data-theme="light"] #walletsSegEnlazarBtn:hover {
+    background: linear-gradient(135deg, var(--accent-soft) 0%, var(--accent-tint-strong) 100%);
+    border-color: var(--accent-soft);
+    border-left-color: var(--accent);
 }
 
 html[data-theme="light"] .portfolioSwitcherMenu {
@@ -1455,7 +1489,17 @@ html[data-theme="light"]
         #addIngresoRowBtn,
         #cuentasAddRowBtn,
         #cuentaAhorroAddRowBtn,
-        #mvcAddRowBtn
+        #mvcAddRowBtn,
+        #cuentasNuevaCuentaBtn,
+        #hipotecasAddBtn,
+        #financiadasAddBtn,
+        #microcreditosAddBtn,
+        #ahorroConfigBtn,
+        #pinvCrearBtn,
+        #mensAddBtn,
+        #recAddBtn,
+        #pinvArchivoBtn,
+        .alPanelNueva
     ) {
     background: var(--accent-tint) !important;
     border-color: var(--accent-soft) !important;
@@ -1485,7 +1529,17 @@ html[data-theme="light"]
         #addIngresoRowBtn,
         #cuentasAddRowBtn,
         #cuentaAhorroAddRowBtn,
-        #mvcAddRowBtn
+        #mvcAddRowBtn,
+        #cuentasNuevaCuentaBtn,
+        #hipotecasAddBtn,
+        #financiadasAddBtn,
+        #microcreditosAddBtn,
+        #ahorroConfigBtn,
+        #pinvCrearBtn,
+        #mensAddBtn,
+        #recAddBtn,
+        #pinvArchivoBtn,
+        .alPanelNueva
     ):hover {
     background: var(--accent-tint-strong) !important;
     border-color: var(--accent-soft) !important;
@@ -1774,9 +1828,19 @@ html[data-theme="light"] .interesesTooltip {
 
 /* ── 8. Vista general ────────────────────────────────────────────────────── */
 
-html[data-theme="light"] .overviewEmpty {
+html[data-theme="light"] .overviewEmpty,
+html[data-theme="light"] .mensCalEmpty,
+html[data-theme="light"] .ahorroEmpty,
+html[data-theme="light"] .mensTableWrapper:has(.mensEmptyRow),
+html[data-theme="light"] .recTableWrapper:has(.recEmptyRow) {
     background: #f8faff;
     border-color: var(--border-mid);
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .mensTable tbody .mensEmptyRow td,
+html[data-theme="light"] .recTable tbody .recEmptyRow td {
+    background: transparent;
     color: var(--text-dim);
 }
 
@@ -2173,23 +2237,6 @@ html[data-theme="light"] .bonosTab.active {
 /* ── 12. Mi dinero ───────────────────────────────────────────────────────── */
 /* Gastos, ingresos, cuentas, ahorro y calendario. */
 
-html[data-theme="light"] .calFinYearBtn {
-    background: var(--bg-header);
-    border-color: var(--border-soft);
-    color: var(--text-subtle);
-}
-
-html[data-theme="light"] .calFinYearBtn:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-mid);
-}
-
-html[data-theme="light"] .calFinYearBtn.active {
-    background: #1e293b;
-    border-color: #334155;
-    color: #ffffff;
-}
-
 html[data-theme="light"] .calFinCard,
 html[data-theme="light"] .calFinMonth,
 html[data-theme="light"] .calFinSide,
@@ -2267,7 +2314,6 @@ html[data-theme="light"] .calFinTipo-mensualidades {
     color: var(--accent);
 }
 
-html[data-theme="light"] .gastosYearBtn,
 html[data-theme="light"] .gastosAddYearBtn,
 html[data-theme="light"] .gastosMonthTab {
     background: var(--bg-header);
@@ -2275,14 +2321,12 @@ html[data-theme="light"] .gastosMonthTab {
     color: var(--text-subtle);
 }
 
-html[data-theme="light"] .gastosYearBtn:hover,
 html[data-theme="light"] .gastosAddYearBtn:hover,
 html[data-theme="light"] .gastosMonthTab:hover {
     background: var(--bg-hover);
     border-color: var(--border-mid);
 }
 
-html[data-theme="light"] .gastosYearBtn.active,
 html[data-theme="light"] .gastosMonthTab.active {
     background: #1e293b;
     border-color: #334155;
@@ -2386,7 +2430,6 @@ html[data-theme="light"] .gtTotalRow td {
     border-top-color: var(--accent);
 }
 
-html[data-theme="light"] .ingresosYearBtn,
 html[data-theme="light"] .ingresosAddYearBtn,
 html[data-theme="light"] .ingresosMonthTab {
     background: var(--bg-header);
@@ -2394,14 +2437,12 @@ html[data-theme="light"] .ingresosMonthTab {
     color: var(--text-subtle);
 }
 
-html[data-theme="light"] .ingresosYearBtn:hover,
 html[data-theme="light"] .ingresosAddYearBtn:hover,
 html[data-theme="light"] .ingresosMonthTab:hover {
     background: var(--bg-hover);
     border-color: var(--border-mid);
 }
 
-html[data-theme="light"] .ingresosYearBtn.active,
 html[data-theme="light"] .ingresosMonthTab.active {
     background: #1e293b;
     border-color: #334155;

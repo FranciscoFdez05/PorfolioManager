@@ -36,10 +36,11 @@ from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from core import bloqueo, paths
+from core import bloqueo
 from core.cripto_direcciones import REDES, TIPO_DIRECCION
 from core.escritura import escribirAtomico
 from core.secret_store import fernetDeSecretKey, readSecretLines
+from core.wallets_carpeta import carpetaWalletsActiva
 
 log = logging.getLogger(__name__)
 
@@ -428,8 +429,9 @@ class WalletsRepository:
     """Lectura y escritura del fichero cifrado de wallets.
 
     Args:
-        ruta: Fichero de wallets. Por defecto `API_DIR/wallets.key`, resuelto en
-            cada llamada para que una prueba que redirige API/ no toque el real.
+        ruta: Fichero de wallets. Por defecto `API_DIR/portfolios/<id>/wallets.key`
+            del portfolio activo, resuelto en cada llamada para que una prueba que
+            redirige API/ no toque el real.
         proveedorFernet: Devuelve el Fernet o None. Inyectable para los tests.
     """
 
@@ -440,7 +442,7 @@ class WalletsRepository:
 
     @property
     def ruta(self) -> Path:
-        return self._ruta if self._ruta is not None else paths.API_DIR / NOMBRE_FICHERO
+        return self._ruta if self._ruta is not None else carpetaWalletsActiva() / NOMBRE_FICHERO
 
     def _fernet(self) -> Fernet:
         fernet = self._proveedorFernet()

@@ -7,7 +7,7 @@
 <h1 align="center">PorfolioManager</h1>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-5.4.0-blue" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-5.5.0-blue" alt="Version"></a>
   <a href="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml"><img src="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB" alt="Python">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED" alt="Docker">
@@ -100,8 +100,17 @@ Secrets live in `.env` (copy `.env.example`; `./docker-setup` does it for you). 
 
 | Where | What you do there |
 | --- | --- |
-| Asset page › **Gráfico** | Price or return of your position, with your buys and sells marked |
+| Asset page › **Gráfico** | Dropdown with three charts: price or return of your position with your buys and sells, yearly return bars, and comparison against indices (S&P 500, Nasdaq 100...) |
+| Asset page › **Mercado** | Market cap, supply, FDV and volume; futures (open interest, funding) for crypto; trend and fundamentals for the rest |
 | **Mi dinero › Cuentas / Movimientos / Cuenta remunerada** | Balance and history of each account, transfers and interest earned |
+| **Mi dinero › Hipotecas / Compras financiadas** | Amortization schedule and metrics of each mortgage (fixed or variable with Euribor reviews and early repayments) and your instalment purchases (charged monthly as labelled recurring payments from the account you choose, with early repayments and a schedule of instalments) |
+| **Mi dinero › Patrimonio** | Net worth: investments, accounts and unmatured fixed income minus mortgages, instalment purchases and micro-loans, with the breakdown of each side |
+| **Mi dinero › Hipotecas › Simular amortización** | Compare a mortgage with a hypothetical early repayment, shortening the term or lowering the instalment, without saving anything |
+| **Mi dinero › Calendario › Vencimientos** | Maturities of your fixed income and bonds on the calendar, next to expenses, income and recurring payments |
+| **Dividendos › Ingresos pasivos** | Dividends of the last 12 months, monthly average and yield on cost per asset and overall |
+| **Dividendos › Reinvertir** | A dividend can be marked as reinvested: it adds a "Reinvertido" purchase to the asset sheet that counts in the position and in FIFO |
+| **Ajustes › Exportar a CSV** | Download expenses, income, dividends, operations and accounts as Excel-ready CSV |
+| **Mi dinero › Microcréditos** | Small short-term loans, either one single repayment (amount plus fee) or monthly instalments: cost, equivalent APR, due dates with overdue warnings, and a schedule for the instalment ones |
 | **Cripto › Transacciones › ··· › Wallets enlazadas** | Import your wallets' movements from the blockchain (never paste private keys or seed phrases) |
 | **Cripto › Seguimiento** | Group your own or third-party wallets, view their history, UTXOs and tokens, and get Telegram alerts |
 

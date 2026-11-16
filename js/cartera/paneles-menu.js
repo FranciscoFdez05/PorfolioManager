@@ -21,6 +21,14 @@ function pnMenu(anchor, items, alElegir, opciones = {}) {
     pop.className = "pnPop"
     pop._anchor = anchor
     if (opciones.ancho) pop.style.width = opciones.ancho + "px"
+    // Con `igualarAncho` el menú mide lo mismo que su botón; el min-width de .pnPop
+    // se anula para que no lo ensanche.
+    if (opciones.igualarAncho) {
+        const anchoAncla = anchor.getBoundingClientRect().width
+        pop.style.width = anchoAncla + "px"
+        pop.style.minWidth = anchoAncla + "px"
+        pop.style.boxSizing = "border-box"
+    }
     if (opciones.clase) pop.classList.add(opciones.clase)
 
     if (opciones.contenido) {
@@ -329,7 +337,7 @@ function pnSelectorActivos(
                                 (
                                     r
                                 ) => `<button type="button" class="pnSelItem pnSelResultado" data-ticker="${escapeAttr(r.id)}">
-                                <span class="pnSelMas">+</span>
+                                <span class="pnSelMas"></span>
                                 <span class="pnSelAvatar" style="--c:${escapeAttr(pnColorTipo(r.tipo))}">${escapeHtml(String(r.simbolo.split(":").pop()).slice(0, 1))}</span>
                                 <span class="pnSelNombre">${escapeHtml(r.nombre)}</span>
                                 <span class="pnSelSimbolo">${escapeHtml(r.simbolo)}</span>

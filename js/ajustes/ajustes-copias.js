@@ -228,6 +228,17 @@ function _initAjustesDatos() {
     const exportZipBtn = document.getElementById("ajustesExportZipBtn")
     const exportMsg = document.getElementById("ajustesExportMsg")
     const exportClavesChk = document.getElementById("ajustesExportClaves")
+    const exportWalletsChk = document.getElementById("ajustesExportWallets")
+    const exportAyudaBtn = document.getElementById("ajustesExportAyudaBtn")
+    const exportAyuda = document.getElementById("ajustesExportAyuda")
+
+    if (exportAyudaBtn && exportAyuda) {
+        exportAyudaBtn.addEventListener("click", () => {
+            const abrir = exportAyuda.hidden
+            exportAyuda.hidden = !abrir
+            exportAyudaBtn.setAttribute("aria-expanded", String(abrir))
+        })
+    }
 
     // El orden de las tarjetas de Ajustes, el de cada tabla y los modos de
     // visualización viven en el navegador, así que el servidor no puede
@@ -316,24 +327,24 @@ function _initAjustesDatos() {
         _doExport("/api/export/zip", `portfolio-export-${date}.zip`, exportZipBtn, {
             ui: _volcarUi(),
             incluirClaves: !!exportClavesChk?.checked,
+            incluirWallets: !!exportWalletsChk?.checked,
             contrasena: contrasena || ""
         })
     }
 
     if (exportZipBtn) {
         exportZipBtn.addEventListener("click", () => {
-            // Sin claves dentro no hay nada que proteger: se descarga sin más.
-            if (!exportClavesChk?.checked) {
+            // Sin claves ni wallets dentro no hay nada que proteger: se descarga sin más.
+            if (!exportClavesChk?.checked && !exportWalletsChk?.checked) {
                 _exportarZip("")
                 return
             }
             _abrirModalContrasena({
-                titulo: "Proteger las claves de API",
+                titulo: "Proteger el ZIP",
                 texto:
-                    "El ZIP va a llevar tus claves de los proveedores y la del Atajo. Con contraseña " +
-                    "van cifradas, junto a tus wallets, y se pedirá al importar; sin ella, las claves van en " +
-                    "claro, el archivo es un secreto y las wallets no se incluyen. " +
-                    "Si la olvidas, el resto del ZIP se puede importar igual, pero las claves no.",
+                    "Con contraseña, las APIs y las wallets van cifradas y se pedirá al importar. " +
+                    "Sin ella van en claro y el archivo es un secreto. " +
+                    "Si la olvidas, el resto del ZIP se puede importar igual.",
                 repetir: true,
                 botones: [
                     { etiqueta: "Cancelar", clase: "cancelButton", valor: "cancelar" },

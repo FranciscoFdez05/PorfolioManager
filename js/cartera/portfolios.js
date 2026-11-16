@@ -8,6 +8,24 @@ async function initPortfolioSwitcher() {
     const newBtn = document.getElementById("portfolioNewBtn")
     const importBtn = document.getElementById("portfolioImportBtn")
 
+    // El menú es fixed y lo abren/cierran varios manejadores globales con la clase "open":
+    // se observa esa clase en lugar de tocar cada uno de ellos.
+    const switcherDrop = document.getElementById("portfolioSwitcherDrop")
+    const switcherBtn = document.getElementById("portfolioSwitcherBtn")
+    const switcherMenu = document.getElementById("portfolioSwitcherMenu")
+    if (switcherDrop && switcherBtn && switcherMenu) {
+        new MutationObserver(() => {
+            if (switcherMenu.classList.contains("open")) {
+                // El contenedor crece con el botón para que las métricas se desplacen y no queden tapadas.
+                switcherBtn.classList.add("portfolioSwitcherBtnOpen")
+                switcherBtn.style.width = switcherMenu.offsetWidth + "px"
+            } else {
+                switcherBtn.classList.remove("portfolioSwitcherBtnOpen")
+                switcherBtn.style.width = ""
+            }
+        }).observe(switcherMenu, { attributes: true, attributeFilter: ["class"] })
+    }
+
     // Modal crear/renombrar
     const modalOverlay = document.getElementById("portfolioModalOverlay")
     const modalTitle = document.getElementById("portfolioModalTitle")

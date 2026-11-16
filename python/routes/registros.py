@@ -1,8 +1,10 @@
 from flask import Blueprint, jsonify, request
 
+from core import dinero
 from core.validation import jsonBody, primerIdDuplicado
 from core.wallets_sync import filaProtegidaDeBorrado, protegerFilasImportadas, redesConWalletPropia
 from stores import revisiones
+from stores.reinversion_dividendos import parsearFechaCompleta
 from stores.app_data import (
     readBonosFile,
     readDividendoCalendar,
@@ -86,6 +88,41 @@ def getDividendos():
     return jsonify(readDividendosFile())
 
 
+def _reinversionDeFila(row: dict) -> tuple[dict, str]:
+    """Datos de reinversión de un dividendo ya validados.
+
+    Args:
+        row: Fila de dividendo tal como llega del cliente.
+
+    Returns:
+        `(campos, error)`. Sin reinversión, `campos` la deja desactivada y vacía.
+        Con ella, la fecha tiene que estar completa y las participaciones y el
+        precio ser números mayores que cero: la compra que se genera entra en el
+        FIFO y una fila a medias lo falsearía.
+    """
+    sinReinversion = {"reinvertido": False, "reinvParticipaciones": "", "reinvPrecio": ""}
+    if not row.get("reinvertido"):
+        return sinReinversion, ""
+
+    if not str(row.get("instrumento", "")).strip():
+        return sinReinversion, "Un dividendo reinvertido necesita instrumento"
+    if parsearFechaCompleta(str(row.get("fecha", ""))) is None:
+        return sinReinversion, "Un dividendo reinvertido necesita la fecha completa (dd-mm-aaaa)"
+
+    participaciones = dinero.aDecimalONulo(row.get("reinvParticipaciones"))
+    precio = dinero.aDecimalONulo(row.get("reinvPrecio"))
+    if participaciones is None or participaciones <= 0:
+        return sinReinversion, "Indica las participaciones compradas con la reinversión"
+    if precio is None or precio <= 0:
+        return sinReinversion, "Indica el precio de compra de la reinversión"
+
+    return {
+        "reinvertido": True,
+        "reinvParticipaciones": f"{participaciones:f}",
+        "reinvPrecio": f"{precio:f}",
+    }, ""
+
+
 @registrosBp.route("/api/dividendos", methods=["POST"])
 def saveDividendos():
     requestData = jsonBody(required=False)
@@ -112,6 +149,9 @@ def saveDividendos():
         md = str(row.get("monedaDividendo", "USD")).strip().upper()
         mt = str(row.get("monedaTotal",     "EUR")).strip().upper()
         cuenta = str(row.get("cuenta", "") or "").strip()
+        reinversion, errorReinversion = _reinversionDeFila(row)
+        if errorReinversion:
+            return jsonify({"ok": False, "error": errorReinversion}), 400
         sanitizedRows.append({
             "fecha": str(row.get("fecha", "")).strip(),
             "instrumento": str(row.get("instrumento", "")).strip(),
@@ -122,6 +162,7 @@ def saveDividendos():
             "monedaDividendo": md if md.isalpha() and 2 <= len(md) <= 5 else "USD",
             "monedaTotal":     mt if mt.isalpha() and 2 <= len(mt) <= 5 else "EUR",
             "cuenta": cuenta if cuenta in cuentasValidas else "",
+            **reinversion,
         })
 
     writeDividendosFile({"rows": sanitizedRows})
