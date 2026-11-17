@@ -14,7 +14,8 @@ window.i18nDiccionarios.es = {
     comun: {
         guardado: "Guardado",
         error: "Error",
-        errorRed: "Error de red"
+        errorRed: "Error de red",
+        centrarGrafico: "Centrar"
     },
     portfolio: {
         nuevo: "Nuevo portfolio",

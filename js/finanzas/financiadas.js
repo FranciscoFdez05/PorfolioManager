@@ -82,11 +82,13 @@ function financiadasPintar() {
     document.getElementById("financiadasPanel")?.classList.toggle("hidden", visibles.length === 0)
 
     cuerpo.innerHTML = visibles.map(financiadasFila).join("")
-    cuerpo.querySelectorAll("[data-editar]").forEach((boton) =>
-        boton.addEventListener("click", () =>
-            financiadasAbrirFormulario(_financiadas.find((c) => c.id === boton.dataset.editar))
+    cuerpo
+        .querySelectorAll("[data-editar]")
+        .forEach((boton) =>
+            boton.addEventListener("click", () =>
+                financiadasAbrirFormulario(_financiadas.find((c) => c.id === boton.dataset.editar))
+            )
         )
-    )
     cuerpo
         .querySelectorAll("[data-eliminar]")
         .forEach((boton) => boton.addEventListener("click", () => financiadasConfirmarBorrado(boton.dataset.eliminar)))
@@ -255,9 +257,7 @@ function financiadasAbrirFormulario(compra = null) {
                 categoria: valor("finCategoria"),
                 nota: valor("finNota")
             }
-            const lista = compra
-                ? _financiadas.map((c) => (c.id === compra.id ? nueva : c))
-                : [..._financiadas, nueva]
+            const lista = compra ? _financiadas.map((c) => (c.id === compra.id ? nueva : c)) : [..._financiadas, nueva]
             return financiadasGuardarYPintar(lista)
         }
     )
@@ -283,7 +283,9 @@ function financiadasFilaCuadro(recibo, idProxima) {
     const clases = [recibo.pagado ? "pagado" : "", recibo.numero === idProxima ? "financiadasProxima" : ""]
         .filter(Boolean)
         .join(" ")
-    const extra = recibo.extra ? `<span class="financiadasSub">+ ${escapeHtml(formatEuro(recibo.extra))} anticipado</span>` : ""
+    const extra = recibo.extra
+        ? `<span class="financiadasSub">+ ${escapeHtml(formatEuro(recibo.extra))} anticipado</span>`
+        : ""
     const estado = recibo.pagado ? "Pagada" : recibo.numero === idProxima ? "Próxima" : "Pendiente"
     return `<tr class="${clases}">
         <td>${recibo.numero}</td>
@@ -327,7 +329,14 @@ function financiadasAbrirDetalle(id) {
         prestamoTarjeta("Coste total", formatEuro(resumen.totalAPagar))
     ]
     if (resumen.ahorroIntereses > 0) {
-        tarjetas.push(prestamoTarjeta("Intereses ahorrados", formatEuro(resumen.ahorroIntereses), "por pagos anticipados", "positivo"))
+        tarjetas.push(
+            prestamoTarjeta(
+                "Intereses ahorrados",
+                formatEuro(resumen.ahorroIntereses),
+                "por pagos anticipados",
+                "positivo"
+            )
+        )
     }
 
     const overlay = document.createElement("div")
@@ -371,9 +380,15 @@ function financiadasAbrirDetalle(id) {
     modal.querySelector("[data-anticipar]")?.addEventListener("click", () => financiadasAbrirAnticipado(compra, cerrar))
     modal.querySelectorAll("[data-quitar-anticipado]").forEach((boton) =>
         boton.addEventListener("click", async () => {
-            const restantes = compra.amortizaciones.filter((_, posicion) => posicion !== Number(boton.dataset.quitarAnticipado))
+            const restantes = compra.amortizaciones.filter(
+                (_, posicion) => posicion !== Number(boton.dataset.quitarAnticipado)
+            )
             cerrar()
-            if (await financiadasGuardarYPintar(_financiadas.map((c) => (c.id === id ? { ...financiadasEntrada(c), amortizaciones: restantes } : c)))) {
+            if (
+                await financiadasGuardarYPintar(
+                    _financiadas.map((c) => (c.id === id ? { ...financiadasEntrada(c), amortizaciones: restantes } : c))
+                )
+            ) {
                 financiadasAbrirDetalle(id)
             }
         })

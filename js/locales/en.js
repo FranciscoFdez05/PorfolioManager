@@ -11,7 +11,8 @@ window.i18nDiccionarios.en = {
     comun: {
         guardado: "Saved",
         error: "Error",
-        errorRed: "Network error"
+        errorRed: "Network error",
+        centrarGrafico: "Reset view"
     },
     portfolio: {
         nuevo: "New portfolio",

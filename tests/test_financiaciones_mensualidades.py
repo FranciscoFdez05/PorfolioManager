@@ -1,10 +1,11 @@
 """Cuotas de compras financiadas como mensualidades: generación, sincronización y protección."""
 
-import pytest
 
 from stores.financiaciones_store import guardarFinanciaciones, sanearListado
 from stores.gastos_store import (
-    readGastosYear, sanitizeGastosPayload, writeGastosYear,
+    readGastosYear,
+    sanitizeGastosPayload,
+    writeGastosYear,
 )
 
 

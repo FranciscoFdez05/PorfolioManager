@@ -137,7 +137,11 @@ con la ventana de 60 segundos.
 ## Pasos del Atajo
 
 Sustituye `192.168.1.X:5050` por la IP y el puerto reales de tu servidor. Por
-WireGuard usarás la IP del túnel, no la de la LAN.
+la VPN del router usa **la misma IP de la LAN**: con la VPN conectada el router
+ya enruta hacia ella y no hay que tocar su configuración. Así el Atajo lleva
+una sola URL dentro y fuera de casa y, con HTTPS activo, el certificado vale
+también por la VPN (al entrar por IP Caddy solo puede presentar el de una, la
+de la LAN). Con HTTPS, la URL empieza por `https://`.
 
 **Cada «Obtener contenido de la URL» lleva la cabecera `X-Atajo-Token`** con el
 token de Ajustes › API (despliega *Mostrar más* en la acción para ver las

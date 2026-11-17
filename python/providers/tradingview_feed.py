@@ -431,7 +431,7 @@ def _handleSeriesMessage(
     rawMessage: str,
     socketClient: _WebSocket,
     pending: set[str],
-    closes: dict[str, dict[int, tuple[float, float, float]]],
+    closes: dict[str, dict[int, tuple[float, float, float, float]]],
     currencies: dict[str, str] | None = None,
 ) -> None:
     """Procesa un mensaje del feed de velas: latidos, divisa, velas y fin o error de sesión."""
@@ -463,11 +463,12 @@ def _handleSeriesMessage(
         raise FeedError(f"El feed de TradingView devolvió {method}")
 
 
-def _addBar(closesBySession: dict[int, tuple[float, float, float]], bar: object) -> None:
-    """Anota cierre, máximo y mínimo de una vela; las que no traen `[ts, ..., cierre]` válido se ignoran.
+def _addBar(closesBySession: dict[int, tuple[float, float, float, float]], bar: object) -> None:
+    """Anota cierre, máximo, mínimo y apertura de una vela; las que no traen `[ts, ..., cierre]` válido se ignoran.
 
     Un máximo o un mínimo ilegible se sustituye por el cierre: la vela sigue
-    sirviendo para la línea, solo que sin rango.
+    sirviendo para la línea, solo que sin rango. Una apertura ilegible también,
+    y la vela se pinta sin cuerpo.
     """
     values = bar.get("v") if isinstance(bar, dict) else None
     if not isinstance(values, list) or len(values) < 5:
@@ -484,7 +485,14 @@ def _addBar(closesBySession: dict[int, tuple[float, float, float]], bar: object)
         high = low = close
     high = max(high, close)
     low = min(low, close) if low > 0 else close
-    closesBySession[timestamp] = (close, high, low)
+    try:
+        opening = float(values[1])
+    except (TypeError, ValueError):
+        opening = close
+    # Se recorta al rango en vez de ampliarlo: el máximo y el mínimo deciden si una
+    # operación cotizó ese día, y una apertura rara no debe cambiar esa respuesta.
+    opening = min(max(opening, low), high) if opening > 0 else close
+    closesBySession[timestamp] = (close, high, low, opening)
 
 
 def fetchSeries(
@@ -517,7 +525,7 @@ def fetchSeries(
         {'NASDAQ:NDX': [(1793893800, 26749.43), ...]}
     """
     series = _fetchSeriesSessions(symbols, resolution, bars, timeout, socketFactory, clock)
-    return {symbol: [(ts, close) for ts, close, _high, _low in bars] for symbol, (_currency, bars) in series.items()}
+    return {symbol: [(ts, close) for ts, close, _high, _low, _opening in bars] for symbol, (_currency, bars) in series.items()}
 
 
 def fetchSeriesWithCurrency(
@@ -527,12 +535,13 @@ def fetchSeriesWithCurrency(
     timeout: float | None = None,
     socketFactory: Callable[..., _WebSocket] = _WebSocket,
     clock: Callable[[], float] = time.monotonic,
-) -> dict[str, tuple[str | None, list[tuple[int, float, float, float]]]]:
-    """Como `fetchSeries`, pero con la divisa de cada símbolo y el máximo y mínimo de cada vela.
+) -> dict[str, tuple[str | None, list[tuple[int, float, float, float, float]]]]:
+    """Como `fetchSeries`, pero con la divisa de cada símbolo y la vela completa.
 
     La divisa hace falta para pasar las velas a otra: el ticker no la dice
     (NASDAQ:AAPL va en USD aunque el activo se apunte en euros). El máximo y
-    el mínimo dicen si un precio se pudo pagar ese día.
+    el mínimo dicen si un precio se pudo pagar ese día, y con la apertura la
+    ficha del activo puede pintar velas japonesas.
 
     Args:
         symbols: Tickers con mercado (`NASDAQ:NDX`).
@@ -543,7 +552,7 @@ def fetchSeriesWithCurrency(
         clock: Reloj monotónico, inyectable para los tests.
 
     Returns:
-        `{ticker: (divisa, [(ts, cierre, máximo, mínimo), ...])}`, con la divisa
+        `{ticker: (divisa, [(ts, cierre, máximo, mínimo, apertura), ...])}`, con la divisa
         en mayúsculas o None si el feed no la dio. Mismo filtrado que `fetchSeries`.
 
     Raises:
@@ -551,7 +560,7 @@ def fetchSeriesWithCurrency(
 
     Example:
         >>> fetchSeriesWithCurrency(["NASDAQ:AAPL"], "1D", 1)  # doctest: +SKIP
-        {'NASDAQ:AAPL': ('USD', [(1794407400, 268.9, 271.2, 266.0)])}
+        {'NASDAQ:AAPL': ('USD', [(1794407400, 268.9, 271.2, 266.0, 267.5)])}
     """
     return _fetchSeriesSessions(symbols, resolution, bars, timeout, socketFactory, clock)
 
@@ -563,7 +572,7 @@ def _fetchSeriesSessions(
     timeout: float | None,
     socketFactory: Callable[..., _WebSocket],
     clock: Callable[[], float],
-) -> dict[str, tuple[str | None, list[tuple[int, float, float, float]]]]:
+) -> dict[str, tuple[str | None, list[tuple[int, float, float, float, float]]]]:
     """Cuerpo común de `fetchSeries` y `fetchSeriesWithCurrency`: una sesión de gráfico por símbolo."""
     wanted = list(dict.fromkeys(str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()))
     if not wanted:
@@ -573,7 +582,7 @@ def _fetchSeriesSessions(
     deadline = clock() + totalTimeout
     sessions = {f"cs_{secrets.token_hex(4)}_{index}": symbol for index, symbol in enumerate(wanted)}
     pending = set(sessions)
-    closes: dict[str, dict[int, tuple[float, float, float]]] = {}
+    closes: dict[str, dict[int, tuple[float, float, float, float]]] = {}
     currencies: dict[str, str] = {}
 
     recordApiCall("TradingView")

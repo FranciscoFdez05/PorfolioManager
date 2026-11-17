@@ -13,9 +13,9 @@ que en variable es el tipo inicial pactado.
 """
 
 import re
+from collections.abc import Callable
 from datetime import date
 from decimal import Decimal
-from typing import Callable, Optional
 
 from core import amortizacion, dinero
 from core.amortizacion import Amortizacion, AmortizacionInvalida
@@ -162,7 +162,7 @@ def estrategiaDeTipo(hipoteca: dict) -> Callable[[date], Decimal]:
                   for r in hipoteca["euribor"]]
 
     def tipoVariable(fecha: date) -> Decimal:
-        vigente: Optional[Decimal] = None
+        vigente: Decimal | None = None
         for fechaRevision, valor in revisiones:
             if fechaRevision <= fecha:
                 vigente = valor

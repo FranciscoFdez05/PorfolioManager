@@ -335,7 +335,7 @@ def posicionPorDias(filas, operaciones, esCripto: bool, ventas, dias: list, tran
 
     def resumen() -> tuple:
         vivos = [lote for lote in lotes if lote["cantidad"] > 0]
-        return sum((l["cantidad"] for l in vivos), CERO), sum((l["coste"] for l in vivos), CERO)
+        return sum((lote["cantidad"] for lote in vivos), CERO), sum((lote["coste"] for lote in vivos), CERO)
 
     for dia in sorted({d for d in dias if d is not None}):
         while siguiente < len(eventos) and eventos[siguiente][0] <= dia:

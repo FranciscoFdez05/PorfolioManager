@@ -56,7 +56,7 @@ def testMarcaLasDireccionesQueYaSeSiguen(cliente):
 
 
 def testGuardarEditarYQuitarUnaPropia(cliente):
-    client, cabeceras, rutas = cliente
+    client, cabeceras, _rutas = cliente
 
     respuesta = _guardar(client, cabeceras)
     cartera = respuesta.get_json()["cartera"]

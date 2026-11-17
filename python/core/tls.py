@@ -298,6 +298,82 @@ def _sitioDePrueba(nombres: list[str]) -> str:
     )
 
 
+def ipLan() -> str | None:
+    """IP del servidor en la LAN, tal como la calcula docker-up.sh en el host.
+
+    Returns:
+        La IP normalizada, o None si la variable no está o no es válida.
+    """
+    normalizada = normalizarNombres([os.environ.get("PORTFOLIO_LAN_IP", "")])
+    return normalizada[0] if normalizada else None
+
+
+def nombrePorDefecto(nombres: list[str]) -> str | None:
+    """Nombre cuyo certificado se entrega cuando el cliente no dice cuál quiere.
+
+    Quien entra por IP (`https://192.168.1.50:5000`) no manda SNI: el estándar
+    lo prohíbe para direcciones IP. Caddy busca entonces el certificado por la IP
+    local de la conexión, y dentro de Docker esa es la del contenedor (172.x),
+    no la de la LAN que se escribió en Ajustes, así que corta el handshake con
+    «no certificate available». Se prefiere la IP de la LAN que pone
+    docker-up.sh porque es justo por la que entran el móvil y el portátil; si no
+    está en la lista, la primera IP; y si no hay ninguna, el primer nombre.
+
+    Args:
+        nombres: Nombres declarados por el usuario, ya normalizados.
+
+    Returns:
+        El nombre elegido, o None si la lista está vacía.
+
+    Example:
+        >>> nombrePorDefecto(["portfolio.casa", "192.168.1.50"])
+        '192.168.1.50'
+    """
+    if not nombres:
+        return None
+
+    direccionLan = ipLan()
+    if direccionLan and direccionLan in nombres:
+        return direccionLan
+
+    for nombre in nombres:
+        try:
+            ipaddress.ip_address(nombre)
+            return nombre
+        except ValueError:
+            continue
+    return nombres[0]
+
+
+def _opcionesTlsGlobales(nombres: list[str]) -> str:
+    """Opciones globales que solo tienen sentido cuando Caddy sirve TLS.
+
+    - `default_sni`: certificado para clientes sin SNI (entradas por IP). Ver
+      `nombrePorDefecto()`.
+    - `fallback_sni`: certificado para un SNI que no tiene sitio. El vigilante
+      sondea `https://caddy:<puerto>` y `caddy` no está en el certificado; sin
+      esto el handshake fallaba, el reintento en `http://` lo rechaza un puerto
+      que solo habla TLS, y avisaba por Telegram de una caída que no existía.
+      Solo cambia qué certificado se presenta: el navegador sigue validando el
+      nombre, así que no amplía a qué nombres sirve el HTTPS.
+    - `skip_install_trust`: Caddy intenta meter su CA en el almacén del propio
+      contenedor, que no la usa nadie, y al no encontrar `certutil` ni Java
+      llena el log de avisos que parecen fallos de instalación del
+      certificado. La CA se instala en los aparatos, desde Ajustes.
+
+    Args:
+        nombres: Nombres declarados por el usuario, ya normalizados.
+
+    Returns:
+        Líneas tabuladas para el bloque global del Caddyfile.
+    """
+    lineas = "\tskip_install_trust\n"
+    porDefecto = nombrePorDefecto(nombres)
+    if porDefecto:
+        lineas += f"\tdefault_sni {porDefecto}\n\tfallback_sni {porDefecto}\n"
+    return lineas
+
+
 def construirCaddyfile(activado: bool, nombres: list[str], preparando: bool = False) -> str:
     """Configuración completa de Caddy para el estado pedido.
 
@@ -327,7 +403,9 @@ def construirCaddyfile(activado: bool, nombres: list[str], preparando: bool = Fa
         sitios = ", ".join(f"https://{n}:{puerto}" for n in _conLocalhost(nombres))
         return (
             admin
-            + "\tauto_https disable_redirects\n}\n\n"
+            + "\tauto_https disable_redirects\n"
+            + _opcionesTlsGlobales(nombres)
+            + "}\n\n"
             + f"{sitios} {{\n"
             + "\ttls internal\n"
             + proxy
@@ -347,7 +425,9 @@ def construirCaddyfile(activado: bool, nombres: list[str], preparando: bool = Fa
         # nombre tampoco cambiaría, pero esto no depende de saberlo.
         return (
             admin
-            + "\tauto_https disable_redirects\n}\n\n"
+            + "\tauto_https disable_redirects\n"
+            + _opcionesTlsGlobales(nombres)
+            + "}\n\n"
             + f"http://:{puerto} {{\n"
             + proxy
             + "}\n\n"

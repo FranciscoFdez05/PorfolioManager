@@ -1145,7 +1145,10 @@ function ahorroPagosDeudas(vista) {
         nombre,
         valor: mensualidades
             .filter((m) => m.financiacionId && (m.origen || "financiada") === clave)
-            .reduce((total, m) => total + meses.reduce((suma, mes) => suma + parseEuroNumber(m.meses?.[mes] || ""), 0), 0)
+            .reduce(
+                (total, m) => total + meses.reduce((suma, mes) => suma + parseEuroNumber(m.meses?.[mes] || ""), 0),
+                0
+            )
     }))
 }
 
@@ -1163,8 +1166,7 @@ function ahorroPintarDeudas(vista) {
             <span class="ahorroDonutLegendPct">${gastos > 0 ? ahorroPct((valor / gastos) * 100) : "—"}</span>
         </div>`
     contenedor.innerHTML =
-        filas.map((f) => fila(f.nombre, f.valor)).join("") +
-        fila("Total deudas", total, "ahorroDeudasTotal")
+        filas.map((f) => fila(f.nombre, f.valor)).join("") + fila("Total deudas", total, "ahorroDeudasTotal")
 }
 
 // ── Observaciones ────────────────────────────────────────────────────────

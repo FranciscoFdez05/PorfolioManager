@@ -1234,9 +1234,10 @@ function openMensualidadDetailModal(index) {
     const frecuencia = getMensualidadFrecuencia(row.frecuencia)
     const cargo = getMensualidadCargo(row)
     const next = getMensualidadNextCharge(row)
-    const nextText = next && !next.isPast
-        ? `${formatMensualidadDate(next.date)} (${next.daysLeft === 0 ? "hoy" : `en ${next.daysLeft} d`})`
-        : "—"
+    const nextText =
+        next && !next.isPast
+            ? `${formatMensualidadDate(next.date)} (${next.daysLeft === 0 ? "hoy" : `en ${next.daysLeft} d`})`
+            : "—"
     const nota = row.nota.trim()
 
     const overlay = document.createElement("div")
@@ -1454,12 +1455,17 @@ function indicesParteOtrosOcultas(rows) {
 }
 
 function mismaFilaGasto(a, b) {
-    return ["fecha", "nombre", "tipo", "cantidad", "nota", "cuenta"].every((campo) => (a[campo] || "") === (b[campo] || ""))
+    return ["fecha", "nombre", "tipo", "cantidad", "nota", "cuenta"].every(
+        (campo) => (a[campo] || "") === (b[campo] || "")
+    )
 }
 
 /** Sin paréntesis: el nombre de quien devuelve va entre ellos y se lee de vuelta al editar. */
 function limpiarNombrePersona(persona) {
-    return String(persona || "").replace(/[()]/g, "").trim().slice(0, 40)
+    return String(persona || "")
+        .replace(/[()]/g, "")
+        .trim()
+        .slice(0, 40)
 }
 
 /** Concepto del ingreso de una devolución: «Devolución: Cena (Parte Antonio)». */
@@ -1895,7 +1901,9 @@ async function openGastoFraccionadoModal(rowIndex = -1) {
             try {
                 const conceptoViejo = conceptoFraccionado(propia.nombre)
                 await modificarIngresosDelMes(currentGastosYear, currentGastosMonth, (existentes) => [
-                    ...(isEdit ? existentes.filter((i) => !esDevolucionDe(i, propia.fecha, conceptoViejo)) : existentes),
+                    ...(isEdit
+                        ? existentes.filter((i) => !esDevolucionDe(i, propia.fecha, conceptoViejo))
+                        : existentes),
                     ...filas.ingresos
                 ])
             } catch (error) {
@@ -2532,9 +2540,7 @@ function renderGastosAnnualTable() {
     // «Pagos fraccionados» ni se enseña ni suma: lo adelantado a otros no es un
     // gasto tuyo (tu parte ya está en su categoría) y se consulta en su página.
     const shownTypes = visibleTypes.filter((type) => !mismoTipoGasto(type, TIPO_GASTO_FRACCIONADO))
-    const typesWithData = shownTypes.filter((type) =>
-        GASTOS_MONTHS.some((month) => expenseTotals[type][month.key] > 0)
-    )
+    const typesWithData = shownTypes.filter((type) => GASTOS_MONTHS.some((month) => expenseTotals[type][month.key] > 0))
     const typesEmpty = shownTypes.filter((type) => GASTOS_MONTHS.every((month) => !expenseTotals[type][month.key]))
 
     // Los índices de las acciones apuntan a la lista completa de tipos guardados.
@@ -3309,7 +3315,12 @@ function esMensualidadFinanciada(index) {
 }
 
 const GASTOS_ORIGENES_DEUDA = {
-    financiada: { etiqueta: "Financiada", pagina: "financiadas", ventana: "Compras financiadas", tipo: "Compra financiada" },
+    financiada: {
+        etiqueta: "Financiada",
+        pagina: "financiadas",
+        ventana: "Compras financiadas",
+        tipo: "Compra financiada"
+    },
     hipoteca: { etiqueta: "Hipoteca", pagina: "hipotecas", ventana: "Hipotecas", tipo: "Hipoteca" },
     microcredito: { etiqueta: "Microcrédito", pagina: "microcreditos", ventana: "Microcréditos", tipo: "Microcrédito" }
 }

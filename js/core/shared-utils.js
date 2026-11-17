@@ -1802,7 +1802,10 @@ function _calendarioVistaDias(estado) {
         const iso = _calendarioIso(dia)
         const operaciones = input.calendarioMarcas?.(iso) || []
         const nombresOperacion = { compra: "compra", venta: "venta" }
-        const textoOperaciones = operaciones.map((tipo) => nombresOperacion[tipo]).filter(Boolean).join(" y ")
+        const textoOperaciones = operaciones
+            .map((tipo) => nombresOperacion[tipo])
+            .filter(Boolean)
+            .join(" y ")
         return _calendarioBotonHtml({
             clase: "calPopupDia",
             datos: `data-fecha="${iso}"`,

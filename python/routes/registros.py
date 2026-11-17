@@ -4,7 +4,6 @@ from core import dinero
 from core.validation import jsonBody, primerIdDuplicado
 from core.wallets_sync import filaProtegidaDeBorrado, protegerFilasImportadas, redesConWalletPropia
 from stores import revisiones
-from stores.reinversion_dividendos import parsearFechaCompleta
 from stores.app_data import (
     readBonosFile,
     readDividendoCalendar,
@@ -26,6 +25,7 @@ from stores.app_data import (
     writeTransaccionesFile,
 )
 from stores.cuentas_store import CuentaInvalida, listarCuentas
+from stores.reinversion_dividendos import parsearFechaCompleta
 
 registrosBp = Blueprint("registros", __name__)
 

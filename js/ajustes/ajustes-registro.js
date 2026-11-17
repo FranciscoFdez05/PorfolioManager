@@ -33,7 +33,9 @@ function _initAjustesRegistro() {
                 ? `Registro en archivo: ${datos.activo ? "activo" : "habilitado pero no activo (no se puede escribir en la carpeta de logs)"}`
                 : "Registro en archivo: desactivado (registros.archivo = false)"
         )
-        lineas.push(`Entorno: ${datos.docker ? "Docker" : "local"} · nivel ${datos.nivel} · proceso ${datos.proceso || "ninguno"} (pid ${datos.pid})`)
+        lineas.push(
+            `Entorno: ${datos.docker ? "Docker" : "local"} · nivel ${datos.nivel} · proceso ${datos.proceso || "ninguno"} (pid ${datos.pid})`
+        )
         datos.archivos.forEach((archivo) => {
             lineas.push(
                 archivo.existe

@@ -223,7 +223,7 @@ class TestHistoricoDeCuentasCacheado:
     def testElCambioDeDivisaInvalida(self, clienteCuentas, monkeypatch):
         import routes.cuentas as rutaCuentas
 
-        client, cabeceras = clienteCuentas
+        client, _cabeceras = clienteCuentas
         conn = getDb()
         conn.execute("UPDATE cuentas SET dividendos = 1 WHERE id = 'banco'")
         conn.execute(

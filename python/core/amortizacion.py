@@ -13,10 +13,10 @@ política de tipos y el cuadro no sabe nada de Euríbor.
 
 import calendar
 import logging
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_CEILING, Decimal
-from typing import Callable, Optional, Sequence
 
 from core import dinero
 
@@ -235,7 +235,7 @@ def generarCuadro(
 
 
 def resumir(recibos: Sequence[Recibo], capital: Decimal, hoy: date,
-            recibosSinExtras: Optional[Sequence[Recibo]] = None) -> dict:
+            recibosSinExtras: Sequence[Recibo] | None = None) -> dict:
     """Métricas del préstamo a fecha `hoy`.
 
     Un recibo cuenta como pagado si su fecha es hoy o anterior. Los pagos

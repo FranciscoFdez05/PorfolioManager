@@ -13,8 +13,7 @@ from decimal import Decimal
 import pytest
 
 from core import db, telegram_notifier
-from stores import reglas_alerta_motor as motor
-from stores import reglas_alerta_store as store
+from stores import reglas_alerta_motor as motor, reglas_alerta_store as store
 from stores.asset_store import writeAssetFile
 
 hora = 3600

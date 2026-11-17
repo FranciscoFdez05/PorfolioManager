@@ -1264,6 +1264,7 @@
                                placeholder="192.168.1.50, portfolio.casa, localhost">
                     </div>
                     <div class="ajustesTlsAvisoNombre" id="ajustesTlsAvisoNombre" hidden></div>
+                    <div class="ajustesTlsAvisoNombre" id="ajustesTlsAvisoVpn" hidden></div>
                     <div class="ajustesFieldHint">
                         Uno por línea o separados por comas. El certificado <strong>solo vale para los que estén aquí</strong>:
                         si entras por una dirección que falte, el navegador avisará aunque tengas la CA instalada.
@@ -1300,10 +1301,24 @@
                             Ajustes › Perfil descargado › Instalar. Y después, <strong>el paso que todo el mundo se salta</strong>:
                             Ajustes › General › Información › Ajustes de confianza de certificados, y activa el interruptor.
                             Sin eso queda instalado pero no es de confianza, y el aviso sigue igual.</p>
+                            <p><strong>Por la VPN del router (iPhone / iPad).</strong> Usa la <strong>misma IP de la LAN</strong>
+                            que en casa (por ejemplo <code>https://192.168.1.50:5050</code>): con la VPN conectada el router
+                            ya te lleva a ella por el túnel, y no hay que tocar la configuración de la VPN. El certificado solo
+                            puede presentarse para una IP, así que no añadas otras. Safari y el Atajo usan entonces una sola
+                            dirección dentro y fuera de casa, y la CA instalada vale para las dos.</p>
                             <p><strong>Android.</strong> Ajustes › Seguridad › Cifrado y credenciales › Instalar un certificado ›
                             Certificado de CA. Avisará de que es una acción delicada; lo es, y por eso lo estás instalando tú.</p>
-                            <p><strong>Windows.</strong> Doble clic en el archivo › Instalar certificado › Equipo local ›
-                            <strong>«Colocar todos los certificados en el siguiente almacén»</strong> › Examinar ›
+                            <p><strong>Windows (Vivaldi, Chrome, Edge, Brave).</strong> Lo más fiable es un comando: abre
+                            PowerShell (no hace falta como administrador) y pega
+                            <code>certutil -user -addstore Root "$env:USERPROFILE\Downloads\PorfolioManager-CA.crt"</code>.
+                            Windows pregunta si quieres instalar el certificado: <strong>Sí</strong>. Si lo descargaste a otra
+                            carpeta, o el navegador lo renombró a <code>PorfolioManager-CA (1).crt</code>, cambia la ruta.
+                            Después <strong>cierra el navegador del todo y vuelve a abrirlo</strong>: Chromium no ve la CA
+                            nueva hasta reiniciarse, y «Comprobar en este aparato» seguiría fallando con el certificado bien
+                            instalado. Si el navegador bloquea la descarga por «no segura» (va por <code>http://</code>),
+                            elige conservarla.</p>
+                            <p><strong>Windows, con el asistente.</strong> Doble clic en el archivo › Instalar certificado ›
+                            Usuario actual › <strong>«Colocar todos los certificados en el siguiente almacén»</strong> › Examinar ›
                             <strong>Entidades de certificación raíz de confianza</strong>.
                             Ese paso no se puede saltar: si dejas marcado «Seleccionar automáticamente el almacén», o si
                             abres el asistente desde la pestaña «Personal» del gestor de certificados, el certificado acaba
@@ -2544,6 +2559,7 @@
 
 <script defer src="js/vendor/chart.umd.min.js?v=4.5.1"></script>
 <script defer src="js/core/app-core.js"></script>
+<script defer src="js/core/grafico-escala.js"></script>
 <script defer src="js/cartera/assets.js"></script>
 <script defer src="js/cartera/assets-todos.js"></script>
 <script defer src="js/cartera/assets-grafico.js"></script>

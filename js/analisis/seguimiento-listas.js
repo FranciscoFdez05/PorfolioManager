@@ -338,12 +338,20 @@ function segListasIniciar() {
         segListasPintarModal()
     })
     document.getElementById("segListaTodosBtn")?.addEventListener("click", () => {
-        segListaAlternarVarios(_segListaEditada, segListaActivosVisibles().map((i) => i._segId), true)
+        segListaAlternarVarios(
+            _segListaEditada,
+            segListaActivosVisibles().map((i) => i._segId),
+            true
+        )
         segListasPintarModal()
         segRenderGrid()
     })
     document.getElementById("segListaNingunoBtn")?.addEventListener("click", () => {
-        segListaAlternarVarios(_segListaEditada, segListaActivosVisibles().map((i) => i._segId), false)
+        segListaAlternarVarios(
+            _segListaEditada,
+            segListaActivosVisibles().map((i) => i._segId),
+            false
+        )
         segListasPintarModal()
         segRenderGrid()
     })

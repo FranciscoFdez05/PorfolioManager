@@ -312,7 +312,6 @@ function setupAssetTabs(asset) {
         }
     })
     assetGraficoRegistrarMenuModo()
-
 }
 
 // Una fila recién añadida está en blanco hasta que se rellena. No cuenta como

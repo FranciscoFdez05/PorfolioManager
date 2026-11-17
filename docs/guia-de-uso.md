@@ -57,9 +57,13 @@ En **Compras / ventas** hay dos vistas:
 | **Precio** | Precio por participación | Euros o % de variación del periodo |
 | **Mi posición** | Ganancia o pérdida de lo que sigue en cartera | Euros o % sobre su coste |
 
-- Puntos **verdes** = compras, **rojos** = ventas. Al pasar el cursor se ven la fecha, el valor y el detalle de cada operación.
+- Puntos **verdes** = compras, **rojos** = ventas. Al pasar el cursor se ven la fecha, el valor y el detalle de cada operación: cantidad y precio, lo invertido (o lo vendido) en euros y su **peso en la cartera**, que es ese importe sobre el valor total de la cartera de hoy, sea cual sea el rango o las fechas del gráfico.
+- Pulsa un punto para **fijar** su detalle: se queda en pantalla aunque muevas el cursor, sigue a su punto al desplazar o estirar el gráfico y puedes fijar varios a la vez. Vuelve a pulsar el punto para soltarlo, o pulsa **Ocultar detalles** (arriba a la derecha, a la izquierda de **Centrar** si está) para quitarlos todos.
 - En **Precio**, cada punto sale al precio de su operación y, como las operaciones no tienen hora, en el momento de ese día cuyo precio guardado más se le acerca.
+- **Línea / Velas**: en **Precio** el gráfico puede pintarse como línea o como velas japonesas (verde si cerró por encima de la apertura, roja si por debajo; al pasar el cursor se ven apertura, máximo, mínimo y cierre). La elección se recuerda. Solo aparece cuando el precio sale de las velas de TradingView del activo; en **Mi posición** o con el histórico propio se ve siempre la línea.
 - Rangos: **1 D**, **7 D**, **30 D**, **YTD** (desde el 1 de enero), **1 A** y **Todo**. El eje de tiempo se ajusta al tramo con datos.
+- El botón de ampliar (el último de los controles) pone el gráfico a casi toda la ventana, con los mismos controles. Se cierra con el mismo botón, con **Escape** o pulsando fuera.
+- Escala del eje de precios, como en TradingView (vale para todos los gráficos de línea de la aplicación): arrastra el eje vertical hacia arriba para estirar la línea o hacia abajo para comprimirla; arrastra el eje de fechas hacia la izquierda para ver menos meses o hacia la derecha para ver más (el final queda fijo); arrastra dentro del gráfico con el ratón para desplazarte arriba, abajo y a los lados. Doble clic en un eje lo devuelve a la escala automática; el botón **Centrar** (arriba a la derecha, sale en cuanto mueves el gráfico) y el botón **AUTO** de la esquina devuelven los dos. El botón **LOG** alterna entre escala lineal y logarítmica y se recuerda por gráfico; solo aparece cuando todos los valores son positivos (no en las vistas en % ni de ganancia o pérdida).
 
 Limitaciones:
 

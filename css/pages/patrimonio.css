@@ -38,13 +38,27 @@
 }
 
 /* ── Colores por grupo ── */
-.patrimonioColor0 { --pat-color: var(--pat-c0); }
-.patrimonioColor1 { --pat-color: var(--pat-c1); }
-.patrimonioColor2 { --pat-color: var(--pat-c2); }
-.patrimonioColor3 { --pat-color: var(--pat-c3); }
-.patrimonioColor4 { --pat-color: var(--pat-c4); }
-.patrimonioColor5 { --pat-color: var(--pat-c5); }
-.patrimonioColor6 { --pat-color: var(--pat-c6); }
+.patrimonioColor0 {
+    --pat-color: var(--pat-c0);
+}
+.patrimonioColor1 {
+    --pat-color: var(--pat-c1);
+}
+.patrimonioColor2 {
+    --pat-color: var(--pat-c2);
+}
+.patrimonioColor3 {
+    --pat-color: var(--pat-c3);
+}
+.patrimonioColor4 {
+    --pat-color: var(--pat-c4);
+}
+.patrimonioColor5 {
+    --pat-color: var(--pat-c5);
+}
+.patrimonioColor6 {
+    --pat-color: var(--pat-c6);
+}
 
 .patrimonioSegmento,
 .patrimonioPunto {
@@ -356,7 +370,6 @@ body.money-hidden .patrimonioImporte {
     pointer-events: none;
     color: var(--text-muted) !important;
 }
-
 
 @media (max-width: 820px) {
     .patrimonioColumnas,

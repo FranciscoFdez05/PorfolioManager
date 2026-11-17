@@ -65,9 +65,34 @@ RANGOS_FICHA = {
     "1A": ("1D", 380),
 }
 
+# Velas de los rangos intradía cuando se piden también las anteriores al rango
+# (`conPrevios`): misma resolución y más cantidad, para que al alejar el gráfico
+# las velas sigan igual de juntas. Unas 2000, bajo el tope de 5000 del feed:
+# 7 días de 5 min, 90 de 1 h y un año de 4 h. YTD y 1A ya son diarias, como
+# «Todo», y no hacen falta aquí.
+RANGOS_FICHA_PREVIOS = {
+    "1D": ("5", 7 * 288),
+    "7D": ("60", 90 * 24),
+    "30D": ("240", 365 * 6),
+}
+
 # Velas diarias como mucho en «TODO». Comprobado contra el feed: sin sesión
 # iniciada da 5000 (unos 20 años de bolsa) y con más no da más.
 MAX_VELAS_DIARIAS = 5000
+
+# Temporalidad elegida en el gráfico de velas → (resolución del feed, velas). Se
+# pide de una vez todo lo que se puede ver al alejar: 2000 velas intradía (unos
+# 7 días de 5 min, 3 semanas de 15 min, 3 meses de 1 h o un año de 4 h en cripto;
+# en bolsa, menos tiempo porque solo hay velas en sesión), el máximo de diarias
+# y 1000 semanales (unos 20 años). Comprobado contra el feed: sirve «15» y «1W».
+TEMPORALIDADES_FICHA = {
+    "5m": ("5", 2000),
+    "15m": ("15", 2000),
+    "1h": ("60", 2000),
+    "4h": ("240", 2000),
+    "1D": ("1D", MAX_VELAS_DIARIAS),
+    "1S": ("1W", 1000),
+}
 # Días de más en «TODO», para que la primera vela no caiga justo después de la
 # primera operación (festivos, fines de semana).
 _MARGEN_DIAS_TODO = 10
@@ -189,6 +214,8 @@ def velasDelGrafico(
     ahoraTs: float | None = None,
     fetch: Callable[..., dict] | None = None,
     clock: Callable[[], float] = time.monotonic,
+    conPrevios: bool = False,
+    temporalidad: str | None = None,
 ) -> tuple[str, list[list]] | None:
     """Velas de un ticker para el gráfico de la ficha de su activo, con su divisa.
 
@@ -203,22 +230,36 @@ def velasDelGrafico(
         fetch: Función que pide las velas; por defecto,
             `tradingview_feed.fetchSeriesWithCurrency`.
         clock: Reloj monotónico de la caché, inyectable para los tests.
+        conPrevios: Pedir también velas anteriores al rango con la misma
+            resolución (ver `RANGOS_FICHA_PREVIOS`); en los demás rangos no cambia nada.
+        temporalidad: Clave de `TEMPORALIDADES_FICHA`. Si se da, manda sobre
+            `rango`: las velas son las de esa temporalidad, sin ventana de fechas.
 
     Returns:
         `(divisa, [[ts, cierre, máximo, mínimo], ...])` con al menos dos velas, o None.
 
     Raises:
-        PeriodoInvalido: Si `rango` no existe.
+        PeriodoInvalido: Si `rango` o `temporalidad` no existen.
     """
-    if rango == "TODO":
+    # La clave de la caché lleva la temporalidad: con el mismo número de velas,
+    # 5 min y 4 h serían la misma entrada.
+    claveRango = rango
+    if temporalidad is not None:
+        if temporalidad not in TEMPORALIDADES_FICHA:
+            raise PeriodoInvalido(f"Temporalidad no admitida: {temporalidad or 'vacía'}")
+        resolucion, velas = TEMPORALIDADES_FICHA[temporalidad]
+        claveRango = f"velas:{temporalidad}"
+    elif rango == "TODO":
         resolucion = "1D"
         velas = _velasDeTodo(desdeTs, time.time() if ahoraTs is None else ahoraTs)
+    elif conPrevios and rango in RANGOS_FICHA_PREVIOS:
+        resolucion, velas = RANGOS_FICHA_PREVIOS[rango]
     elif rango in RANGOS_FICHA:
         resolucion, velas = RANGOS_FICHA[rango]
     else:
         raise PeriodoInvalido(f"Rango no admitido: {rango or 'vacío'}")
 
-    clave = (simbolo, rango, velas)
+    clave = (simbolo, claveRango, velas)
     ttl = settings.serieMapaTtlSegundos()
     ahora = clock()
     with _cacheLock:

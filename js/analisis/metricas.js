@@ -39,7 +39,15 @@ let _metricasSortKey = getChartPref("metricasSortKey", "netoActualEur")
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
 let _metricasSortDir = getChartPref("metricasSortDir", "desc")
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
-let _metricasActivosFilter = new Set(["cripto", "acciones", "etfs", "comoditis", "indices", "rentaFija", "privateMarket"])
+let _metricasActivosFilter = new Set([
+    "cripto",
+    "acciones",
+    "etfs",
+    "comoditis",
+    "indices",
+    "rentaFija",
+    "privateMarket"
+])
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
 let _metricasGastosTipoFilter = new Set()
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo

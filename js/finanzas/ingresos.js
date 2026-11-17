@@ -102,10 +102,14 @@ function normalizePagasExtra(value) {
         .filter((paga) => paga && typeof paga === "object")
         .map((paga) => ({
             nombre: String(paga.nombre || "").trim() || PAGA_EXTRA_NOMBRE,
-            mes: String(paga.mes || "").trim().toLowerCase(),
+            mes: String(paga.mes || "")
+                .trim()
+                .toLowerCase(),
             importe: String(paga.importe || "").trim()
         }))
-        .filter((paga) => INGRESOS_MONTHS.some((month) => month.key === paga.mes) && parseEuroNumber(paga.importe) !== 0)
+        .filter(
+            (paga) => INGRESOS_MONTHS.some((month) => month.key === paga.mes) && parseEuroNumber(paga.importe) !== 0
+        )
 }
 
 /**
@@ -1107,9 +1111,10 @@ function openRecurrenteDetailModal(index) {
     const cobro = getRecurrenteCobro(row)
     const extraAnual = getRecurrenteExtraAnual(row)
     const next = getRecurrenteNextCharge(row)
-    const nextText = next && !next.isPast
-        ? `${formatRecurrenteDate(next.date)} (${next.daysLeft === 0 ? "hoy" : `en ${next.daysLeft} d`})`
-        : "—"
+    const nextText =
+        next && !next.isPast
+            ? `${formatRecurrenteDate(next.date)} (${next.daysLeft === 0 ? "hoy" : `en ${next.daysLeft} d`})`
+            : "—"
     const nota = row.nota.trim()
 
     const overlay = document.createElement("div")
@@ -1476,7 +1481,9 @@ async function copiarRecurrentesAlAnioActual(origen) {
 function avisarRecurrentesCopiadas({ nuevas, omitidas }, origen) {
     if (!nuevas.length) {
         showToast(
-            omitidas ? `Las recurrentes de ${origen} ya estaban en este año.` : `${origen} no tiene ingresos recurrentes.`,
+            omitidas
+                ? `Las recurrentes de ${origen} ya estaban en este año.`
+                : `${origen} no tiene ingresos recurrentes.`,
             { type: "warning" }
         )
         return
@@ -2364,7 +2371,9 @@ function buildRecCalMonth(monthIndex, cobrosDelMes, today, yearNumber) {
         if (fecha.getTime() === today.getTime()) classes.push("mensCalDayToday")
 
         if (!delDia.length) {
-            celdas.push(`<span class="${classes.join(" ")} mensCalDayEmpty"><span class="mensCalDayNum">${day}</span></span>`)
+            celdas.push(
+                `<span class="${classes.join(" ")} mensCalDayEmpty"><span class="mensCalDayNum">${day}</span></span>`
+            )
             continue
         }
 

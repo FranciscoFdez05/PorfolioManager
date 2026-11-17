@@ -5307,7 +5307,10 @@ button.calPopupTitulo:hover,
     color: var(--text-bright);
     font-size: 14px;
     outline: none;
-    transition: border-color 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
+    transition:
+        border-color 0.12s ease,
+        background-color 0.12s ease,
+        box-shadow 0.12s ease;
 }
 
 .catInput:hover {
@@ -5362,7 +5365,10 @@ button.calPopupTitulo:hover,
     font-size: 10px;
     line-height: 1;
     cursor: pointer;
-    transition: border-color 0.12s ease, background-color 0.12s ease, color 0.12s ease;
+    transition:
+        border-color 0.12s ease,
+        background-color 0.12s ease,
+        color 0.12s ease;
 }
 
 .catRow:hover .catIconBtn:not(:disabled),
@@ -5405,7 +5411,10 @@ button.calPopupTitulo:hover,
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    transition: border-color 0.12s ease, background-color 0.12s ease, color 0.12s ease;
+    transition:
+        border-color 0.12s ease,
+        background-color 0.12s ease,
+        color 0.12s ease;
 }
 
 .catAddBtn:hover {

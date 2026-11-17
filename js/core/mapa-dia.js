@@ -80,7 +80,10 @@ function mapaDiaCargar(periodo = "dia") {
     const guardado = _mapaDiaCache[periodo]
     if (guardado && Date.now() - guardado.ts < MAPA_DIA_TTL) return Promise.resolve(guardado.datos)
     if (!_mapaDiaPeticion[periodo]) {
-        const url = periodo === "dia" ? "/api/activos-serie-dia" : `/api/activos-serie-dia?periodo=${encodeURIComponent(periodo)}`
+        const url =
+            periodo === "dia"
+                ? "/api/activos-serie-dia"
+                : `/api/activos-serie-dia?periodo=${encodeURIComponent(periodo)}`
         _mapaDiaPeticion[periodo] = fetch(url)
             .then((res) => (res.ok ? res.json() : null))
             .then((json) => {
@@ -139,7 +142,9 @@ async function mapaDiaCargarVelas(periodo, simbolos) {
 
 /** Tickers de TradingView de las baldosas de un lienzo, sin repetir. */
 function mapaDiaSimbolos(lienzo) {
-    return [...new Set([...lienzo.querySelectorAll("[data-serie-id][data-tv]")].map((c) => c.dataset.tv).filter(Boolean))]
+    return [
+        ...new Set([...lienzo.querySelectorAll("[data-serie-id][data-tv]")].map((c) => c.dataset.tv).filter(Boolean))
+    ]
 }
 
 /**
@@ -329,7 +334,9 @@ function mapaDiaSerieCelda(celda, datos, velas) {
     // Fuera de la sesión solo quedan los puntos planos recortados. Con el
     // mercado cerrado todo el día no hay nada que dibujar: sería una recta.
     const puntos =
-        ventana.plano && ventana.cerrado ? undefined : serie?.filter((p) => p[0] >= ventana.inicio && p[0] <= ventana.fin)
+        ventana.plano && ventana.cerrado
+            ? undefined
+            : serie?.filter((p) => p[0] >= ventana.inicio && p[0] <= ventana.fin)
     return { puntos, ventana }
 }
 
@@ -433,7 +440,10 @@ function mapaDiaActivar(lienzo, periodo, alPintar = null) {
  * @returns {Promise<void>}
  */
 async function mapaDiaRepintar(lienzo, periodo) {
-    const [datos, velas] = await Promise.all([mapaDiaCargar(periodo), mapaDiaCargarVelas(periodo, mapaDiaSimbolos(lienzo))])
+    const [datos, velas] = await Promise.all([
+        mapaDiaCargar(periodo),
+        mapaDiaCargarVelas(periodo, mapaDiaSimbolos(lienzo))
+    ])
     // El periodo pudo cambiar mientras llegaba la respuesta.
     if (datos && lienzo.isConnected && lienzo.dataset.mapaDia === periodo) mapaDiaPintarEn(lienzo, datos, velas)
 }

@@ -656,7 +656,9 @@ async function initMetricasLogic(options = {}) {
         // Se mantiene dentro del filtro para que "Todos" siga marcándose bien.
         const _tiposConDatos = new Set([
             ...(_metricasPayload.summaries || []).map((a) => a.type),
-            ...((_metricasPayload.bonos || []).length || (_metricasPayload.rentaFija || []).length ? ["rentaFija"] : []),
+            ...((_metricasPayload.bonos || []).length || (_metricasPayload.rentaFija || []).length
+                ? ["rentaFija"]
+                : []),
             ...((_metricasPayload.privateMarket || []).length ? ["privateMarket"] : [])
         ])
         _specificBtns.forEach((b) => {

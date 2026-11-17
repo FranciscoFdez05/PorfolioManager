@@ -9,9 +9,8 @@ from decimal import Decimal
 
 import pytest
 
-from core.wallets_carpeta import carpetaWalletsActiva
-
 from core.db import getDb
+from core.wallets_carpeta import carpetaWalletsActiva
 from providers.blockchain_clients import (
     ENVIADA,
     RECIBIDA,
@@ -44,7 +43,7 @@ def _enlazar(client, cabeceras, **cambios):
 
 
 def testEnlazarListarYNoDevolverNuncaElValor(cliente):
-    client, cabeceras, rutas = cliente
+    client, cabeceras, _rutas = cliente
 
     respuesta = _enlazar(client, cabeceras)
     listado = client.get("/api/wallets")
@@ -60,7 +59,7 @@ def testEnlazarListarYNoDevolverNuncaElValor(cliente):
 
 
 def testUnaClavePrivadaSeRechazaYNoSeGuarda(cliente):
-    client, cabeceras, rutas = cliente
+    client, cabeceras, _rutas = cliente
 
     respuesta = _enlazar(client, cabeceras, tipo="direccion", valor=" ".join(["abandon"] * 11 + ["about"]))
 
@@ -906,7 +905,7 @@ def _guardarDireccion(client, cabeceras, **cambios):
 
 
 def testGuardarYOlvidarUnaDireccion(cliente):
-    client, cabeceras, rutas = cliente
+    client, cabeceras, _rutas = cliente
 
     respuesta = _guardarDireccion(client, cabeceras).get_json()
 

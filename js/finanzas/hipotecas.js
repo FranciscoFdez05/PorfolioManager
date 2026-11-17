@@ -515,10 +515,22 @@ function hipotecasSimuladorFilas(r) {
     const fila = (titulo, celdas) =>
         `<tr><td>${escapeHtml(titulo)}</td>${celdas.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`
     return [
-        fila("Cuota tras el pago", [actual, plazo, cuota].map((e) => formatEuro(e.cuotaTrasElPago))),
-        fila("Cuotas restantes", [actual, plazo, cuota].map((e) => prestamoFormatoPlazo(e.cuotasRestantes))),
-        fila("Fecha de fin", [actual, plazo, cuota].map((e) => prestamoFormatoFecha(e.fechaFin))),
-        fila("Intereses pendientes", [actual, plazo, cuota].map((e) => formatEuro(e.interesesPendientes))),
+        fila(
+            "Cuota tras el pago",
+            [actual, plazo, cuota].map((e) => formatEuro(e.cuotaTrasElPago))
+        ),
+        fila(
+            "Cuotas restantes",
+            [actual, plazo, cuota].map((e) => prestamoFormatoPlazo(e.cuotasRestantes))
+        ),
+        fila(
+            "Fecha de fin",
+            [actual, plazo, cuota].map((e) => prestamoFormatoFecha(e.fechaFin))
+        ),
+        fila(
+            "Intereses pendientes",
+            [actual, plazo, cuota].map((e) => formatEuro(e.interesesPendientes))
+        ),
         fila("Intereses ahorrados", ["", ahorro(plazo), ahorro(cuota)]),
         fila("Meses ahorrados", ["", String(plazo.mesesAhorrados), String(cuota.mesesAhorrados)])
     ].join("")

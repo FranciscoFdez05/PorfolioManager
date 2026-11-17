@@ -82,7 +82,8 @@ function microcreditosBadge(estado) {
 function microcreditosChipsHtml(microcredito) {
     const resumen = microcreditosResumen(microcredito)
     const modo = microcredito.modo === "cuotas" ? `${microcredito.cuotas} cuotas` : "Pago único"
-    const plazo = resumen && resumen.plazoDias != null ? `<span class="microcreditosChip">${resumen.plazoDias} días</span>` : ""
+    const plazo =
+        resumen && resumen.plazoDias != null ? `<span class="microcreditosChip">${resumen.plazoDias} días</span>` : ""
     return `<span class="microcreditosChip">${escapeHtml(modo)}</span>${plazo}`
 }
 
@@ -96,14 +97,18 @@ function microcreditosPintar() {
     document.getElementById("microcreditosPanel")?.classList.toggle("hidden", visibles.length === 0)
 
     cuerpo.innerHTML = visibles.map(microcreditosFila).join("")
-    cuerpo.querySelectorAll("[data-editar]").forEach((boton) =>
-        boton.addEventListener("click", () =>
-            microcreditosAbrirFormulario(_microcreditos.find((m) => m.id === boton.dataset.editar))
+    cuerpo
+        .querySelectorAll("[data-editar]")
+        .forEach((boton) =>
+            boton.addEventListener("click", () =>
+                microcreditosAbrirFormulario(_microcreditos.find((m) => m.id === boton.dataset.editar))
+            )
         )
-    )
     cuerpo
         .querySelectorAll("[data-eliminar]")
-        .forEach((boton) => boton.addEventListener("click", () => microcreditosConfirmarBorrado(boton.dataset.eliminar)))
+        .forEach((boton) =>
+            boton.addEventListener("click", () => microcreditosConfirmarBorrado(boton.dataset.eliminar))
+        )
     cuerpo
         .querySelectorAll("[data-devolver]")
         .forEach((boton) => boton.addEventListener("click", () => microcreditosMarcarDevuelto(boton.dataset.devolver)))
@@ -145,7 +150,9 @@ function microcreditosPintarTotales(pendientes) {
         prestamoTarjeta(
             "Vencidos sin devolver",
             String(vencidos.length),
-            vencidos.length ? formatEuro(vencidos.reduce((total, m) => total + microcreditosResumen(m).pendiente, 0)) : "ninguno",
+            vencidos.length
+                ? formatEuro(vencidos.reduce((total, m) => total + microcreditosResumen(m).pendiente, 0))
+                : "ninguno",
             vencidos.length ? "negativo" : ""
         ),
         prestamoTarjeta("Coste total", formatEuro(costeTotal), "comisiones e intereses, todos los créditos")
@@ -158,7 +165,11 @@ function microcreditosPintarProximos(pendientes) {
     if (!contenedor) return
 
     const avisos = pendientes
-        .filter((m) => microcreditosResumen(m).proximaFecha && microcreditosResumen(m).diasRestantes <= microcreditosDiasProximos)
+        .filter(
+            (m) =>
+                microcreditosResumen(m).proximaFecha &&
+                microcreditosResumen(m).diasRestantes <= microcreditosDiasProximos
+        )
         .sort((a, b) => microcreditosResumen(a).proximaFecha.localeCompare(microcreditosResumen(b).proximaFecha))
 
     contenedor.classList.toggle("hidden", avisos.length === 0)
@@ -200,7 +211,9 @@ function microcreditosFila(microcredito) {
         return `<tr><td>${escapeHtml(microcredito.nombre)}</td><td colspan="8">${escapeHtml(microcredito.calculo?.error || "No se puede calcular")}</td>${acciones}</tr>`
     }
     const progreso = Math.min(100, Math.max(0, resumen.progreso))
-    const sub = resumen.liquidado ? "" : `<span class="microcreditosSub">${escapeHtml(microcreditosTextoDias(resumen.diasRestantes))}</span>`
+    const sub = resumen.liquidado
+        ? ""
+        : `<span class="microcreditosSub">${escapeHtml(microcreditosTextoDias(resumen.diasRestantes))}</span>`
     return `<tr class="microcreditosFila ${resumen.liquidado ? "pagado" : ""}" data-detalle="${escapeAttr(microcredito.id)}" title="Ver detalle">
         <td>${escapeHtml(microcredito.nombre)}<span class="microcreditosChips">${microcreditosChipsHtml(microcredito)}</span></td>
         <td>${formatEuro(resumen.importe)}</td>
@@ -216,7 +229,9 @@ function microcreditosFila(microcredito) {
 async function microcreditosMarcarDevuelto(id) {
     const hoy = new Date().toISOString().slice(0, 10)
     await microcreditosGuardarYPintar(
-        _microcreditos.map((m) => (m.id === id ? { ...microcreditosEntrada(m), devuelto: true, fechaDevolucion: hoy } : m))
+        _microcreditos.map((m) =>
+            m.id === id ? { ...microcreditosEntrada(m), devuelto: true, fechaDevolucion: hoy } : m
+        )
     )
 }
 

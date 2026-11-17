@@ -156,7 +156,7 @@ def _sesiones(fake):
     enviados = [json.loads(tradingview_feed.splitMessages(text)[0]) for text in fake.sent]
     sesiones = [m["p"][0] for m in enviados if m["m"] == "chart_create_session"]
     simbolos = [json.loads(m["p"][2][1:])["symbol"] for m in enviados if m["m"] == "resolve_symbol"]
-    return dict(zip(simbolos, sesiones))
+    return dict(zip(simbolos, sesiones, strict=True))
 
 
 def _velas(sesion, *cierres, desde=1000, paso=300):
@@ -263,10 +263,10 @@ def testFetchSeriesWithCurrencyDevuelveLaDivisaDeCadaSimbolo():
 
     series = _realFetchSeriesWithCurrency(["NASDAQ:AAPL", "XETR:SAP"], "1D", 2, timeout=5, socketFactory=fake.factory)
 
-    # `_velas` pone máximo 2 y mínimo 0,5; un cierre de 3 sube el máximo a 3.
+    # `_velas` pone apertura 1, máximo 2 y mínimo 0,5; un cierre de 3 sube el máximo a 3.
     assert series == {
-        "NASDAQ:AAPL": ("USD", [(1000, 1.0, 2.0, 0.5), (1300, 2.0, 2.0, 0.5)]),
-        "XETR:SAP": (None, [(1000, 3.0, 3.0, 0.5)]),
+        "NASDAQ:AAPL": ("USD", [(1000, 1.0, 2.0, 0.5, 1.0), (1300, 2.0, 2.0, 0.5, 1.0)]),
+        "XETR:SAP": (None, [(1000, 3.0, 3.0, 0.5, 1.0)]),
     }
 
 
@@ -281,7 +281,29 @@ def testFetchSeriesWithCurrencyMaximoYMinimoIlegiblesUsanElCierre():
 
     series = _realFetchSeriesWithCurrency(["SP:SPX"], "1D", 2, timeout=5, socketFactory=fake.factory)
 
-    assert series == {"SP:SPX": (None, [(1000, 5.0, 5.0, 5.0), (1300, 6.0, 7.0, 6.0)])}
+    # Sin rango la apertura se recorta al cierre; con rango, al mínimo.
+    assert series == {"SP:SPX": (None, [(1000, 5.0, 5.0, 5.0, 5.0), (1300, 6.0, 7.0, 6.0, 6.0)])}
+
+
+def testFetchSeriesWithCurrencyConservaLaAperturaYLaRecortaAlRango():
+    fake = GuionVelas(lambda s: [[
+        {"m": "timescale_update", "p": [s["SP:SPX"], {"s": {"s": [
+            {"i": 0, "v": [1000, 4.5, 6.0, 4.0, 5.0]},
+            {"i": 1, "v": [1300, 9.0, 7.0, 5.0, 6.0]},
+            {"i": 2, "v": [1600, "x", 7.0, 5.0, 6.5]},
+            {"i": 3, "v": [1900, 0, 7.0, 5.0, 6.5]},
+        ]}}]},
+        {"m": "series_completed", "p": [s["SP:SPX"], "s"]},
+    ]])
+
+    series = _realFetchSeriesWithCurrency(["SP:SPX"], "1D", 4, timeout=5, socketFactory=fake.factory)
+
+    assert series == {"SP:SPX": (None, [
+        (1000, 5.0, 6.0, 4.0, 4.5),
+        (1300, 6.0, 7.0, 5.0, 7.0),
+        (1600, 6.5, 7.0, 5.0, 6.5),
+        (1900, 6.5, 7.0, 5.0, 6.5),
+    ])}
 
 
 def testFetchSeriesSinSimbolosNoConecta():

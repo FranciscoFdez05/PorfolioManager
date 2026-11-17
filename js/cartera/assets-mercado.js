@@ -31,7 +31,8 @@ function renderAssetMercadoSection() {
     const section = document.getElementById("assetMercadoSection")
     if (!section || !_assetMercadoAsset) return
 
-    const tvSymbol = typeof buildTVSymbol === "function" ? String(buildTVSymbol(_assetMercadoAsset) || "").toUpperCase() : ""
+    const tvSymbol =
+        typeof buildTVSymbol === "function" ? String(buildTVSymbol(_assetMercadoAsset) || "").toUpperCase() : ""
     if (!tvSymbol.includes(":")) {
         section.innerHTML = mkMessage(
             "Este activo no tiene un ticker de TradingView con mercado (MERCADO:TICKER), así que no hay datos que mostrar. Puedes asignarlo desde Editar activo."
@@ -88,7 +89,7 @@ function mkBuildHtml(data, asset) {
     const cur = String(s.currency || asset.currency || "EUR").toUpperCase()
     // El popup de datos técnicos se abre más tarde, con lo que se pintó aquí.
     _mkTecActivo = { nombre: String(asset?.name || data.ticker || ""), stats: s, divisa: cur }
-    const blocks = (data.isCrypto ? mkCryptoBlocks(data) : mkTraditionalBlocks(s, cur))
+    const blocks = data.isCrypto ? mkCryptoBlocks(data) : mkTraditionalBlocks(s, cur)
 
     return `
         <div class="mkWrap">
@@ -177,7 +178,9 @@ async function mkLevelsFillYear(section, ticker, close, cur) {
     if (section.querySelector("[data-mk-ticker]")?.dataset.mkTicker !== ticker) return
 
     const anio = new Date().getFullYear()
-    const cierres = (puntos || []).filter(([ts, c]) => c > 0 && new Date(ts * 1000).getFullYear() === anio).map(([, c]) => c)
+    const cierres = (puntos || [])
+        .filter(([ts, c]) => c > 0 && new Date(ts * 1000).getFullYear() === anio)
+        .map(([, c]) => c)
     if (!cierres.length) return
 
     const niveles = { max: Math.max(...cierres), min: Math.min(...cierres) }
@@ -216,7 +219,10 @@ function mkQualityCol(s) {
     const filas = []
 
     if (precio !== null && maximo !== null && minimo !== null && maximo > minimo) {
-        filas.push(["Posición en el rango de 52 sem.", fnPercentPlain(((precio - minimo) / (maximo - minimo)) * 100, 1)])
+        filas.push([
+            "Posición en el rango de 52 sem.",
+            fnPercentPlain(((precio - minimo) / (maximo - minimo)) * 100, 1)
+        ])
     }
     if (precio !== null && bandaAlta !== null && bandaBaja !== null && bandaAlta > bandaBaja) {
         const pctB = ((precio - bandaBaja) / (bandaAlta - bandaBaja)) * 100
@@ -265,7 +271,9 @@ function mkPivotsCol(s, cur) {
         ["Soporte S2", "S2"],
         ["Soporte S3", "S3"]
     ]
-    const filas = niveles.map(([etiqueta, nivel]) => mkNivelLinea(etiqueta, s[`Pivot.M.Classic.${nivel}`], s.close, cur)).join("")
+    const filas = niveles
+        .map(([etiqueta, nivel]) => mkNivelLinea(etiqueta, s[`Pivot.M.Classic.${nivel}`], s.close, cur))
+        .join("")
     if (!filas.trim()) return ""
     return `
         <div class="fnDetailCol">
@@ -301,14 +309,27 @@ function mkCryptoBlocks(data) {
     if (coin) {
         parts.push(`<div class="mkGrid">${mkCoinCards(coin)}</div>`)
         if (coin.crypto_common_categories?.length) {
-            const chips = coin.crypto_common_categories.slice(0, 6).map((c) => `<span class="mkChip">${escapeHtml(c)}</span>`).join("")
+            const chips = coin.crypto_common_categories
+                .slice(0, 6)
+                .map((c) => `<span class="mkChip">${escapeHtml(c)}</span>`)
+                .join("")
             parts.push(`<div class="mkChips">${chips}</div>`)
         }
     } else {
-        parts.push(mkMessage(data.coinError ? escapeHtml(data.coinError) : "TradingView no publica datos de suministro para esta moneda."))
+        parts.push(
+            mkMessage(
+                data.coinError
+                    ? escapeHtml(data.coinError)
+                    : "TradingView no publica datos de suministro para esta moneda."
+            )
+        )
     }
 
-    parts.push(mkSectionTitle(`Derivados${data.derivatives ? ` · ${escapeHtml(data.derivatives.symbol)} perpetuo (Binance)` : ""}`))
+    parts.push(
+        mkSectionTitle(
+            `Derivados${data.derivatives ? ` · ${escapeHtml(data.derivatives.symbol)} perpetuo (Binance)` : ""}`
+        )
+    )
     parts.push(mkDerivativesHtml(data, coin))
     return parts.join("")
 }
@@ -329,7 +350,11 @@ function mkCoinCards(coin) {
         mkCard("Volumen (24 h)", mkMoney(volume, "USD"), mkSignedSub(coin["24h_vol_change|5"])),
         mkCard("Vol. / Cap. de mercado", volRatio === null ? "—" : fnPercentPlain(volRatio, 1)),
         mkCard("FDV (valoración diluida)", mkMoney(fnToNumber(coin.market_cap_diluted_calc), "USD")),
-        mkCard("Suministro en circulación", mkSupply(circulating, base), issuedPct === null ? "" : `${fnPercentPlain(issuedPct, 1)} del máximo`),
+        mkCard(
+            "Suministro en circulación",
+            mkSupply(circulating, base),
+            issuedPct === null ? "" : `${fnPercentPlain(issuedPct, 1)} del máximo`
+        ),
         mkCard("Suministro total", mkSupply(fnToNumber(coin.total_supply), base)),
         mkCard("Suministro máximo", maxSupply === null ? "Sin límite" : mkSupply(maxSupply, base))
     ].join("")
@@ -353,9 +378,17 @@ function mkDerivativesHtml(data, coin) {
         : ""
 
     return `<div class="mkGrid">${[
-        mkCard("Precio de marca", fnMoneyFull(d.markPrice, "USD", d.markPrice >= 1 ? 2 : 6), mkSignedSub(d.basisPct, "frente al índice")),
+        mkCard(
+            "Precio de marca",
+            fnMoneyFull(d.markPrice, "USD", d.markPrice >= 1 ? 2 : 6),
+            mkSignedSub(d.basisPct, "frente al índice")
+        ),
         mkCard("Tasa de financiación", funding === null ? "—" : fnPercentSigned(funding, 4), fundingSub),
-        mkCard("Interés abierto", mkMoney(d.openInterestUsd, "USD"), oiToCap === null ? "" : `${fnPercentPlain(oiToCap, 1)} de la capitalización`),
+        mkCard(
+            "Interés abierto",
+            mkMoney(d.openInterestUsd, "USD"),
+            oiToCap === null ? "" : `${fnPercentPlain(oiToCap, 1)} de la capitalización`
+        ),
         mkCard("Volumen de futuros (24 h)", mkMoney(d.volume24hUsd, "USD"))
     ].join("")}</div>`
 }
@@ -466,11 +499,13 @@ function mkTecGauge(valor, titulo) {
 
     const info = fnRatingInfo(num)
     const hueco = 0.03
-    const arcos = _MK_TEC_TRAMOS.map(([desde, hasta, clase]) => {
-        const a = mkTecPunto(desde + hueco, 48)
-        const b = mkTecPunto(hasta - hueco, 48)
-        return `<path class="${clase}" d="M ${a.x.toFixed(2)} ${a.y.toFixed(2)} A 48 48 0 0 1 ${b.x.toFixed(2)} ${b.y.toFixed(2)}" />`
-    }).join("")
+    const arcos = _MK_TEC_TRAMOS
+        .map(([desde, hasta, clase]) => {
+            const a = mkTecPunto(desde + hueco, 48)
+            const b = mkTecPunto(hasta - hueco, 48)
+            return `<path class="${clase}" d="M ${a.x.toFixed(2)} ${a.y.toFixed(2)} A 48 48 0 0 1 ${b.x.toFixed(2)} ${b.y.toFixed(2)}" />`
+        })
+        .join("")
     const punta = mkTecPunto(Math.max(-1, Math.min(1, num)), 34)
 
     return `
@@ -690,7 +725,10 @@ function mkCompact(value) {
     const tier = _MK_SCALE.find((t) => abs >= t.from)
     const number = tier ? value / tier.divisor : value
     const decimals = tier ? 2 : abs >= 100 ? 0 : 2
-    return number.toLocaleString(_nl(), { minimumFractionDigits: 0, maximumFractionDigits: decimals }) + (tier ? tier.suffix : "")
+    return (
+        number.toLocaleString(_nl(), { minimumFractionDigits: 0, maximumFractionDigits: decimals }) +
+        (tier ? tier.suffix : "")
+    )
 }
 
 function mkMoney(value, currency) {

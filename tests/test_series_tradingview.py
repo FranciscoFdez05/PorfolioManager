@@ -202,6 +202,31 @@ def testVelasDelGraficoDevuelveDivisaYPideLaResolucionDelRango(reloj):
     assert feed.llamadas == [(["NASDAQ:AAPL"], "240", 200)]
 
 
+def testVelasDelGraficoConPreviosPideMasVelasConLaMismaResolucion(reloj):
+    feed = FeedConDivisa()
+
+    series_tradingview.velasDelGrafico("X:A", "30D", fetch=feed, clock=reloj, conPrevios=True)
+    series_tradingview.velasDelGrafico("X:A", "7D", fetch=feed, clock=reloj, conPrevios=True)
+    series_tradingview.velasDelGrafico("X:A", "1A", fetch=feed, clock=reloj, conPrevios=True)
+
+    assert [llamada[1:] for llamada in feed.llamadas] == [("240", 365 * 6), ("60", 90 * 24), ("1D", 380)]
+
+
+def testVelasDelGraficoConTemporalidadMandaSobreElRangoYNoComparteCache(reloj):
+    feed = FeedConDivisa()
+
+    series_tradingview.velasDelGrafico("X:A", "TODO", fetch=feed, clock=reloj, temporalidad="15m")
+    series_tradingview.velasDelGrafico("X:A", "TODO", fetch=feed, clock=reloj, temporalidad="4h")
+    series_tradingview.velasDelGrafico("X:A", "TODO", fetch=feed, clock=reloj, temporalidad="1S")
+
+    assert [llamada[1:] for llamada in feed.llamadas] == [("15", 2000), ("240", 2000), ("1W", 1000)]
+
+
+def testVelasDelGraficoConTemporalidadDesconocidaFalla(reloj):
+    with pytest.raises(series_tradingview.PeriodoInvalido):
+        series_tradingview.velasDelGrafico("X:A", "TODO", fetch=FeedConDivisa(), clock=reloj, temporalidad="3h")
+
+
 def testVelasDelGraficoEnTodoCubreDesdeElPrimerMovimientoConTope(reloj):
     feed = FeedConDivisa()
     ahora = 1_800_000_000

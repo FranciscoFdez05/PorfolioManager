@@ -22,12 +22,26 @@ decide cómo se deshace la actualización:
 
 ---
 
-## [Sin publicar]
+## [5.6.0] — 2026-11-17
 
 **Esquema de base de datos:** no lo toca (sigue en el **41**).
 
 ### Añadido
 
+- **Escala del eje de precios en los gráficos de línea**, como en TradingView:
+  arrastrar el eje vertical estira o comprime la línea, arrastrar el eje de
+  fechas estira o comprime los meses, arrastrar dentro del gráfico lo desplaza,
+  doble clic en un eje, **Centrar** (arriba a la derecha) o **AUTO** vuelve a
+  la escala automática y **LOG**
+  alterna entre lineal y logarítmica
+  (se recuerda por gráfico y solo sale con todos los valores positivos).
+- **Detalle de cada compra y venta en el gráfico del activo**: el tooltip de
+  cada punto da además lo invertido o vendido en euros y su peso sobre el total
+  de la cartera de hoy. Pulsar un punto fija su detalle en pantalla (se pueden
+  fijar varios; volver a pulsarlo lo suelta) y **Ocultar detalles**, arriba a
+  la derecha junto a **Centrar**, los quita todos. Las fichas fijadas se apartan
+  para no pisarse. El eje de precios lleva más cifras, a la misma distancia
+  también en **LOG**, y el gráfico es algo más bajo para que se vea entero.
 - **Herramientas › Fiscal › Compensar pérdidas**: simula vender cada posición
   en pérdidas al último precio guardado, una a una y todas juntas, y da la
   cuota del ahorro que ahorrarías este año, la pérdida que pasaría a años
@@ -76,6 +90,31 @@ decide cómo se deshace la actualización:
   pantallas (Fundamentales, Sentimiento, Mapas, Herramientas, Cripto, Cuentas,
   Planes, alertas…) seguían escribiendo los números a la española. Ahora todas
   respetan el ajuste.
+- **HTTPS: el certificado no se presentaba al entrar por IP.** Un navegador que
+  entra por `https://192.168.1.50:5000` no manda SNI y Caddy, dentro de Docker,
+  buscaba el certificado de la IP del contenedor: cortaba el handshake (`no
+  certificate available`) en el puerto de siempre y en el de comprobación, así
+  que la CA parecía mal instalada aunque estuviese bien. Ahora se entrega el
+  certificado de la IP de la LAN (`default_sni`).
+- **HTTPS: el vigilante daba la aplicación por caída con el HTTPS activo.**
+  Sondea `https://caddy:<puerto>` y ese nombre no tiene certificado; ahora Caddy
+  presenta el de la LAN (`fallback_sni`) y el vigilante lo valida contra la CA.
+- **HTTPS: avisos de `certutil` en el log de Caddy** al emitir el certificado.
+  Intentaba instalar su CA en el propio contenedor, que no la usa; ya no
+  (`skip_install_trust`). La CA se sigue instalando en cada aparato desde
+  Ajustes.
+- **HTTPS por la VPN en iPhone e iPad.** Por IP solo puede presentarse el
+  certificado de una, así que una segunda IP daba aviso de certificado. Ahora
+  la recomendación es usar la misma IP de la LAN también por la VPN del router
+  (que ya enruta hacia ella, sin tocar su configuración) y en el Atajo. El panel
+  de HTTPS avisa si la lista lleva más de una IP y la guía de instalación lo
+  explica; `GET /api/tls` devuelve `ipLan` y `nombrePorDefecto`.
+- **HTTPS: instalar el certificado en Windows con Vivaldi, Chrome o Edge.** La
+  guía propone un único comando (`certutil -user -addstore Root …`, sin
+  administrador) que lo deja siempre en «Entidades de certificación raíz de
+  confianza», en vez del asistente, que lo dejaba en *Personal*. Y avisa de
+  que hay que cerrar el navegador del todo tras instalarlo: Chromium no ve la
+  CA nueva hasta reiniciarse y la comprobación seguía fallando.
 
 ---
 

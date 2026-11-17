@@ -70,6 +70,12 @@ def _estadoPublico() -> dict:
         # nombre de la barra más la IP de la LAN, que es la que se olvida y la
         # que hace falta para entrar desde el móvil.
         "nombresSugeridos": tls.nombresSugeridos(request.host or ""),
+        # El certificado que Caddy entrega a quien entra por IP (sin SNI). Solo
+        # hay uno, así que una segunda IP en la lista no va a validar: el panel
+        # lo avisa y propone usar esta misma IP también por la VPN del router,
+        # que ya enruta hacia la LAN. Ver `tls.nombrePorDefecto()`.
+        "nombrePorDefecto": tls.nombrePorDefecto(estado["nombres"]),
+        "ipLan": tls.ipLan(),
     }
 
 

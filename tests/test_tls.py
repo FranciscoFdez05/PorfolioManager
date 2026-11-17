@@ -165,6 +165,68 @@ def testLaApiDeAdminNoSePublicaPeroSíEscucha():
     assert "admin :2019" in tls.construirCaddyfile(False, [])
 
 
+# ── Certificado sin SNI ───────────────────────────────────────────────────────
+# Quien entra por IP no manda SNI, y dentro de Docker la IP local que ve Caddy
+# es la del contenedor: sin `default_sni` el handshake se corta.
+
+@pytest.fixture
+def sinIpDeLaLan(monkeypatch):
+    monkeypatch.delenv("PORTFOLIO_LAN_IP", raising=False)
+
+
+def testSinSniSeEntregaElCertificadoDeLaIpDeLaLan(monkeypatch):
+    monkeypatch.setenv("PORTFOLIO_LAN_IP", "192.168.1.50")
+
+    assert tls.nombrePorDefecto(["10.0.0.7", "portfolio.casa", "192.168.1.50"]) == "192.168.1.50"
+
+
+def testSinIpDeLaLanEnLaListaSeEligeLaPrimeraIp(monkeypatch):
+    monkeypatch.setenv("PORTFOLIO_LAN_IP", "192.168.1.99")
+
+    assert tls.nombrePorDefecto(["portfolio.casa", "10.0.0.7", "192.168.1.50"]) == "10.0.0.7"
+
+
+def testSoloConNombresSeEligeElPrimero(sinIpDeLaLan):
+    assert tls.nombrePorDefecto(["portfolio.casa", "nas.lan"]) == "portfolio.casa"
+
+
+def testSinNombresNoHayCertificadoPorDefecto(sinIpDeLaLan):
+    assert tls.nombrePorDefecto([]) is None
+
+
+def testConIpv6TambiénSeEligeLaIp(sinIpDeLaLan):
+    assert tls.nombrePorDefecto(["portfolio.casa", "fd00::50"]) == "fd00::50"
+
+
+@pytest.mark.parametrize("activado,preparando", [(True, False), (False, True)])
+def testConTlsElProxyAtiendeClientesSinSni(sinIpDeLaLan, activado, preparando):
+    """Vale para el puerto de siempre y para el de comprobación: los dos los
+    abre el móvil por IP, y los dos cortaban el handshake."""
+    conf = tls.construirCaddyfile(activado, ["portfolio.casa", "192.168.1.50"], preparando=preparando)
+    globales = conf.split("}\n\n")[0]
+
+    assert "\tdefault_sni 192.168.1.50\n" in globales
+    assert "\tfallback_sni 192.168.1.50\n" in globales
+
+
+@pytest.mark.parametrize("activado,preparando", [(True, False), (False, True)])
+def testCaddyNoIntentaInstalarSuCaEnElContenedor(sinIpDeLaLan, activado, preparando):
+    """La CA se instala en los aparatos; en el contenedor solo dejaba avisos de
+    `certutil` que parecían un fallo del certificado."""
+    conf = tls.construirCaddyfile(activado, ["casa"], preparando=preparando)
+
+    assert "\tskip_install_trust\n" in conf.split("}\n\n")[0]
+
+
+def testEnClaroNoHayOpcionesDeTls(sinIpDeLaLan):
+    """Sin `tls internal` no hay certificado que elegir ni CA que instalar."""
+    conf = tls.construirCaddyfile(False, ["casa"])
+
+    assert "default_sni" not in conf
+    assert "fallback_sni" not in conf
+    assert "skip_install_trust" not in conf
+
+
 # ── Preparación ───────────────────────────────────────────────────────────────
 # El paso que evita quedarse fuera: se emite el certificado sin que el puerto por
 # el que está entrando el usuario deje de hablar en claro.
@@ -613,6 +675,29 @@ def testLosEndpointsExigenSesion(crearApp, bpTls):
     assert client.get("/api/tls/ca.crt").status_code == 401
     assert client.get("/api/tls/prueba").status_code == 401
     assert client.post("/api/tls/preparar", json={"nombres": ["casa"]}).status_code == 401
+
+
+def testElEstadoDiceQueIpRecibeElCertificadoSinSni(clienteAutenticado, bpTls, caddy, monkeypatch):
+    """El panel lo necesita para avisar de que la IP del túnel de WireGuard no
+    validaría como segunda entrada y proponer entrar por la VPN a la de la LAN."""
+    monkeypatch.setenv("PORTFOLIO_LAN_IP", "192.168.1.50")
+    tls.guardarEstado(False, ["10.8.0.1", "192.168.1.50"])
+    client, _cab, _app = clienteAutenticado(bpTls)
+
+    datos = client.get("/api/tls").get_json()
+
+    assert datos["ipLan"] == "192.168.1.50"
+    assert datos["nombrePorDefecto"] == "192.168.1.50"
+
+
+def testSinIpDeLaLanElEstadoNoInventaNinguna(sinIpDeLaLan):
+    assert tls.ipLan() is None
+
+
+def testUnaIpDeLaLanMalFormadaSeIgnora(monkeypatch):
+    monkeypatch.setenv("PORTFOLIO_LAN_IP", "<IP_DEL_SERVIDOR>")
+
+    assert tls.ipLan() is None
 
 
 def testElEstadoSugiereElNombrePorElQueHasEntrado(clienteAutenticado, bpTls, caddy):

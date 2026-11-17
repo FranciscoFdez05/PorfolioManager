@@ -937,6 +937,10 @@ function _initAjustesAtajoHttps() {
     const tlsEstadoEl = document.getElementById("ajustesTlsEstado")
     const tlsNombresEl = document.getElementById("ajustesTlsNombres")
     const tlsAvisoNombreEl = document.getElementById("ajustesTlsAvisoNombre")
+    const tlsAvisoVpnEl = document.getElementById("ajustesTlsAvisoVpn")
+    // IP de la LAN que calcula docker-up.sh; decide qué certificado entrega
+    // Caddy a quien entra por IP. Se guarda al pintar para el aviso de la VPN.
+    let _tlsIpLan = null
     const tlsPrepararBtn = document.getElementById("ajustesTlsPrepararBtn")
     const tlsActivarBtn = document.getElementById("ajustesTlsActivarBtn")
     const tlsDesactivarBtn = document.getElementById("ajustesTlsDesactivarBtn")
@@ -1027,7 +1031,9 @@ function _initAjustesAtajoHttps() {
         if (tlsPaso2El) {
             tlsPaso2El.style.display = editable && !data.activado && conCa ? "" : "none"
         }
+        _tlsIpLan = data.ipLan || null
         _avisarSiTeDejasFuera()
+        _avisarSiVariasIps()
         // La comprobación también se adelanta: sirve para el certificado ya
         // emitido, no solo para el HTTPS ya puesto. Era el orden equivocado
         // —comprobar después de apostarse la sesión es un diagnóstico, no una
@@ -1110,8 +1116,46 @@ function _initAjustesAtajoHttps() {
             lista.push(actual)
             if (tlsNombresEl) tlsNombresEl.value = lista.join(", ")
             _avisarSiTeDejasFuera()
+            _avisarSiVariasIps()
         })
         tlsAvisoNombreEl.appendChild(btn)
+    }
+
+    // Solo IPv4: `_nombreLimpio` corta en el primer «:» y una IPv6 no llega
+    // entera hasta aquí. En una LAN doméstica con WireGuard es lo que se usa.
+    function _esIp(nombre) {
+        return /^\d{1,3}(\.\d{1,3}){3}$/.test(nombre)
+    }
+
+    // Quien entra por IP no manda SNI y Caddy, dentro de Docker, no sabe por cuál
+    // de las IPs del servidor ha llegado: entrega siempre el certificado de una
+    // (la de la LAN, o la primera). Una segunda IP en la lista da aviso de
+    // certificado en iPhone e iPad aunque la CA esté instalada. Con la VPN del
+    // router no hace falta otra: el móvil llega a la IP de la LAN por el túnel.
+    // Mismo criterio que `nombrePorDefecto()` en core/tls.py.
+    function _avisarSiVariasIps() {
+        if (!tlsAvisoVpnEl) return
+
+        const ips = _nombresEscritos()
+            .map(_nombreLimpio)
+            .filter((n) => _esIp(n) && n !== "127.0.0.1")
+        const unicas = [...new Set(ips)]
+        if (unicas.length < 2) {
+            tlsAvisoVpnEl.hidden = true
+            return
+        }
+
+        const principal = _tlsIpLan && unicas.includes(_tlsIpLan) ? _tlsIpLan : unicas[0]
+        const otras = unicas.filter((n) => n !== principal)
+        const codigo = (n) => `<code>${escapeHtml(n)}</code>`
+
+        tlsAvisoVpnEl.hidden = false
+        tlsAvisoVpnEl.innerHTML =
+            `<span>Entrando por IP solo valdrá el certificado de ${codigo(principal)}; ` +
+            `por ${otras.map(codigo).join(", ")} el navegador avisará aunque tengas la CA instalada. ` +
+            `Usa ${codigo(principal)} en todos los aparatos y en el Atajo, también desde fuera: con la VPN ` +
+            `del router conectada se llega a la LAN por el túnel. Si necesitas otra dirección, usa un nombre ` +
+            `de host (el que reparta el router), que sí lleva su propio certificado.</span>`
     }
 
     // --- Paso 1: emitir el certificado ---
@@ -1334,7 +1378,9 @@ function _initAjustesAtajoHttps() {
                     "mal",
                     "<strong>Este aparato no acepta el certificado.</strong> O no está instalado aquí —en Windows tiene que " +
                         "quedar en «Entidades de certificación raíz de confianza», no en «Personal»—, o no se llega al puerto " +
-                        "de comprobación. Si activas el HTTPS ahora, este navegador te sacaría el aviso.",
+                        "de comprobación. Si acabas de instalarlo, <strong>cierra el navegador del todo y vuelve a abrirlo</strong>: " +
+                        "Vivaldi, Chrome y Edge no ven una CA nueva hasta reiniciarse. Si activas el HTTPS ahora, este " +
+                        "navegador te sacaría el aviso.",
                     url
                 )
             }
@@ -1454,6 +1500,7 @@ function _initAjustesAtajoHttps() {
     }
 
     if (tlsNombresEl) tlsNombresEl.addEventListener("input", _avisarSiTeDejasFuera)
+    if (tlsNombresEl) tlsNombresEl.addEventListener("input", _avisarSiVariasIps)
     if (tlsPruebaBtn) tlsPruebaBtn.addEventListener("click", _probarTls)
     if (tlsPruebaAparatoBtn) tlsPruebaAparatoBtn.addEventListener("click", _comprobarEnEsteAparato)
     if (tlsPrepararBtn) tlsPrepararBtn.addEventListener("click", _prepararTls)

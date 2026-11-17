@@ -9,10 +9,9 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-
-from core.wallets_carpeta import carpetaWalletsActiva
 from cryptography.fernet import Fernet
 
+from core.wallets_carpeta import carpetaWalletsActiva
 from core.wallets_historial import HistorialWallets, claveMovimiento, fusionarMovimientos
 from providers.blockchain_clients import RECIBIDA, ErrorLecturaWallet, MovimientoWallet, UtxoBitcoin
 from stores.wallets_lecturas import SECCION_MOVIMIENTOS, SECCION_UTXOS, LecturasRepository
@@ -236,7 +235,7 @@ def _ponerLector(monkeypatch, movimientos) -> _LectorFalso:
 
 class TestRutas:
     def testLoLeidoSeVeAlVolverSinTocarLaRed(self, cliente, monkeypatch):
-        client, _cabeceras, walletId, rutas = cliente
+        client, _cabeceras, walletId, _rutas = cliente
         hashLargo = "abcdef0123456789abcdef0123456789"
         lector = _ponerLector(monkeypatch, [_movimiento(hashLargo)])
 
@@ -310,7 +309,7 @@ class TestRutas:
         assert datos["lecturas"] == {}
 
     def testDesenlazarBorraLoGuardado(self, cliente, monkeypatch):
-        client, cabeceras, walletId, rutas = cliente
+        client, cabeceras, walletId, _rutas = cliente
         _ponerLector(monkeypatch, [_movimiento("h1")])
         client.get(f"/api/wallets/{walletId}/movimientos")
         fichero = carpetaWalletsActiva() / "wallets_lecturas" / f"{walletId}.key"
@@ -321,7 +320,7 @@ class TestRutas:
         assert not fichero.exists()
 
     def testDejarDeSeguirBorraLoGuardado(self, cliente, monkeypatch):
-        client, cabeceras, walletId, rutas = cliente
+        client, cabeceras, walletId, _rutas = cliente
         _ponerLector(monkeypatch, [_movimiento("h1")])
         client.get(f"/api/wallets/{walletId}/movimientos")
         fichero = carpetaWalletsActiva() / "wallets_lecturas" / f"{walletId}.key"

@@ -236,7 +236,9 @@ async function assetGraficoDibujarAnual() {
     }
 
     const anioActual = new Date().getFullYear()
-    const etiquetas = filas.map((fila) => `${fila.anio}${fila.anio === anioActual ? " (YTD)" : ""}${fila.parcial ? " *" : ""}`)
+    const etiquetas = filas.map(
+        (fila) => `${fila.anio}${fila.anio === anioActual ? " (YTD)" : ""}${fila.parcial ? " *" : ""}`
+    )
     const ultima = filas[filas.length - 1]
     assetGraficoEscribirCabecera({
         etiqueta: "Rentabilidad del precio por año",
@@ -253,7 +255,9 @@ async function assetGraficoDibujarAnual() {
                 {
                     label: "Rentabilidad (%)",
                     data: filas.map((fila) => +fila.rentabilidad.toFixed(2)),
-                    backgroundColor: filas.map((fila) => (fila.rentabilidad >= 0 ? base.colorPositivo : base.colorNegativo)),
+                    backgroundColor: filas.map((fila) =>
+                        fila.rentabilidad >= 0 ? base.colorPositivo : base.colorNegativo
+                    ),
                     borderRadius: 6,
                     maxBarThickness: 90
                 }
@@ -320,7 +324,9 @@ async function assetGraficoDibujarIndices() {
 
     if (puntos.length < 2 || puntos[puntos.length - 1].ts - puntos[0].ts < assetGraficoMinimoComparativaSegundos) {
         assetGraficoEscribirCabecera({ etiqueta })
-        assetGraficoMostrarVacio("Hacen falta al menos dos días de precios para comparar con un índice. Prueba con un rango más amplio.")
+        assetGraficoMostrarVacio(
+            "Hacen falta al menos dos días de precios para comparar con un índice. Prueba con un rango más amplio."
+        )
         return
     }
 
@@ -427,16 +433,28 @@ async function assetGraficoDibujarIndices() {
                     grace: "8%",
                     grid: { color: base.colorRejilla },
                     border: { display: false },
-                    ticks: { color: base.colorTexto, maxTicksLimit: 6, callback: (valor) => assetGraficoFormatearPct(valor) }
+                    ticks: {
+                        color: base.colorTexto,
+                        maxTicksLimit: 6,
+                        callback: (valor) => assetGraficoFormatearPct(valor)
+                    }
                 }
             },
             plugins: {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        title: (items) => (items[0] ? assetGraficoFormatearFecha(items[0].raw.x, assetGraficoConHora(assetGraficoEstado().rango)) : ""),
+                        title: (items) =>
+                            items[0]
+                                ? assetGraficoFormatearFecha(
+                                      items[0].raw.x,
+                                      assetGraficoConHora(assetGraficoEstado().rango)
+                                  )
+                                : "",
                         label: (contexto) =>
-                            Number.isFinite(contexto.raw.y) ? `${contexto.dataset.label}: ${assetGraficoFormatearPct(contexto.raw.y)}` : ""
+                            Number.isFinite(contexto.raw.y)
+                                ? `${contexto.dataset.label}: ${assetGraficoFormatearPct(contexto.raw.y)}`
+                                : ""
                     }
                 }
             }
@@ -642,7 +660,9 @@ async function assetGraficoDibujarTablaEstacional(token) {
     // El servidor devuelve la serie con el ticker en mayúsculas, como lo pide la ficha lateral.
     const ticker = assetGraficoSimboloTv().toUpperCase()
     if (!tabla || typeof detMkObtenerMensual !== "function" || !ticker.includes(":")) {
-        assetGraficoMostrarVacio("La tabla mensual necesita las velas de TradingView y este activo no tiene ticker con mercado.")
+        assetGraficoMostrarVacio(
+            "La tabla mensual necesita las velas de TradingView y este activo no tiene ticker con mercado."
+        )
         return
     }
     tabla.innerHTML = detMkMensaje("Cargando…")

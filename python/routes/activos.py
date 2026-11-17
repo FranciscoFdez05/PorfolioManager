@@ -296,6 +296,10 @@ def getActivoGrafico(assetId):
     `?tv=` es el ticker de TradingView del activo (lo calcula el frontend, igual
     que en Paneles): con él, lo que no cubren los snapshots sale de sus velas.
     Uno con formato no válido se ignora y el gráfico usa solo los snapshots.
+    `?previos=1` añade, en los rangos intradía, las velas anteriores al rango
+    con su misma resolución, para verlas al alejar el gráfico.
+    `?temporalidad=` (5m, 15m, 1h, 4h, 1D o 1S) pide para el gráfico de velas
+    todas las de esa temporalidad, y manda sobre el rango.
     """
     try:
         simbolosTv = series_tradingview.normalizarSimbolos([request.args.get("tv", "")])
@@ -306,6 +310,8 @@ def getActivoGrafico(assetId):
             slugify(assetId),
             request.args.get("rango", "30D").strip().upper(),
             simboloTv=simbolosTv[0] if simbolosTv else None,
+            conPrevios=request.args.get("previos") == "1",
+            temporalidad=request.args.get("temporalidad") or None,
         )
     except grafico_activo.RangoInvalido as error:
         return jsonify({"ok": False, "error": str(error)}), 400

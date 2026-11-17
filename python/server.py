@@ -32,16 +32,16 @@ from routes.carteras_conocidas import carterasConocidasBp
 from routes.categorias import categoriasBp
 from routes.cuenta_ahorro import cuentaAhorroBp
 from routes.cuentas import cuentasBp
-from routes.financiaciones import financiacionesBp
 from routes.exportar import exportarBp
+from routes.financiaciones import financiacionesBp
 from routes.gastos import gastosBp
 from routes.herramientas import herramientasBp
 from routes.hipotecas import hipotecasBp
-from routes.microcreditos import microcreditosBp
 from routes.ingresos import ingresosBp
 from routes.ingresos_pasivos import ingresosPasivosBp
 from routes.market import marketBp
 from routes.market_pulse import marketPulseBp
+from routes.microcreditos import microcreditosBp
 from routes.movimientos import movimientosBp
 from routes.operaciones import operacionesBp
 from routes.patrimonio import patrimonioBp
@@ -318,8 +318,8 @@ ensureDataFile()
 _encryptApiKeysAtRest()
 # Las wallets de seguimiento eran de la instalación; ahora son de cada portfolio.
 # Las que había pasan al portfolio activo en este arranque.
-from core import wallets_carpeta  # noqa: E402
-from core.db import getActiveDbPath  # noqa: E402
+from core import wallets_carpeta
+from core.db import getActiveDbPath
 
 wallets_carpeta.migrarWalletsAlPortfolio(getActiveDbPath().stem)
 # Con el servicio worker de Docker, estos hilos corren allí (admin/worker.py) y

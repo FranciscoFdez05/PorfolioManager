@@ -77,12 +77,109 @@
    el lienzo crecería sin freno. Se usa --vh y no vh por el zoom de pantallas grandes. */
 .assetGraficoLienzo {
     position: relative;
-    height: calc(var(--vh, 1vh) * 48);
-    min-height: 280px;
+    /* 52 y no más: con la cabecera de la página y la del gráfico encima, a partir de
+       ahí el eje de fechas y la leyenda quedaban por debajo del borde de la ventana. */
+    height: calc(var(--vh, 1vh) * 52);
+    min-height: 340px;
+}
+
+.assetGraficoAmpliarBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    min-width: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.assetGraficoAmpliarBtn:hover,
+.assetGraficoAmpliarBtn[aria-pressed="true"] {
+    color: var(--text-bright);
+    border-color: var(--btn-active-border);
+}
+
+/* Vista ampliada: el mismo panel pasa a casi toda la ventana. Queda por debajo de los
+   desplegables (10000) y del calendario (100000), que se abren sobre él. */
+.assetGrafico.assetGraficoAmpliado {
+    position: fixed;
+    inset: calc(var(--vh, 1vh) * 3) calc(var(--vw, 1vw) * 3);
+    z-index: 5000;
+    overflow: auto;
+    background: var(--bg-panel);
+    border: 1px solid var(--btn-border);
+    border-radius: 12px;
+    box-sizing: border-box;
+}
+
+/* El lienzo se come todo el alto que dejan la cabecera, la leyenda y la nota. */
+.assetGraficoAmpliado .assetGraficoLienzo {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 340px;
+}
+
+.assetGraficoFondo {
+    position: fixed;
+    inset: 0;
+    z-index: 4999;
+    background: rgba(4, 12, 24, 0.68);
+}
+
+.assetGraficoFondo.hidden {
+    display: none;
 }
 
 .assetGraficoLienzo.hidden {
     display: none;
+}
+
+/* Detalles fijados de las compras y ventas. Imitan el tooltip de Chart.js para que se
+   lean como el mismo dato. No reciben el ratón: el gráfico se sigue pudiendo mover y
+   señalar por debajo, y se sueltan pulsando otra vez su punto. */
+.assetGraficoFichas {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.assetGraficoFicha {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.35;
+    white-space: nowrap;
+}
+
+/* Mismo aspecto que el botón «Centrar» que pinta js/core/grafico-escala.js, al que
+   acompaña arriba a la derecha del área. */
+.assetGraficoOcultarFichas {
+    position: absolute;
+    box-sizing: border-box;
+    height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--text-muted);
+    border-radius: 4px;
+    background: var(--bg-panel);
+    color: var(--text-muted);
+    font: bold 11px sans-serif;
+    cursor: pointer;
+}
+
+.assetGraficoOcultarFichas:hover {
+    color: var(--text-bright);
+    border-color: var(--text-bright);
 }
 
 .assetGraficoVacio {

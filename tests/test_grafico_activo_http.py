@@ -565,8 +565,8 @@ class VelasFalsas:
         self.respuesta = (divisa, velas or []) if velas else None
         self.llamadas = []
 
-    def __call__(self, simbolo, rango, desdeTs=0, ahoraTs=None):
-        self.llamadas.append({"simbolo": simbolo, "rango": rango, "desdeTs": desdeTs})
+    def __call__(self, simbolo, rango, desdeTs=0, ahoraTs=None, **opciones):
+        self.llamadas.append({"simbolo": simbolo, "rango": rango, "desdeTs": desdeTs, **opciones})
         return self.respuesta
 
 
@@ -615,6 +615,23 @@ class TestVelasDeTradingview:
         assert len(puntos) == 20
         assert {p["fuente"] for p in puntos} == {"tradingview"}
         assert {p["precio"] for p in puntos} == {10}
+
+    def testLosPuntosDeVelasLlevanAperturaMaximoYMinimo(self):
+        crearActivo([compra(HOY - timedelta(days=60), 10, 10)])
+        velasCompletas = [[*vela, 9.8] for vela in velasDiarias(HOY - timedelta(days=5), HOY - timedelta(days=1))]
+
+        puntos = graficoConVelas(VelasFalsas(velas=velasCompletas))["puntos"]
+
+        assert {(p["apertura"], p["maximo"], p["minimo"], p["precio"]) for p in puntos} == {(9.8, 10.5, 9.5, 10)}
+
+    def testVelasSinAperturaUsanElCierre(self):
+        # La caché de velas puede guardar el formato anterior, sin apertura.
+        crearActivo([compra(HOY - timedelta(days=60), 10, 10)])
+        velas = VelasFalsas(velas=velasDiarias(HOY - timedelta(days=5), HOY - timedelta(days=1)))
+
+        puntos = graficoConVelas(velas)["puntos"]
+
+        assert {p["apertura"] for p in puntos} == {10}
 
     def testPrecioFueraDelRangoDelDiaNoDoblaLaLinea(self):
         diaCompra = HOY - timedelta(days=10)
@@ -689,6 +706,106 @@ class TestVelasDeTradingview:
 
         diaEsperado = diaCompra - timedelta(days=30)
         assert velas.llamadas[0]["desdeTs"] == int(datetime.combine(diaEsperado, time.min).timestamp())
+
+    def testEnTodoConLaPrimeraCompraRecientePideAlMenosUnAnyo(self):
+        crearActivo([compra(HOY - timedelta(days=60), 1, 10)])
+        velas = VelasFalsas(velas=velasDiarias(HOY - timedelta(days=380), HOY - timedelta(days=1)))
+
+        datos = graficoConVelas(velas, rango="TODO")
+
+        inicioDeUnAnyo = int(AHORA - 365 * 86400)
+        assert velas.llamadas[0]["desdeTs"] == inicioDeUnAnyo
+        assert min(p["ts"] for p in datos["puntos"]) < AHORA - 360 * 86400
+
+    def testConPreviosIncluyeLasVelasYOperacionesAnterioresAlRango(self):
+        diaCompra = HOY - timedelta(days=50)
+        crearActivo([compra(diaCompra, 1, 10)])
+        velas = VelasFalsas(velas=velasDiarias(HOY - timedelta(days=90), HOY - timedelta(days=1)))
+
+        datos = grafico_activo.datosDelGrafico(
+            "acme", "30D", ahora=AHORA, simboloTv="XETR:ACME", velas=velas, conPrevios=True
+        )
+
+        assert velas.llamadas[0]["conPrevios"] is True
+        assert datos["inicioRango"] == int(AHORA - 30 * 86400)
+        assert min(p["ts"] for p in datos["puntos"]) < AHORA - 80 * 86400
+        # La compra de hace 50 días, fuera del rango, tiene su marca.
+        assert [date.fromtimestamp(op["ts"]) for op in datos["operaciones"]] == [diaCompra]
+
+    def testSinPreviosElRangoNoCambia(self):
+        crearActivo([compra(HOY - timedelta(days=50), 1, 10)])
+        velas = VelasFalsas(velas=velasDiarias(HOY - timedelta(days=90), HOY - timedelta(days=1)))
+
+        datos = graficoConVelas(velas, rango="30D")
+
+        assert "conPrevios" not in velas.llamadas[0]
+        assert min(p["ts"] for p in datos["puntos"]) >= AHORA - 30 * 86400
+        assert datos["operaciones"] == []
+
+    def testConTemporalidadPideEsasVelasYTodasLasOperaciones(self):
+        diaCompra = HOY - timedelta(days=50)
+        crearActivo([compra(diaCompra, 1, 10)])
+        velas = VelasFalsas(velas=velasDiarias(HOY - timedelta(days=90), HOY - timedelta(days=1)))
+
+        datos = grafico_activo.datosDelGrafico(
+            "acme", "TODO", ahora=AHORA, simboloTv="XETR:ACME", velas=velas, temporalidad="4h"
+        )
+
+        assert velas.llamadas[0]["temporalidad"] == "4h"
+        assert datos["temporalidad"] == "4h"
+        assert min(p["ts"] for p in datos["puntos"]) < AHORA - 80 * 86400
+        assert [date.fromtimestamp(op["ts"]) for op in datos["operaciones"]] == [diaCompra]
+
+    def testConVelasSemanalesLaOperacionVaASuVelaAunqueAbraDiasAntes(self):
+        # Una vela por semana; la compra es 4 días después de que abra la suya.
+        inicio = HOY - timedelta(days=70)
+        semanales = [
+            [marca(inicio + timedelta(weeks=i), 0), 10.0, 10.5, 9.5, 10.0] for i in range(10)
+        ]
+        diaCompra = inicio + timedelta(weeks=5, days=4)
+        crearActivo([compra(diaCompra, 1, 10)])
+
+        datos = grafico_activo.datosDelGrafico(
+            "acme", "TODO", ahora=AHORA, simboloTv="XETR:ACME", velas=VelasFalsas(velas=semanales), temporalidad="1S"
+        )
+
+        assert datos["operacionesSinPunto"] == 0
+        punto = datos["puntos"][datos["operaciones"][0]["indice"]]
+        # La línea pasa por lo pagado en su instante, no por la vela de la semana siguiente.
+        assert (punto["fuente"], date.fromtimestamp(punto["ts"])) == ("operacion", diaCompra)
+
+    def testConTemporalidadSinVelasNoLaDevuelve(self):
+        crearActivo([compra(HOY - timedelta(days=50), 1, 10)])
+
+        datos = grafico_activo.datosDelGrafico(
+            "acme", "TODO", ahora=AHORA, simboloTv="XETR:ACME", velas=VelasFalsas(), temporalidad="1h"
+        )
+
+        assert datos["temporalidad"] is None
+        assert datos["conVelas"] is False
+
+    def testTemporalidadDesconocidaEsRangoInvalido(self):
+        crearActivo([])
+
+        with pytest.raises(grafico_activo.RangoInvalido):
+            grafico_activo.datosDelGrafico("acme", "TODO", ahora=AHORA, temporalidad="3h")
+
+    def testConPreviosEnRangosDiariosNoPideMas(self):
+        crearActivo([compra(HOY - timedelta(days=50), 1, 10)])
+        velas = VelasFalsas(velas=velasDiarias(HOY - timedelta(days=400), HOY - timedelta(days=1)))
+
+        grafico_activo.datosDelGrafico("acme", "1A", ahora=AHORA, simboloTv="XETR:ACME", velas=velas, conPrevios=True)
+
+        assert "conPrevios" not in velas.llamadas[0]
+
+    def testEnTodoSinMovimientosNoEmpiezaDespuesDeUnAnyo(self):
+        crearActivo([])
+        snapshot(marca(HOY - timedelta(days=20)), 100, 100)
+        velas = VelasFalsas()
+
+        graficoConVelas(velas, rango="TODO")
+
+        assert velas.llamadas[0]["desdeTs"] == int(AHORA - 365 * 86400)
 
 
 class TestRuta:

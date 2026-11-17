@@ -13,13 +13,13 @@ from core import paths, settings
 from core.bloqueo import exclusivo
 from core.centimos import COLUMNAS_FASE_B, MESES, convertirImportes, importeLegible
 from core.escritura import escribirJsonAtomico
-from core.wallets_carpeta import carpetaWalletsDe
 from core.paths import (
     DELETED_DIR as _DELETED_DIR,
     LEGACY_DB as _LEGACY_DB,
     PORTFOLIOS_DIR as _PORTFOLIOS_DIR,
     PORTFOLIOS_META_FILE as _META_FILE,
 )
+from core.wallets_carpeta import carpetaWalletsDe
 
 log = logging.getLogger(__name__)
 

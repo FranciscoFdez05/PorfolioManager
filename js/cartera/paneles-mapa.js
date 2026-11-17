@@ -439,7 +439,7 @@ function pnBaldosas(lienzo, items, caja, cfg, periodo, escala, def = {}) {
         cel.dataset.serieId = r.id
         // Con ticker de TradingView, la línea sale de sus velas (mapaDiaSerieCelda).
         if (r.tv) cel.dataset.tv = r.tv
-        cel.style.cssText =`left:${r.x + hueco / 2}px;top:${r.y + hueco / 2}px;width:${cw}px;height:${ch}px;background:${pnColorMapa(r.valor, escala)}`
+        cel.style.cssText = `left:${r.x + hueco / 2}px;top:${r.y + hueco / 2}px;width:${cw}px;height:${ch}px;background:${pnColorMapa(r.valor, escala)}`
         cel._pn = { ...r, periodo }
 
         const rotulo = porNombre ? r.nombre : r.simbolo || r.nombre
