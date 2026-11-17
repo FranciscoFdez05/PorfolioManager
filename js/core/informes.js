@@ -80,7 +80,7 @@ const infPct = (v) => (Number.isFinite(v) ? `${v.toFixed(2).replace(".", ",")} %
 const infPctSigno = (v) => (Number.isFinite(v) ? `<span class="${infClase(v)}">${infSigno(v)}${infPct(v)}</span>` : "—")
 
 function infHoy() {
-    return new Date().toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" })
+    return new Date().toLocaleString(uiLocale(), { dateStyle: "long", timeStyle: "short" })
 }
 
 // ── piezas de maquetación ──────────────────────────────────────────────────

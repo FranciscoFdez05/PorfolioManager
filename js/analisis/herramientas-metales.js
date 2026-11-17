@@ -249,9 +249,9 @@ function hMetCalcular() {
 
     const moneda = hMetMoneda()
     const dinero = (valor) =>
-        valor.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + moneda
+        valor.toLocaleString(_nl(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + moneda
     const numero = (valor, decimales) =>
-        valor.toLocaleString("es-ES", { minimumFractionDigits: decimales, maximumFractionDigits: decimales })
+        valor.toLocaleString(_nl(), { minimumFractionDigits: decimales, maximumFractionDigits: decimales })
 
     document.getElementById("hMetValor").textContent = dinero(resultado.valor)
     document.getElementById("hMetOnzas").textContent = numero(resultado.onzasFinas, 4) + " oz"
@@ -260,7 +260,7 @@ function hMetCalcular() {
     // Con una pureza menor, aclarar por qué el valor no es peso × precio.
     const pureza =
         datos.ley < 1000
-            ? `La pieza tiene un ${(datos.ley / 10).toLocaleString("es-ES", { maximumFractionDigits: 1 })} % de metal puro y solo esa parte tiene valor.  ·  `
+            ? `La pieza tiene un ${(datos.ley / 10).toLocaleString(_nl(), { maximumFractionDigits: 1 })} % de metal puro y solo esa parte tiene valor.  ·  `
             : ""
     document.getElementById("hMetNota").textContent =
         pureza +

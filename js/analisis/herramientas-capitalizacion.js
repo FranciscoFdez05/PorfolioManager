@@ -376,19 +376,19 @@ function hCapRenderRefs() {
 
 function hCapFmt(valor, divisa) {
     try {
-        return new Intl.NumberFormat("es-ES", {
+        return new Intl.NumberFormat(_nl(), {
             style: "currency",
             currency: divisa,
             notation: "compact",
             maximumFractionDigits: 2
         }).format(valor)
     } catch {
-        return valor.toLocaleString("es-ES", { maximumFractionDigits: 0 }) + " " + divisa
+        return valor.toLocaleString(_nl(), { maximumFractionDigits: 0 }) + " " + divisa
     }
 }
 
 function hCapFmtCompleto(valor, divisa) {
-    return valor.toLocaleString("es-ES", { maximumFractionDigits: 0 }) + " " + divisa
+    return valor.toLocaleString(_nl(), { maximumFractionDigits: 0 }) + " " + divisa
 }
 
 async function hCapTipoCambio(origen, destino) {
@@ -431,10 +431,10 @@ async function hCapCalcular() {
     subidaEl.textContent =
         subida === null
             ? "—"
-            : (subida >= 0 ? "+" : "") + subida.toLocaleString("es-ES", { maximumFractionDigits: 1 }) + " %"
+            : (subida >= 0 ? "+" : "") + subida.toLocaleString(_nl(), { maximumFractionDigits: 1 }) + " %"
     subidaEl.className = "hResultValue " + (subida === null ? "" : subida >= 0 ? "hResultPositive" : "hResultNegative")
     document.getElementById("hCapMultiplicador").textContent =
-        multiplicador === null ? "—" : "×" + multiplicador.toLocaleString("es-ES", { maximumFractionDigits: 2 })
+        multiplicador === null ? "—" : "×" + multiplicador.toLocaleString(_nl(), { maximumFractionDigits: 2 })
 
     // Las fijas se piden en vivo; si llevan rato cargadas se refrescan.
     if (Date.now() - _hCapFijasHora > H_CAP_FIJAS_CADUCIDAD_MS)
@@ -468,7 +468,7 @@ async function hCapCalcular() {
             nombre.textContent = f.nombre
             nombre.title = hCapFmtCompleto(f.capitalRef, divisa)
             const veces = document.createElement("strong")
-            veces.textContent = f.veces.toLocaleString("es-ES", { maximumFractionDigits: 2 }) + " veces"
+            veces.textContent = f.veces.toLocaleString(_nl(), { maximumFractionDigits: 2 }) + " veces"
             const detalle = document.createElement("small")
             detalle.textContent =
                 (f.veces >= 1 ? "supera su capitalización (" : "queda por debajo de su capitalización (") +
@@ -484,7 +484,7 @@ async function hCapCalcular() {
     if (sinConvertir.length) avisos.push("Sin tipo de cambio para: " + sinConvertir.join(", ") + ".")
     const interp = document.getElementById("hCapInterpretacion")
     interp.textContent =
-        `Para que 1 ${_hCapActivo.nombre} valga ${objetivo.toLocaleString("es-ES", { maximumFractionDigits: 6 })} ${divisa} con el suministro actual, ` +
+        `Para que 1 ${_hCapActivo.nombre} valga ${objetivo.toLocaleString(_nl(), { maximumFractionDigits: 6 })} ${divisa} con el suministro actual, ` +
         `su capitalización debería ser ${hCapFmt(necesaria, divisa)}. Supone que el suministro no cambia.` +
         (avisos.length ? " " + avisos.join(" ") : "")
     interp.className = "hRatioInterpretacion hRatioInfoPos"

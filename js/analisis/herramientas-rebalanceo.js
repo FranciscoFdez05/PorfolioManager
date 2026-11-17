@@ -279,7 +279,7 @@ async function hSvCalcular() {
     const moneda = document.querySelector("#toolSimularVenta .hSvMoneda")?.textContent || "€"
     const importe = (valor) => formatEuro(parseFloat(valor) || 0).replace("€", moneda)
 
-    disponible.textContent = `Tienes ${parseFloat(s.disponible).toLocaleString("es-ES", { maximumFractionDigits: 8 })} uds.`
+    disponible.textContent = `Tienes ${parseFloat(s.disponible).toLocaleString(_nl(), { maximumFractionDigits: 8 })} uds.`
     disponible.className = "hPrecargaMsg"
 
     document.getElementById("hSvNeto").textContent = importe(s.neto)
@@ -300,7 +300,7 @@ async function hSvCalcular() {
         tr.innerHTML = "<td></td><td></td><td></td><td></td>"
         const celdas = tr.querySelectorAll("td")
         celdas[0].textContent = lote.fecha
-        celdas[1].textContent = parseFloat(lote.cantidad).toLocaleString("es-ES", { maximumFractionDigits: 8 })
+        celdas[1].textContent = parseFloat(lote.cantidad).toLocaleString(_nl(), { maximumFractionDigits: 8 })
         celdas[2].textContent = importe(lote.costeUnitario)
         celdas[3].textContent = importe(lote.coste)
         lotes.appendChild(tr)

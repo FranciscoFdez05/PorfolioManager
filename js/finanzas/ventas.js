@@ -733,7 +733,7 @@ function formatVentasNumber(value) {
         return ""
     }
 
-    return parsedValue.toLocaleString("es-ES", {
+    return parsedValue.toLocaleString(_nl(), {
         minimumFractionDigits: 0,
         maximumFractionDigits: 8
     })

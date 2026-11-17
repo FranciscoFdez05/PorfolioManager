@@ -13,6 +13,7 @@ beforeAll(() => {
     // Sin requestIdleCallback la espera es un setTimeout corto; jsdom no carga
     // los iframes externos, así que se simula su `load` al crearlos.
     delete window.requestIdleCallback
+    cargarScript("js/core/i18n.js")
     cargarScript("js/core/mapa-dia.js")
     new MutationObserver((cambios) =>
         cambios.forEach((c) =>

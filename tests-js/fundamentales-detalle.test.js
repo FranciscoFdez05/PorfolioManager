@@ -11,6 +11,7 @@ import { cargarScript } from "./cargar.js"
 beforeAll(() => {
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
+    cargarScript("js/core/i18n.js")
     cargarScript("js/analisis/fundamentales.js")
 })
 

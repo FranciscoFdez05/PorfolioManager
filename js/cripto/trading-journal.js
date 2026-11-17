@@ -315,7 +315,7 @@ function buildTradingRow(row, num) {
     const gNetaNum = parseTradingAmount(row.ganancia_neta)
     const gNetaFmt =
         gNetaNum !== null
-            ? `${gNetaNum >= 0 ? "+" : ""}${gNetaNum.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${escapeHtml(row.capital_currency)}`
+            ? `${gNetaNum >= 0 ? "+" : ""}${gNetaNum.toLocaleString(_nl(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${escapeHtml(row.capital_currency)}`
             : ""
 
     tr.innerHTML = `
@@ -402,7 +402,7 @@ function buildHaciendaYearTable(rows, year) {
         Object.entries(netaByCurrency)
             .map(
                 ([cur, val]) =>
-                    `${val >= 0 ? "+" : ""}${val.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`
+                    `${val >= 0 ? "+" : ""}${val.toLocaleString(_nl(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`
             )
             .join(" / ") || "—"
     const netaPositive = Object.values(netaByCurrency).every((v) => v >= 0)
@@ -442,7 +442,7 @@ function buildHaciendaYearTable(rows, year) {
             const gNetaN = parseTradingAmount(row.ganancia_neta)
             const gNetaF =
                 gNetaN !== null
-                    ? `${gNetaN >= 0 ? "+" : ""}${gNetaN.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${escapeHtml(row.capital_currency)}`
+                    ? `${gNetaN >= 0 ? "+" : ""}${gNetaN.toLocaleString(_nl(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${escapeHtml(row.capital_currency)}`
                     : ""
             return `
             <tr>

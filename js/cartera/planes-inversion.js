@@ -345,13 +345,13 @@ function pinvEuros(valor) {
 
 function pinvPorcentaje(valor) {
     if (valor === null || !Number.isFinite(valor)) return "—"
-    return new Intl.NumberFormat("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 1 }).format(valor) + " %"
+    return new Intl.NumberFormat(_nl(), { minimumFractionDigits: 0, maximumFractionDigits: 1 }).format(valor) + " %"
 }
 
 function pinvCantidad(valor, tipo) {
     if (valor === null || !Number.isFinite(valor)) return "—"
     const decimales = typeof getAssetParticipationDecimals === "function" ? getAssetParticipationDecimals(tipo) : 6
-    return valor.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: decimales })
+    return valor.toLocaleString(_nl(), { minimumFractionDigits: 0, maximumFractionDigits: decimales })
 }
 
 function pinvBadgeOrden(orden) {
@@ -999,7 +999,7 @@ function pinvEditorAnadirNueva(assetId) {
 
     const divisa = leer("divisa") || normalizeCurrencyCode(activo.currency)
     const texto = (numero) =>
-        numero === null ? "" : numero.toLocaleString("es-ES", { maximumFractionDigits: 8, useGrouping: false })
+        numero === null ? "" : numero.toLocaleString(_nl(), { maximumFractionDigits: 8, useGrouping: false })
 
     entrada.nuevas.push({
         id: pinvNuevoId("operacion"),

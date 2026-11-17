@@ -104,6 +104,12 @@
     <!-- recuperacion.js avisa de los errores no capturados y reabre la vista
          cuando el servidor vuelve tras una caída. Después de dom.js. -->
     <script defer src="js/core/recuperacion.js"></script>
+    <!-- Diccionarios de textos e i18n.js (t, aplicarI18n, uiLocale). Los
+         diccionarios, antes que i18n.js; los tres, antes que cualquier
+         módulo que pinte texto. -->
+    <script defer src="js/locales/es.js"></script>
+    <script defer src="js/locales/en.js"></script>
+    <script defer src="js/core/i18n.js"></script>
 </head>
 <body>
 
@@ -121,44 +127,44 @@
                 <div class="navDropdownMenu portfolioSwitcherMenu" id="portfolioSwitcherMenu">
                     <div id="portfolioList"></div>
                     <div class="portfolioMenuDivider"></div>
-                    <button class="portfolioNewBtn" id="portfolioNewBtn" type="button">Nuevo portfolio</button>
-                    <button class="portfolioNewBtn portfolioImportBtn" id="portfolioImportBtn" type="button">↑ Importar portfolio</button>
+                    <button class="portfolioNewBtn" id="portfolioNewBtn" type="button" data-i18n="portfolio.nuevo">Nuevo portfolio</button>
+                    <button class="portfolioNewBtn portfolioImportBtn" id="portfolioImportBtn" type="button" data-i18n="portfolio.importar">↑ Importar portfolio</button>
                 </div>
             </div>
 
             <div class="metrics" data-module="panelSuperior">
                 <div class="metricBox" data-metric="topTotalCuenta">
-                    <span class="metricTitle">Total Cuenta</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.totalCuenta">Total Cuenta</span>
                     <span class="metricValue" id="topTotalCuenta">---</span>
                 </div>
 
                 <div class="metricBox" data-metric="topPorcentajeCuenta">
-                    <span class="metricTitle">% cuenta</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.porcentajeCuenta">% cuenta</span>
                     <span class="metricValue" id="topPorcentajeCuenta">---</span>
                 </div>
 
                 <div class="metricBox" data-metric="topRendimientoEuros">
-                    <span class="metricTitle">Rendimiento €</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.rendimientoEuros">Rendimiento €</span>
                     <span class="metricValue" id="topRendimientoEuros">---</span>
                 </div>
 
                 <div class="metricBox" data-metric="topInvertido">
-                    <span class="metricTitle">Invertido</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.invertido">Invertido</span>
                     <span class="metricValue" id="topInvertido">---</span>
                 </div>
 
                 <div class="metricBox" data-metric="topNumActivos">
-                    <span class="metricTitle">Nº activos</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.numActivos">Nº activos</span>
                     <span class="metricValue" id="topNumActivos">---</span>
                 </div>
 
                 <div class="metricBox" data-metric="topPorcentajeAcciones">
-                    <span class="metricTitle">% acciones</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.porcentajeAcciones">% acciones</span>
                     <span class="metricValue" id="topPorcentajeAcciones">---</span>
                 </div>
 
                 <div class="metricBox" data-metric="topEurosAcciones">
-                    <span class="metricTitle">€ acciones</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.eurosAcciones">€ acciones</span>
                     <span class="metricValue" id="topEurosAcciones">---</span>
                 </div>
 
@@ -173,37 +179,37 @@
                 </div>
 
                 <div class="metricBox" data-metric="topPorcentajeComoditis">
-                    <span class="metricTitle">% comoditis</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.porcentajeComoditis">% comoditis</span>
                     <span class="metricValue" id="topPorcentajeComoditis">---</span>
                 </div>
 
                 <div class="metricBox" data-metric="topEurosComoditis">
-                    <span class="metricTitle">€ comoditis</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.eurosComoditis">€ comoditis</span>
                     <span class="metricValue" id="topEurosComoditis">---</span>
                 </div>
 
                 <div class="metricBox" data-metric="topPorcentajeCripto">
-                    <span class="metricTitle">% cripto</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.porcentajeCripto">% cripto</span>
                     <span class="metricValue" id="topPorcentajeCripto">---</span>
                 </div>
 
                 <div class="metricBox" data-metric="topEurosCripto">
-                    <span class="metricTitle">€ cripto</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.eurosCripto">€ cripto</span>
                     <span class="metricValue" id="topEurosCripto">---</span>
                 </div>
 
                 <div class="metricBox" data-metric="topTotalDividendos">
-                    <span class="metricTitle">€ dividendos</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.dividendos">€ dividendos</span>
                     <span class="metricValue" id="topTotalDividendos">0,00 €</span>
                 </div>
 
                 <div class="metricBox" data-metric="topTotalInteres">
-                    <span class="metricTitle">€ C. Rem.</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.cuentaRemunerada">€ C. Rem.</span>
                     <span class="metricValue" id="topTotalInteres">0,00 €</span>
                 </div>
 
                 <div class="metricBox" data-metric="topTotalRentaFija">
-                    <span class="metricTitle">€ Renta Fija</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.rentaFija">€ Renta Fija</span>
                     <span class="metricValue" id="topTotalRentaFija">0,00 €</span>
                 </div>
 
@@ -213,17 +219,17 @@
                 </div>
 
                 <div class="metricBox" data-metric="topMercadoPrivado">
-                    <span class="metricTitle">Mercado Privado</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.mercadoPrivado">Mercado Privado</span>
                     <span class="metricValue" id="topMercadoPrivado">0,00 €</span>
                 </div>
 
                 <div class="metricBox" data-metric="topGastosAnio">
-                    <span class="metricTitle">Gastos (año)</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.gastosAnio">Gastos (año)</span>
                     <span class="metricValue" id="topGastosAnio">0,00 €</span>
                 </div>
 
                 <div class="metricBox" data-metric="topIngresosAnio">
-                    <span class="metricTitle">Ingresos (año)</span>
+                    <span class="metricTitle" data-i18n="metricasSuperiores.ingresosAnio">Ingresos (año)</span>
                     <span class="metricValue" id="topIngresosAnio">0,00 €</span>
                 </div>
 
@@ -242,40 +248,40 @@
             </div> -->
 
             <div class="navButtons">
-                <button class="navBtn active" data-page="vistaGeneral" data-module="vistaGeneral">Vista general</button>
+                <button class="navBtn active" data-page="vistaGeneral" data-module="vistaGeneral" data-i18n="menu.vistaGeneral">Vista general</button>
 
                 <div class="navDropdown" data-module="activos">
-                    <button class="navDropdownBtn" type="button">Activos ▾</button>
+                    <button class="navDropdownBtn" type="button" data-i18n="menu.activos">Activos ▾</button>
                     <div class="navDropdownMenu">
-                        <button class="navBtn navDropdownItem" data-page="activos">Activos</button>
+                        <button class="navBtn navDropdownItem" data-page="activos" data-i18n="menu.activos">Activos</button>
                         <button class="navBtn navDropdownItem" data-page="seguimiento">Watchlist</button>
-                        <button class="navBtn navDropdownItem" data-page="heatmap">Mapas</button>
-                        <button class="navBtn navDropdownItem" data-page="fundamentales">Fundamentales</button>
-                        <button class="navBtn navDropdownItem" data-page="sentimiento">Sentimiento</button>
-                        <button class="navBtn navDropdownItem" data-page="paneles">Paneles</button>
+                        <button class="navBtn navDropdownItem" data-page="heatmap" data-i18n="menu.mapas">Mapas</button>
+                        <button class="navBtn navDropdownItem" data-page="fundamentales" data-i18n="menu.fundamentales">Fundamentales</button>
+                        <button class="navBtn navDropdownItem" data-page="sentimiento" data-i18n="menu.sentimiento">Sentimiento</button>
+                        <button class="navBtn navDropdownItem" data-page="paneles" data-i18n="menu.paneles">Paneles</button>
                     </div>
                 </div>
 
                 <div class="navDropdown" data-module="finanzas">
-                    <button class="navDropdownBtn" type="button">Bolsa e Inversión ▾</button>
+                    <button class="navDropdownBtn" type="button" data-i18n="menu.bolsaInversion">Bolsa e Inversión ▾</button>
                     <div class="navDropdownMenu">
-                        <button class="navBtn navDropdownItem" data-page="operacionesBolsa">Operaciones</button>
-                        <button class="navBtn navDropdownItem" data-page="intereses">Cuenta Remunerada</button>
-                        <button class="navBtn navDropdownItem" data-page="dividendos">Dividendos</button>
-                        <button class="navBtn navDropdownItem" data-page="bonos">Renta Fija</button>
-                        <button class="navBtn navDropdownItem" data-page="ventas">Ventas</button>
-                        <button class="navBtn navDropdownItem" data-page="privateMarket">Mercado Privado</button>
+                        <button class="navBtn navDropdownItem" data-page="operacionesBolsa" data-i18n="menu.operaciones">Operaciones</button>
+                        <button class="navBtn navDropdownItem" data-page="intereses" data-i18n="menu.cuentaRemunerada">Cuenta Remunerada</button>
+                        <button class="navBtn navDropdownItem" data-page="dividendos" data-i18n="menu.dividendos">Dividendos</button>
+                        <button class="navBtn navDropdownItem" data-page="bonos" data-i18n="menu.rentaFija">Renta Fija</button>
+                        <button class="navBtn navDropdownItem" data-page="ventas" data-i18n="menu.ventas">Ventas</button>
+                        <button class="navBtn navDropdownItem" data-page="privateMarket" data-i18n="menu.mercadoPrivado">Mercado Privado</button>
                     </div>
                 </div>
 
                 <div class="navDropdown" data-module="cripto">
-                    <button class="navDropdownBtn" type="button">Cripto ▾</button>
+                    <button class="navDropdownBtn" type="button" data-i18n="menu.cripto">Cripto ▾</button>
                     <div class="navDropdownMenu">
                         <button class="navBtn navDropdownItem" data-page="stablecoins">Stablecoins</button>
-                        <button class="navBtn navDropdownItem" data-page="operaciones">Operaciones</button>
-                        <button class="navBtn navDropdownItem" data-page="conversiones">Conversiones</button>
-                        <button class="navBtn navDropdownItem" data-page="transacciones">Transacciones</button>
-                        <button class="navBtn navDropdownItem" data-page="walletsSeguimiento">Seguimiento</button>
+                        <button class="navBtn navDropdownItem" data-page="operaciones" data-i18n="menu.operaciones">Operaciones</button>
+                        <button class="navBtn navDropdownItem" data-page="conversiones" data-i18n="menu.conversiones">Conversiones</button>
+                        <button class="navBtn navDropdownItem" data-page="transacciones" data-i18n="menu.transacciones">Transacciones</button>
+                        <button class="navBtn navDropdownItem" data-page="walletsSeguimiento" data-i18n="menu.seguimiento">Seguimiento</button>
                         <button class="navBtn navDropdownItem" data-page="Trading">Trading</button>
                         <button class="navBtn navDropdownItem" data-page="Staking">Staking</button>
                         <button class="navBtn navDropdownItem" data-page="Earn">Earn</button>
@@ -286,16 +292,16 @@
                      (cada uno lleva su data-module); el contenedor no, y se oculta solo
                      cuando se apagan los dos (applyModulesVisibility). -->
                 <div class="navDropdown" data-grupo="planificacion">
-                    <button class="navDropdownBtn" type="button">Planificación ▾</button>
+                    <button class="navDropdownBtn" type="button" data-i18n="menu.planificacion">Planificación ▾</button>
                     <div class="navDropdownMenu">
-                        <button class="navBtn navDropdownItem" data-page="planesInversion" data-module="planes">Planes</button>
-                        <button class="navBtn navDropdownItem" data-page="alertas" data-module="alertas">Alertas</button>
-                        <button class="navBtn navDropdownItem" data-page="alertasAvisos" data-module="alertas">Últimos avisos</button>
+                        <button class="navBtn navDropdownItem" data-page="planesInversion" data-module="planes" data-i18n="menu.planes">Planes</button>
+                        <button class="navBtn navDropdownItem" data-page="alertas" data-module="alertas" data-i18n="menu.alertas">Alertas</button>
+                        <button class="navBtn navDropdownItem" data-page="alertasAvisos" data-module="alertas" data-i18n="menu.ultimosAvisos">Últimos avisos</button>
                     </div>
                 </div>
-                <button class="navBtn" data-page="herramientas" data-module="herramientas">Herramientas</button>
-                <button class="navBtn" data-page="metricas" data-module="metricas">Métricas</button>
-                <button id="toggleMoneyBtn" class="navMoneyToggleBtn" type="button" title="Ocultar valores"><span class="icono iconoOjo" aria-hidden="true"></span></button>
+                <button class="navBtn" data-page="herramientas" data-module="herramientas" data-i18n="menu.herramientas">Herramientas</button>
+                <button class="navBtn" data-page="metricas" data-module="metricas" data-i18n="menu.metricas">Métricas</button>
+                <button id="toggleMoneyBtn" class="navMoneyToggleBtn" type="button" title="Ocultar valores" data-i18n-title="menu.ocultarValores"><span class="icono iconoOjo" aria-hidden="true"></span></button>
 
                 <!-- Lo que hay a partir de aquí es el dinero que entra y sale, que
                      no es lo mismo que el patrimonio de la izquierda. El separador
@@ -304,37 +310,37 @@
                 <span class="navSeparador" data-module="gastos" aria-hidden="true"></span>
 
                 <div class="navDropdown" data-module="gastos">
-                    <button class="navDropdownBtn" type="button">Mi dinero ▾</button>
+                    <button class="navDropdownBtn" type="button" data-i18n="menu.miDinero">Mi dinero ▾</button>
                     <div class="navDropdownMenu">
-                        <button class="navBtn navDropdownItem" data-page="patrimonio">Patrimonio</button>
-                        <button class="navBtn navDropdownItem" data-page="gastos">Gastos</button>
-                        <button class="navBtn navDropdownItem" data-page="ingresos">Ingresos</button>
-                        <button class="navBtn navDropdownItem" data-page="calendario">Calendario</button>
-                        <button class="navBtn navDropdownItem" data-page="mensualidades">Mensualidades</button>
-                        <button class="navBtn navDropdownItem" data-page="ingresosRecurrentes">Ingresos recurrentes</button>
-                        <button class="navBtn navDropdownItem" data-page="pagosFraccionados">Pagos fraccionados</button>
+                        <button class="navBtn navDropdownItem" data-page="patrimonio" data-i18n="menu.patrimonio">Patrimonio</button>
+                        <button class="navBtn navDropdownItem" data-page="gastos" data-i18n="menu.gastos">Gastos</button>
+                        <button class="navBtn navDropdownItem" data-page="ingresos" data-i18n="menu.ingresos">Ingresos</button>
+                        <button class="navBtn navDropdownItem" data-page="calendario" data-i18n="menu.calendario">Calendario</button>
+                        <button class="navBtn navDropdownItem" data-page="mensualidades" data-i18n="menu.mensualidades">Mensualidades</button>
+                        <button class="navBtn navDropdownItem" data-page="ingresosRecurrentes" data-i18n="menu.ingresosRecurrentes">Ingresos recurrentes</button>
+                        <button class="navBtn navDropdownItem" data-page="pagosFraccionados" data-i18n="menu.pagosFraccionados">Pagos fraccionados</button>
                     </div>
                 </div>
 
                 <!-- Lo que se tiene y se debe (cuentas, ahorro, hipotecas, compras
                      a plazos), frente a lo que entra y sale de la ventana anterior. -->
                 <div class="navDropdown" data-module="misFinanzas">
-                    <button class="navDropdownBtn" type="button">Mis finanzas ▾</button>
+                    <button class="navDropdownBtn" type="button" data-i18n="menu.misFinanzas">Mis finanzas ▾</button>
                     <div class="navDropdownMenu">
-                        <span class="navDropdownTitulo" aria-hidden="true">Banco</span>
-                        <button class="navBtn navDropdownItem" data-page="ahorro">Ahorro</button>
-                        <button class="navBtn navDropdownItem" data-page="cuentas">Cuentas</button>
-                        <button class="navBtn navDropdownItem" data-page="movimientosCuentas">Movimientos</button>
-                        <button class="navBtn navDropdownItem" data-page="cuentaRemunerada">Cuenta remunerada</button>
-                        <span class="navDropdownTitulo" aria-hidden="true">Deudas</span>
-                        <button class="navBtn navDropdownItem" data-page="hipotecas">Hipotecas</button>
-                        <button class="navBtn navDropdownItem" data-page="microcreditos">Microcréditos</button>
-                        <button class="navBtn navDropdownItem" data-page="financiadas">Compras financiadas</button>                        <!-- Fuera del menú: solo se llega desde «Abrir cuenta de ahorro» en las tarjetas de Cuentas, que pulsa este botón. -->
-                        <button class="navBtn navDropdownItem" data-page="cuentaAhorro" style="display: none">Cuenta de ahorro</button>
+                        <span class="navDropdownTitulo" aria-hidden="true" data-i18n="menu.banco">Banco</span>
+                        <button class="navBtn navDropdownItem" data-page="ahorro" data-i18n="menu.ahorro">Ahorro</button>
+                        <button class="navBtn navDropdownItem" data-page="cuentas" data-i18n="menu.cuentas">Cuentas</button>
+                        <button class="navBtn navDropdownItem" data-page="movimientosCuentas" data-i18n="menu.movimientos">Movimientos</button>
+                        <button class="navBtn navDropdownItem" data-page="cuentaRemunerada" data-i18n="menu.cuentaRemuneradaBanco">Cuenta remunerada</button>
+                        <span class="navDropdownTitulo" aria-hidden="true" data-i18n="menu.deudas">Deudas</span>
+                        <button class="navBtn navDropdownItem" data-page="hipotecas" data-i18n="menu.hipotecas">Hipotecas</button>
+                        <button class="navBtn navDropdownItem" data-page="microcreditos" data-i18n="menu.microcreditos">Microcréditos</button>
+                        <button class="navBtn navDropdownItem" data-page="financiadas" data-i18n="menu.comprasFinanciadas">Compras financiadas</button>                        <!-- Fuera del menú: solo se llega desde «Abrir cuenta de ahorro» en las tarjetas de Cuentas, que pulsa este botón. -->
+                        <button class="navBtn navDropdownItem" data-page="cuentaAhorro" style="display: none" data-i18n="menu.cuentaAhorro">Cuenta de ahorro</button>
                     </div>
                 </div>
 
-                <button class="navBtn navBtnFinal" data-page="ajustes" title="Ajustes" aria-label="Ajustes"><span class="icono iconoAjustes" aria-hidden="true"></span></button>
+                <button class="navBtn navBtnFinal" data-page="ajustes" title="Ajustes" aria-label="Ajustes" data-i18n-title="menu.ajustes" data-i18n-aria-label="menu.ajustes"><span class="icono iconoAjustes" aria-hidden="true"></span></button>
 
             </div>
 
@@ -343,7 +349,7 @@
                  así se sabe qué hay desplegado sin abrir /api/health y sin
                  gastar una petición más en cada carga. Al pulsarla abre
                  #versionPopover; el punto ámbar sale si hay versión nueva. -->
-            <button class="appVersion" id="appVersion" type="button" title="Versión de PorfolioManager" aria-haspopup="dialog" aria-expanded="false" aria-controls="versionPopover">__APP_VERSION__</button>
+            <button class="appVersion" id="appVersion" type="button" title="Versión de PorfolioManager" data-i18n-title="menu.version" aria-haspopup="dialog" aria-expanded="false" aria-controls="versionPopover">__APP_VERSION__</button>
         </nav>
 
         <!-- Fuera de nav.tabs: la barra desplaza en horizontal y recortaría un
@@ -379,20 +385,20 @@
                      Portfolio/Watchlist de debajo, porque hace lo mismo:
                      elegir entre dos modos. -->
                 <div class="sidebarFilterBar sidebarModeBar" id="sidebarAssetMode">
-                    <button class="sidebarFilterBtn active" data-modo="activo" type="button" title="Pulsar un activo abre su ficha">Activo</button>
-                    <button class="sidebarFilterBtn" data-modo="grafico" type="button" title="Pulsar un activo abre su gráfico">Gráfico</button>
+                    <button class="sidebarFilterBtn active" data-modo="activo" type="button" title="Pulsar un activo abre su ficha" data-i18n="panelLateral.modoActivo" data-i18n-title="panelLateral.modoActivoAyuda">Activo</button>
+                    <button class="sidebarFilterBtn" data-modo="grafico" type="button" title="Pulsar un activo abre su gráfico" data-i18n="panelLateral.modoGrafico" data-i18n-title="panelLateral.modoGraficoAyuda">Gráfico</button>
                 </div>
                 <!-- Qué enseña la lista de abajo: el Portfolio o una de las listas
                      de Seguimiento del usuario. Lo rellena sidebarActualizarListas. -->
                 <div class="sidebarFilterBar" id="sidebarFilterBar">
-                    <button class="sidebarFilterBtn active sidebarListaBtn" id="sidebarListaBtn" type="button" aria-haspopup="menu" title="Elegir qué activos se muestran">Portfolio ▾</button>
+                    <button class="sidebarFilterBtn active sidebarListaBtn" id="sidebarListaBtn" type="button" aria-haspopup="menu" title="Elegir qué activos se muestran" data-i18n-title="panelLateral.elegirLista">Portfolio ▾</button>
                 </div>
             </div>
 
             <div class="assetsListHeader" aria-hidden="true">
-                <span>Activo</span>
-                <span>Precio</span>
-                <span>Var.</span>
+                <span data-i18n="panelLateral.columnaActivo">Activo</span>
+                <span data-i18n="panelLateral.columnaPrecio">Precio</span>
+                <span data-i18n="panelLateral.columnaVariacion">Var.</span>
                 <span>%</span>
             </div>
 
@@ -418,58 +424,58 @@
 
                 <div class="detailStats">
                     <div class="detailStatCard">
-                        <span class="detailStatLabel">Tipo</span>
+                        <span class="detailStatLabel" data-i18n="panelLateral.tipo">Tipo</span>
                         <span class="detailStatValue" id="detType"></span>
                     </div>
                     <div class="detailStatCard">
-                        <span class="detailStatLabel">Posición</span>
+                        <span class="detailStatLabel" data-i18n="panelLateral.posicion">Posición</span>
                         <span class="detailStatValue" id="detPosition">0</span>
                     </div>
                     <div class="detailStatCard">
-                        <span class="detailStatLabel">Invertido bruto</span>
+                        <span class="detailStatLabel" data-i18n="panelLateral.invertidoBruto">Invertido bruto</span>
                         <span class="detailStatValue" id="detInvested">0,00 €</span>
                     </div>
                     <div class="detailStatCard">
-                        <span class="detailStatLabel">P/L con comisiones</span>
+                        <span class="detailStatLabel" data-i18n="panelLateral.pylComisiones">P/L con comisiones</span>
                         <span class="detailStatValue" id="detPnL">0,00 €</span>
                     </div>
                     <div class="detailStatCard">
-                        <span class="detailStatLabel">Precio medio</span>
+                        <span class="detailStatLabel" data-i18n="panelLateral.precioMedio">Precio medio</span>
                         <span class="detailStatValue" id="detAvgPrice">0,00 €</span>
                     </div>
                     <div class="detailStatCard">
-                        <span class="detailStatLabel">Comisiones</span>
+                        <span class="detailStatLabel" data-i18n="panelLateral.comisiones">Comisiones</span>
                         <span class="detailStatValue" id="detFees">0,00 €</span>
                         <span class="detailStatSub" id="detFeesCripto" hidden></span>
                     </div>
                     <div class="detailStatCard">
-                        <span class="detailStatLabel">Var. hoy</span>
+                        <span class="detailStatLabel" data-i18n="panelLateral.variacionHoy">Var. hoy</span>
                         <span class="detailStatValue" id="detChangeAbs">0,00 €</span>
                     </div>
                     <div class="detailStatCard">
-                        <span class="detailStatLabel">Peso cartera</span>
+                        <span class="detailStatLabel" data-i18n="panelLateral.pesoCartera">Peso cartera</span>
                         <span class="detailStatValue" id="detWeight"></span>
                     </div>
                 </div>
 
                 <!-- Bloques de mercado: los rellena js/cartera/assets-detalle-mercado.js -->
                 <section class="detMkBlock" aria-labelledby="detMkRendTitulo">
-                    <h3 class="detMkTitle" id="detMkRendTitulo">Rendimiento</h3>
+                    <h3 class="detMkTitle" id="detMkRendTitulo" data-i18n="panelLateral.rendimiento">Rendimiento</h3>
                     <div class="detMkPerf" id="detMkPerf" role="list"></div>
                 </section>
                 <section class="detMkBlock" aria-labelledby="detMkEstTitulo">
                     <div class="detMkTitleRow">
-                        <h3 class="detMkTitle" id="detMkEstTitulo">Estacionales</h3>
-                        <button class="detMkTitleBtn" id="detMkEstTablaBtn" type="button" title="Rendimiento mensual por años">Tabla</button>
+                        <h3 class="detMkTitle" id="detMkEstTitulo" data-i18n="panelLateral.estacionales">Estacionales</h3>
+                        <button class="detMkTitleBtn" id="detMkEstTablaBtn" type="button" title="Rendimiento mensual por años" data-i18n="panelLateral.tabla" data-i18n-title="panelLateral.tablaAyuda">Tabla</button>
                     </div>
-                    <div class="detMkSeason" id="detMkSeason" role="button" tabindex="0" title="Ampliar estacionales"></div>
+                    <div class="detMkSeason" id="detMkSeason" role="button" tabindex="0" title="Ampliar estacionales" data-i18n-title="panelLateral.ampliarEstacionales"></div>
                 </section>
                 <section class="detMkBlock" aria-labelledby="detMkTecTitulo">
-                    <h3 class="detMkTitle" id="detMkTecTitulo">Datos técnicos</h3>
+                    <h3 class="detMkTitle" id="detMkTecTitulo" data-i18n="panelLateral.datosTecnicos">Datos técnicos</h3>
                     <div class="detMkGauge" id="detMkGauge"></div>
                 </section>
                 <section class="detMkBlock" aria-labelledby="detMkStatsTitulo">
-                    <h3 class="detMkTitle" id="detMkStatsTitulo">Estadísticas clave</h3>
+                    <h3 class="detMkTitle" id="detMkStatsTitulo" data-i18n="panelLateral.estadisticasClave">Estadísticas clave</h3>
                     <dl class="detMkStats" id="detMkStats"></dl>
                 </section>
 
@@ -805,35 +811,35 @@
 
     <div class="sttSidebar">
         <div class="sttSidebarHeader">
-            <span class="sttSidebarTitle">Ajustes</span>
-            <button class="sttCloseBtn" id="sttCloseBtn" type="button" aria-label="Cerrar ajustes"><span class="icono iconoCerrar" aria-hidden="true"></span></button>
+            <span class="sttSidebarTitle" data-i18n="ajustes.titulo">Ajustes</span>
+            <button class="sttCloseBtn" id="sttCloseBtn" type="button" aria-label="Cerrar ajustes" data-i18n-aria-label="ajustes.cerrar"><span class="icono iconoCerrar" aria-hidden="true"></span></button>
         </div>
         <nav class="sttNav">
 
             <button class="sttNavBtn active" data-stt="apariencia" type="button">
                 <span class="icono iconoPaleta" aria-hidden="true"></span>
-                Apariencia
+                <span data-i18n="ajustes.nav.apariencia">Apariencia</span>
             </button>
 
             <button class="sttNavBtn" data-stt="cuenta" type="button">
                 <span class="icono iconoUsuario" aria-hidden="true"></span>
-                Cuenta
+                <span data-i18n="ajustes.nav.cuenta">Cuenta</span>
             </button>
             <button class="sttNavBtn" data-stt="seguridad" type="button">
                 <span class="icono iconoEscudo" aria-hidden="true"></span>
-                Seguridad
+                <span data-i18n="ajustes.nav.seguridad">Seguridad</span>
             </button>
 
             <div class="sttNavDivider"></div>
 
             <button class="sttNavBtn" data-stt="portfolio" type="button">
                 <span class="icono iconoPortfolio" aria-hidden="true"></span>
-                Portfolio
+                <span data-i18n="ajustes.nav.portfolio">Portfolio</span>
             </button>
 
             <button class="sttNavBtn" data-stt="automatizacion" type="button">
                 <span class="icono iconoReloj" aria-hidden="true"></span>
-                Automatización
+                <span data-i18n="ajustes.nav.automatizacion">Automatización</span>
             </button>
 
             <button class="sttNavBtn" data-stt="api" type="button">
@@ -845,27 +851,27 @@
 
             <button class="sttNavBtn" data-stt="conexiones" type="button">
                 <span class="icono iconoConexion" aria-hidden="true"></span>
-                Conexiones
+                <span data-i18n="ajustes.nav.conexiones">Conexiones</span>
             </button>
 
             <button class="sttNavBtn" data-stt="avisos" type="button">
                 <span class="icono iconoAviso" aria-hidden="true"></span>
-                Avisos
+                <span data-i18n="ajustes.nav.avisos">Avisos</span>
             </button>
 
             <button class="sttNavBtn" data-stt="datos" type="button">
                 <span class="icono iconoDatos" aria-hidden="true"></span>
-                Datos
+                <span data-i18n="ajustes.nav.datos">Datos</span>
             </button>
 
             <button class="sttNavBtn" data-stt="modulos" type="button">
                 <span class="icono iconoModulos" aria-hidden="true"></span>
-                Módulos
+                <span data-i18n="ajustes.nav.modulos">Módulos</span>
             </button>
 
             <button class="sttNavBtn" data-stt="registro" type="button">
                 <span class="icono iconoArchivo" aria-hidden="true"></span>
-                Registro
+                <span data-i18n="ajustes.nav.registro">Registro</span>
             </button>
 
         </nav>
@@ -875,7 +881,7 @@
 
         <!-- ── Apariencia ── -->
         <div class="sttPage active" id="sttPage-apariencia">
-            <h2 class="sttPageTitle">Apariencia</h2>
+            <h2 class="sttPageTitle" data-i18n="ajustes.nav.apariencia">Apariencia</h2>
 
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
@@ -883,23 +889,23 @@
                         <span class="icono iconoPaleta" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
-                        <div class="ajustesSectionTitle">Paleta de color</div>
-                        <div class="ajustesSectionDesc">Elige el tema visual de la aplicación.</div>
+                        <div class="ajustesSectionTitle" data-i18n="ajustes.paleta.titulo">Paleta de color</div>
+                        <div class="ajustesSectionDesc" data-i18n="ajustes.paleta.descripcion">Elige el tema visual de la aplicación.</div>
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
                 <div class="ajustesTemaGrid" id="ajustesTemaGrid">
                     <button class="ajustesTemaBtn" data-theme="default" type="button">
                         <span class="ajustesTemaPreview temaDefault"></span>
-                        <span class="ajustesTemaLabel">Noche Clara</span>
+                        <span class="ajustesTemaLabel" data-i18n="ajustes.paleta.nocheClara">Noche Clara</span>
                     </button>
                     <button class="ajustesTemaBtn" data-theme="black" type="button">
                         <span class="ajustesTemaPreview temaBlack"></span>
-                        <span class="ajustesTemaLabel">Oscuro</span>
+                        <span class="ajustesTemaLabel" data-i18n="ajustes.paleta.oscuro">Oscuro</span>
                     </button>
                     <button class="ajustesTemaBtn" data-theme="light" type="button">
                         <span class="ajustesTemaPreview temaLight"></span>
-                        <span class="ajustesTemaLabel">Claro</span>
+                        <span class="ajustesTemaLabel" data-i18n="ajustes.paleta.claro">Claro</span>
                     </button>
                 </div>
             </div>
@@ -910,14 +916,14 @@
                         <span class="icono iconoDensidad" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
-                        <div class="ajustesSectionTitle">Densidad del sidebar</div>
-                        <div class="ajustesSectionDesc">Reduce el tamaño de los activos en la barra lateral para mostrar más en pantalla.</div>
+                        <div class="ajustesSectionTitle" data-i18n="ajustes.densidad.titulo">Densidad del sidebar</div>
+                        <div class="ajustesSectionDesc" data-i18n="ajustes.densidad.descripcion">Reduce el tamaño de los activos en la barra lateral para mostrar más en pantalla.</div>
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
                 <div class="ajustesRefreshGrid" id="ajustesDensidadGrid">
                     <button class="ajustesRefreshBtn active" data-density="normal" type="button">Normal</button>
-                    <button class="ajustesRefreshBtn" data-density="compact" type="button">Compacto</button>
+                    <button class="ajustesRefreshBtn" data-density="compact" type="button" data-i18n="ajustes.densidad.compacto">Compacto</button>
                 </div>
                 <span id="ajustesDensidadMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
             </div>
@@ -928,15 +934,15 @@
                         <span class="icono iconoRotacion" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
-                        <div class="ajustesSectionTitle">Rotación del detalle de activo</div>
-                        <div class="ajustesSectionDesc">Cambia automáticamente el activo mostrado en el panel de detalle del sidebar. Se pausa al pasar el ratón por el sidebar.</div>
+                        <div class="ajustesSectionTitle" data-i18n="ajustes.rotacion.titulo">Rotación del detalle de activo</div>
+                        <div class="ajustesSectionDesc" data-i18n="ajustes.rotacion.descripcion">Cambia automáticamente el activo mostrado en el panel de detalle del sidebar. Se pausa al pasar el ratón por el sidebar.</div>
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
                 <div class="ajustesSwitchRow">
                     <div class="ajustesSwitchLabel">
-                        Activar rotación automática
-                        <small>Recorre en bucle los activos visibles del sidebar</small>
+                        <span data-i18n="ajustes.rotacion.activar">Activar rotación automática</span>
+                        <small data-i18n="ajustes.rotacion.activarAyuda">Recorre en bucle los activos visibles del sidebar</small>
                     </div>
                     <label class="ajustesSwitch">
                         <input type="checkbox" id="ajustesRotacionActiva">
@@ -958,15 +964,15 @@
                         <span class="icono iconoOjoTachado" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
-                        <div class="ajustesSectionTitle">Privacidad al inicio</div>
-                        <div class="ajustesSectionDesc">Oculta automáticamente los valores monetarios cada vez que abres la aplicación.</div>
+                        <div class="ajustesSectionTitle" data-i18n="ajustes.privacidad.titulo">Privacidad al inicio</div>
+                        <div class="ajustesSectionDesc" data-i18n="ajustes.privacidad.descripcion">Oculta automáticamente los valores monetarios cada vez que abres la aplicación.</div>
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
                 <div class="ajustesSwitchRow">
                     <div class="ajustesSwitchLabel">
-                        Ocultar valores al iniciar
-                        <small>Equivale a pulsar el botón <span class="icono iconoOjo" aria-hidden="true"></span> al abrir la app</small>
+                        <span data-i18n="ajustes.privacidad.ocultar">Ocultar valores al iniciar</span>
+                        <small><span data-i18n="ajustes.privacidad.ocultarAyudaAntes">Equivale a pulsar el botón</span> <span class="icono iconoOjo" aria-hidden="true"></span> <span data-i18n="ajustes.privacidad.ocultarAyudaDespues">al abrir la app</span></small>
                     </div>
                     <label class="ajustesSwitch">
                         <input type="checkbox" id="ajustesOcultarInicio">
@@ -978,11 +984,31 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
+                        <span class="icono iconoIdioma" aria-hidden="true"></span>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle" data-i18n="ajustes.idioma.titulo">Idioma</div>
+                        <div class="ajustesSectionDesc" data-i18n="ajustes.idioma.descripcion">Idioma de la interfaz. Los números y las fechas siguen sus propios ajustes de formato.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <!-- Cada idioma se nombra en su propia lengua: quien no entiende
+                     el idioma activo tiene que poder encontrar el suyo. -->
+                <div class="ajustesRefreshGrid" id="ajustesIdiomaGrid">
+                    <button class="ajustesRefreshBtn" data-idioma="es" lang="es" type="button">Español</button>
+                    <button class="ajustesRefreshBtn" data-idioma="en" lang="en" type="button">English</button>
+                </div>
+                <span id="ajustesIdiomaMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
                         <span class="icono iconoNumeros" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
-                        <div class="ajustesSectionTitle">Formato de números</div>
-                        <div class="ajustesSectionDesc">Separador decimal y de miles para todos los valores mostrados en la aplicación.</div>
+                        <div class="ajustesSectionTitle" data-i18n="ajustes.numeros.titulo">Formato de números</div>
+                        <div class="ajustesSectionDesc" data-i18n="ajustes.numeros.descripcion">Separador decimal y de miles para todos los valores mostrados en la aplicación.</div>
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
@@ -1000,15 +1026,15 @@
                         <span class="icono iconoCalendario" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
-                        <div class="ajustesSectionTitle">Formato de fecha</div>
-                        <div class="ajustesSectionDesc">Orden en que se muestran día, mes y año.</div>
+                        <div class="ajustesSectionTitle" data-i18n="ajustes.fecha.titulo">Formato de fecha</div>
+                        <div class="ajustesSectionDesc" data-i18n="ajustes.fecha.descripcion">Orden en que se muestran día, mes y año.</div>
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
                 <div class="ajustesRefreshGrid" id="ajustesDateFmtGrid">
-                    <button class="ajustesRefreshBtn" data-fmt="DD/MM/YYYY" type="button">DD/MM/AAAA</button>
-                    <button class="ajustesRefreshBtn" data-fmt="MM/DD/YYYY" type="button">MM/DD/AAAA</button>
-                    <button class="ajustesRefreshBtn" data-fmt="YYYY-MM-DD" type="button">AAAA-MM-DD</button>
+                    <button class="ajustesRefreshBtn" data-fmt="DD/MM/YYYY" type="button" data-i18n="ajustes.fecha.ddmmaaaa">DD/MM/AAAA</button>
+                    <button class="ajustesRefreshBtn" data-fmt="MM/DD/YYYY" type="button" data-i18n="ajustes.fecha.mmddaaaa">MM/DD/AAAA</button>
+                    <button class="ajustesRefreshBtn" data-fmt="YYYY-MM-DD" type="button" data-i18n="ajustes.fecha.aaaammdd">AAAA-MM-DD</button>
                 </div>
                 <span id="ajustesDateFmtMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
             </div>
@@ -2562,6 +2588,10 @@
 <script defer src="js/analisis/herramientas-capitalizacion.js"></script>
 <script defer src="js/analisis/herramientas-metales.js"></script>
 <script defer src="js/analisis/herramientas-divisas.js"></script>
+<script defer src="js/analisis/herramientas-fiscal.js"></script>
+<script defer src="js/analisis/herramientas-proyeccion.js"></script>
+<script defer src="js/analisis/herramientas-cartera.js"></script>
+<script defer src="js/analisis/herramientas-ratio-ab.js"></script>
 <script defer src="js/finanzas/bonos.js"></script>
 <script defer src="js/analisis/metricas.js"></script>
 <script defer src="js/analisis/metricas-graficos.js"></script>

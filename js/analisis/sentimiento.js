@@ -140,7 +140,7 @@ async function smLoadAndRender() {
 
     const updatedEl = document.getElementById("smUpdated")
     if (updatedEl) {
-        updatedEl.textContent = `Actualizado ${new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`
+        updatedEl.textContent = `Actualizado ${new Date().toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })}`
     }
 }
 
@@ -219,7 +219,7 @@ function smFgZoneColor(valor) {
 
 function smFgDateLabel(timestamp) {
     const fecha = new Date(Number(timestamp) * 1000)
-    return fecha.toLocaleDateString("es-ES", { day: "2-digit", month: "short" })
+    return fecha.toLocaleDateString(uiLocale(), { day: "2-digit", month: "short" })
 }
 
 // Pinta las cinco bandas de fondo (miedo extremo → codicia extrema) detrás de
@@ -514,7 +514,7 @@ function smIndexCardHtml(item) {
 
 function smIndexValue(value, currency) {
     const decimals = Math.abs(value) >= 1000 ? 0 : 2
-    const formatted = value.toLocaleString("es-ES", {
+    const formatted = value.toLocaleString(_nl(), {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals
     })
@@ -526,9 +526,7 @@ function smPercentSigned(value, decimals = 2) {
     const num = typeof value === "number" ? value : parseFloat(value)
     if (value === null || value === undefined || isNaN(num)) return "—"
     const sign = num > 0 ? "+" : ""
-    return (
-        sign + num.toLocaleString("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + " %"
-    )
+    return sign + num.toLocaleString(_nl(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + " %"
 }
 
 // ── Distribución del mercado (treemap: S&P 500 / Cripto / Nasdaq 100) ──────
@@ -794,7 +792,7 @@ function smSectorTooltipHtml(d) {
 function smMoneyMillones(value, currency) {
     const num = typeof value === "number" ? value : parseFloat(value)
     if (value === null || value === undefined || isNaN(num)) return "—"
-    return (num / 1e6).toLocaleString("es-ES", { maximumFractionDigits: 0 }) + " M " + currencySuffix(currency || "USD")
+    return (num / 1e6).toLocaleString(_nl(), { maximumFractionDigits: 0 }) + " M " + currencySuffix(currency || "USD")
 }
 
 // El cuerpo del ticker se calcula por lo que ocupa de verdad medido con la
@@ -1026,5 +1024,5 @@ function smVolumeRowHtml(row, idx) {
 function smRatioText(value, decimals = 1) {
     const num = typeof value === "number" ? value : parseFloat(value)
     if (value === null || value === undefined || isNaN(num)) return "—"
-    return num.toLocaleString("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    return num.toLocaleString(_nl(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
 }

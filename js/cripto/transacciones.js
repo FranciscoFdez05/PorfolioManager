@@ -561,7 +561,7 @@ function formatTransaccionesNumber(value) {
         return ""
     }
 
-    return parsedValue.toLocaleString("es-ES", {
+    return parsedValue.toLocaleString(_nl(), {
         minimumFractionDigits: 8,
         maximumFractionDigits: 8
     })
@@ -1126,7 +1126,7 @@ function abrirGrafoTransacciones() {
             : `${filas.length} transacción${filas.length === 1 ? "" : "es"}`,
         movimientos,
         formato: (n) =>
-            `${n.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 8 })} ${simbolo}`.trim(),
+            `${n.toLocaleString(_nl(), { minimumFractionDigits: 0, maximumFractionDigits: 8 })} ${simbolo}`.trim(),
         vacio: `No hay transacciones de ${asset.name || simbolo} entre dos wallets distintas.`
     })
 }

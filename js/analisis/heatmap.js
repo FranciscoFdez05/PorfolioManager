@@ -622,7 +622,7 @@ function hmMedirTexto(texto) {
 }
 
 function hmFormatEur(v) {
-    return (v || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"
+    return (v || 0).toLocaleString(_nl(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"
 }
 
 function hmFormatSignedEur(v) {
@@ -650,7 +650,7 @@ function hmFormatPrice(num, currency) {
               ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
               : { minimumFractionDigits: 2, maximumFractionDigits: 4 }
 
-    return `${num.toLocaleString("es-ES", decimales)} ${currencySuffix(currency)}`
+    return `${num.toLocaleString(_nl(), decimales)} ${currencySuffix(currency)}`
 }
 
 // Gris de "ni sube ni baja" (y de los que no tienen dato). En el tema claro el

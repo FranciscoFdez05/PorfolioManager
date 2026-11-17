@@ -649,7 +649,7 @@ function createAssetSymbolFromName(name) {
 
 function formatPercent(value) {
     return (
-        new Intl.NumberFormat("es-ES", {
+        new Intl.NumberFormat(_nl(), {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         }).format(value) + " %"

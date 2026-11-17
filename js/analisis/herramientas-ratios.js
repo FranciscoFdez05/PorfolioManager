@@ -270,7 +270,7 @@ function hCalcOroBtc() {
 
     const monedaBase = window._monedaBase || "EUR"
     const simbolo = monedaBase === "USD" ? "$" : "€"
-    const fmt = (v) => simbolo + v.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const fmt = (v) => simbolo + v.toLocaleString(_nl(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
     const ratio = precioBtc / precioOro
     const ref = _oroBtcRef

@@ -590,12 +590,12 @@ async function saveStakingToServer() {
 function formatCellCriptoValue(raw) {
     const n = parseLooseNumber(String(raw || ""))
     if (isNaN(n)) return ""
-    return n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 8 })
+    return n.toLocaleString(_nl(), { minimumFractionDigits: 2, maximumFractionDigits: 8 })
 }
 
 function formatLooseNumber(n) {
     if (isNaN(n)) return "0,00"
-    return n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 8 })
+    return n.toLocaleString(_nl(), { minimumFractionDigits: 2, maximumFractionDigits: 8 })
 }
 
 // ----- Init -----

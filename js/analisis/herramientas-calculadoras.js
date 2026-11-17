@@ -162,7 +162,7 @@ function hCalcPrecioMedio() {
     const pm = totalUnd > 0 ? totalInv / totalUnd : 0
     document.getElementById("hPrecioMedioResult").textContent = formatEuro(pm)
     document.getElementById("hPrecioTotalInv").textContent = formatEuro(totalInv)
-    document.getElementById("hPrecioTotalUnidades").textContent = totalUnd.toLocaleString("es-ES", {
+    document.getElementById("hPrecioTotalUnidades").textContent = totalUnd.toLocaleString(_nl(), {
         maximumFractionDigits: 8
     })
     document.getElementById("hPrecioResults").classList.remove("hidden")

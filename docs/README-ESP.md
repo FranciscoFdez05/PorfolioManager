@@ -97,6 +97,7 @@ Los secretos van en `.env` (copia `.env.example`; `./docker-setup` lo hace por t
    - **Telegram**: avisos y comandos (`/estado`, `/cartera`, `/backup`).
    - **Cuenta**: verificación en dos pasos con código por Telegram y frase de recuperación.
    - **Módulos**: qué módulos salen en el menú y cuál se abre al iniciar.
+   - **Apariencia › Idioma**: idioma de la interfaz, español o inglés. Es independiente de los formatos de número y fecha de la misma página. La traducción está en curso: el menú, la cabecera, el panel lateral y esta página de ajustes ya están; el resto de pantallas sigue en español.
 
 | Dónde | Qué haces ahí |
 | --- | --- |
@@ -110,6 +111,9 @@ Los secretos van en `.env` (copia `.env.example`; `./docker-setup` lo hace por t
 | **Dividendos › Ingresos pasivos** | Dividendos de los últimos 12 meses, media mensual y rentabilidad sobre coste por activo y global |
 | **Dividendos › Reinvertir** | Un dividendo se puede marcar como reinvertido: añade a la ficha del activo una compra «Reinvertido» que cuenta en la posición y en el FIFO |
 | **Ajustes › Exportar a CSV** | Descarga gastos, ingresos, dividendos, operaciones y cuentas en CSV listo para Excel |
+| **Herramientas › Proyección** | Interés compuesto, independencia financiera (cuánto necesitas y cuándo llegas), cuánto dura un capital retirando cada año, Monte Carlo con la volatilidad de tu cartera y rentabilidad real tras impuestos e inflación |
+| **Herramientas › Cartera / Mercado** | Tamaño de posición por riesgo, cuánto hay que subir para recuperar una caída, DCA frente a invertir todo de golpe con precios históricos reales, y el ratio entre dos activos cualesquiera frente a su historia |
+| **Herramientas › Fiscal** | Simular una venta, ver qué posiciones en pérdidas vender para rebajar el IRPF del año (y cuándo recomprar), prever la cuota del ahorro con ventas, dividendos e intereses, y calcular la doble imposición de un dividendo extranjero |
 | **Mi dinero › Microcréditos** | Préstamos pequeños y de corta duración, con pago único (importe más comisión) o en cuotas mensuales: coste, TAE equivalente, vencimientos con aviso de los vencidos y calendario en los de cuotas |
 | **Cripto › Transacciones › ··· › Wallets enlazadas** | Importar los movimientos de tus wallets desde la blockchain (nunca pegues claves privadas ni frases semilla) |
 | **Cripto › Seguimiento** | Agrupar wallets propias o ajenas, ver su historial, UTXOs y tokens, y recibir avisos por Telegram |

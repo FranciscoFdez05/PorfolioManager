@@ -5,7 +5,7 @@
 
 function prestamoFormatoPorcentaje(valor) {
     return (
-        new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+        new Intl.NumberFormat(_nl(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
             Number(valor) || 0
         ) + " %"
     )

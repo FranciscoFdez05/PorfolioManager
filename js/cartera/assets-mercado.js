@@ -349,7 +349,7 @@ function mkDerivativesHtml(data, coin) {
     // Tasa positiva: los largos pagan a los cortos (el mercado apuesta al alza).
     const funding = d.fundingRate === null ? null : d.fundingRate * 100
     const fundingSub = d.nextFundingTime
-        ? `Próximo cobro ${new Date(Number(d.nextFundingTime)).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`
+        ? `Próximo cobro ${new Date(Number(d.nextFundingTime)).toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })}`
         : ""
 
     return `<div class="mkGrid">${[
@@ -690,7 +690,7 @@ function mkCompact(value) {
     const tier = _MK_SCALE.find((t) => abs >= t.from)
     const number = tier ? value / tier.divisor : value
     const decimals = tier ? 2 : abs >= 100 ? 0 : 2
-    return number.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: decimals }) + (tier ? tier.suffix : "")
+    return number.toLocaleString(_nl(), { minimumFractionDigits: 0, maximumFractionDigits: decimals }) + (tier ? tier.suffix : "")
 }
 
 function mkMoney(value, currency) {

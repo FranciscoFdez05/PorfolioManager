@@ -213,6 +213,7 @@ def getSettings():
         "bloqueoInactividad":       _asInt(gcfg.get("bloqueoInactividad"), 0),
         "numLocale":                gcfg.get("numLocale") or "es-ES",
         "dateFormat":               gcfg.get("dateFormat") or "DD/MM/YYYY",
+        "idioma":                   gcfg.get("idioma") or "es",
         "maxBackups":               _asInt(gcfg.get("maxBackups"), 0),
         # Por-portfolio
         "hiddenAssets":             pcfg.get("hiddenAssets") or [],
@@ -832,6 +833,7 @@ _NORMALIZADORES_GLOBALES = {
     "bloqueoInactividad": _inactividad,
     "numLocale": _unaDe({"es-ES", "en-US", "fr-FR"}, "es-ES"),
     "dateFormat": _unaDe({"DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"}, "DD/MM/YYYY"),
+    "idioma": _unaDe({"es", "en"}, "es"),
     "maxBackups": _enteroDe({0, 5, 10, 20, 50}, 0),
 }
 

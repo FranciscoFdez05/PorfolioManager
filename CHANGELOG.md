@@ -22,6 +22,63 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [Sin publicar]
+
+**Esquema de base de datos:** no lo toca (sigue en el **41**).
+
+### Añadido
+
+- **Herramientas › Fiscal › Compensar pérdidas**: simula vender cada posición
+  en pérdidas al último precio guardado, una a una y todas juntas, y da la
+  cuota del ahorro que ahorrarías este año, la pérdida que pasaría a años
+  siguientes y desde qué fecha podrías recomprar sin que la regla de los dos
+  meses (un año en cripto) la bloquee. Mismo FIFO que Ventas; no guarda nada.
+- **Herramientas › Fiscal › IRPF del ahorro**: previsión de la cuota de la base
+  del ahorro de un ejercicio con ventas, dividendos e intereses, con la
+  compensación cruzada del 25 % del art. 49 LIRPF y los saldos negativos de
+  años anteriores. Solo la usa esta herramienta: Ventas y el informe de la
+  Renta no cambian.
+- **Herramientas › Fiscal › Doble imposición**: reparto de la retención en
+  origen de un dividendo extranjero entre lo que se deduce en la Renta, lo
+  reclamable al otro país y lo que se pierde (art. 80 LIRPF).
+- **Herramientas › Proyección › Independencia financiera**: patrimonio objetivo
+  según tus gastos y tu tasa de retirada, y cuánto tardas en llegar. El
+  patrimonio actual se puede cargar de **Mi dinero › Patrimonio**.
+- **Herramientas › Proyección › Desacumulación**: cuánto dura un capital con
+  retiradas que suben con la inflación, y la retirada que no lo agota nunca.
+- **Herramientas › Proyección › Monte Carlo**: miles de trayectorias con
+  rentabilidad y volatilidad dadas (o las de tu cartera): mediana, percentiles
+  10 y 90 y probabilidad de acabar por debajo de lo aportado.
+- **Herramientas › Proyección › Rentabilidad real**: lo que gana de verdad una
+  cuenta remunerada, letra o bono tras el IRPF y la inflación (Fisher exacta).
+  La inflación siempre la escribe el usuario.
+- **Herramientas › Cartera › Tamaño de posición**: unidades a comprar para no
+  perder más del porcentaje de la cartera elegido si salta el stop, con peso en
+  la cartera y ratio beneficio/riesgo. El capital se puede cargar de la cartera.
+- **Herramientas › Cartera › Recuperar una caída**: subida necesaria para
+  recuperar una pérdida (comisiones incluidas) y años a una rentabilidad dada.
+- **Herramientas › Cartera › DCA o todo de golpe**: con las velas reales de un
+  activo, compara invertir todo de una vez frente a aportaciones mensuales, y
+  en cuántas ventanas de su historia ganó cada estrategia.
+- **Herramientas › Mercado › Ratio entre dos activos**: el ratio de cualquier
+  pareja de tickers frente a su historia (media, percentiles, z), por periodos.
+  Oro/Plata y Oro/Bitcoin siguen como accesos directos.
+- **Ajustes › Apariencia › Idioma**: la interfaz en español o en inglés,
+  independiente de los formatos de número y fecha. Traducción parcial: por
+  ahora la cabecera, el menú, el panel lateral y Ajustes › Apariencia; el resto
+  de pantallas sigue en español. Ajuste global nuevo `idioma` (`es`/`en`) en
+  `/api/settings`. Los textos están en `js/locales/` y el idioma de respaldo es
+  el español.
+
+### Corregido
+
+- **Formato de números**: con 1,234.56 o 1 234,56 elegido en Ajustes, varias
+  pantallas (Fundamentales, Sentimiento, Mapas, Herramientas, Cripto, Cuentas,
+  Planes, alertas…) seguían escribiendo los números a la española. Ahora todas
+  respetan el ajuste.
+
+---
+
 ## [5.5.0] — 2026-11-16
 
 **Esquema de base de datos:** sube al **41** (antes el 31); añade las tablas

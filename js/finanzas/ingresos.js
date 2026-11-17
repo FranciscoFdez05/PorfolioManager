@@ -2334,7 +2334,7 @@ function recCalDayKey(monthIndex, day) {
  */
 function formatRecCalImporte(amount) {
     if (Math.abs(amount) >= 1000) {
-        return `${(amount / 1000).toLocaleString("es-ES", { maximumFractionDigits: 1 })}k`
+        return `${(amount / 1000).toLocaleString(_nl(), { maximumFractionDigits: 1 })}k`
     }
     return String(Math.round(amount))
 }

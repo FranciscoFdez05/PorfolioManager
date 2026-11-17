@@ -101,6 +101,18 @@ async function initHerramientasLogic() {
     // ── Comparador de divisas ──────────────────────────────────────
     hFxIniciar()
 
+    // ── Compensar pérdidas, IRPF del ahorro y doble imposición ─────
+    hFiscalIniciar()
+
+    // ── FIRE, desacumulación, Monte Carlo y rentabilidad real ──────
+    hProyIniciar()
+
+    // ── Tamaño de posición, recuperación y DCA ─────────────────────
+    hCarIniciar()
+
+    // ── Ratio entre dos activos ────────────────────────────────────
+    hAbIniciar()
+
     // ── Herramientas añadidas por el usuario ───────────────────────
     // Lo último: si falla, las de serie ya están montadas y funcionando.
     await hCargarHerramientasExtra()

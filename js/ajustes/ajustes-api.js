@@ -573,12 +573,12 @@ function _initAjustesEstadoApis() {
     let cambioTimer = null
 
     const _formatoTipo = (rate) =>
-        Number(rate).toLocaleString("es-ES", { minimumFractionDigits: 4, maximumFractionDigits: 6 })
+        Number(rate).toLocaleString(_nl(), { minimumFractionDigits: 4, maximumFractionDigits: 6 })
 
     function _fechaDato(fecha) {
         // Frankfurter da "2026-09-25"; open.er-api.com una fecha HTTP completa.
         const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(fecha) ? `${fecha}T00:00:00` : fecha)
-        return Number.isNaN(d.getTime()) ? fecha : d.toLocaleDateString("es-ES")
+        return Number.isNaN(d.getTime()) ? fecha : d.toLocaleDateString(uiLocale())
     }
 
     async function loadCambioBases() {
@@ -630,7 +630,7 @@ function _initAjustesEstadoApis() {
         })
 
         const comprobado = new Date(data.comprobado)
-        const hora = Number.isNaN(comprobado.getTime()) ? "" : comprobado.toLocaleTimeString("es-ES")
+        const hora = Number.isNaN(comprobado.getTime()) ? "" : comprobado.toLocaleTimeString(uiLocale())
         const pie = document.createElement("div")
         pie.className = "ajustesApiEstadoPie"
         pie.textContent =

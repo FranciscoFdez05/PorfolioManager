@@ -153,7 +153,7 @@ function walletsSegDerivadasHtml(grupo) {
     if (!derivadas.length) return ""
     return `
         <section class="walletsSegDerivadas">
-            <h3 class="walletsSegSeccion">Direcciones de sus claves públicas <span class="walletsSegContador">${derivadas.length.toLocaleString("es-ES")}</span></h3>
+            <h3 class="walletsSegSeccion">Direcciones de sus claves públicas <span class="walletsSegContador">${derivadas.length.toLocaleString(_nl())}</span></h3>
             <p class="walletsSegDato">Cuentan como tuyas: lo que se mueve entre ellas no es una entrada ni una salida de dinero. Salen enmascaradas; las completas están en el botón «Direcciones», con tu contraseña.</p>
             <ul class="walletsSegDerivadasLista">${derivadas
                 .map(

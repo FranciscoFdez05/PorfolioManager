@@ -802,7 +802,7 @@ const DIVIDENDOS_PASIVOS_MAX_ACTIVOS = 5
 function formatDividendosPorcentaje(valor) {
     return valor === null || valor === undefined
         ? "—"
-        : `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor)} %`
+        : `${new Intl.NumberFormat(_nl(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor)} %`
 }
 
 function renderDividendosPasivosDatos(resumen) {

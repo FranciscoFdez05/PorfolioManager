@@ -407,6 +407,143 @@ def repartirCuotaPorVenta(resultados, liquidacion, escala):
     return reparto
 
 
+# ── Integración de la base del ahorro (art. 49 LIRPF) ────────────────────────
+# Lo que `liquidarEjercicios` deja fuera a propósito: los rendimientos del
+# capital mobiliario (dividendos, intereses) y su compensación cruzada con las
+# ganancias y pérdidas patrimoniales. Va en una función aparte, que solo usa la
+# previsión de la herramienta, para que la pantalla de Ventas y el informe de
+# la Renta sigan dando exactamente las mismas cifras que antes.
+
+# Tope de la compensación cruzada entre los dos saldos (art. 49.1.a y 49.1.b).
+LIMITE_COMPENSACION_CRUZADA = Decimal("0.25")
+
+
+@dataclass
+class IntegracionAhorro:
+    """Base del ahorro de un ejercicio con rendimientos y ganancias integrados.
+
+    Attributes:
+        anio: Ejercicio.
+        rcm: Saldo de rendimientos del capital mobiliario del ejercicio.
+        saldoGyp: Saldo de ganancias y pérdidas patrimoniales del ejercicio,
+            antes de aplicar saldos negativos de ejercicios anteriores.
+        cruzadoGypContraRcm: Pérdida patrimonial del ejercicio compensada con
+            rendimientos (como mucho, el 25 % de estos).
+        cruzadoRcmContraGyp: Rendimiento negativo del ejercicio compensado con
+            ganancias (como mucho, el 25 % de estas).
+        arrastresAplicadosGyp: Saldos negativos de ejercicios anteriores
+            aplicados contra ganancias.
+        arrastresAplicadosRcm: Saldos negativos de ejercicios anteriores
+            aplicados contra rendimientos, dentro del 25 % que quede libre.
+        baseGyp: Parte de la base que sale de ganancias patrimoniales.
+        baseRcm: Parte de la base que sale de rendimientos.
+        base: Base liquidable del ahorro.
+        tramos: Cuota por tramo de la escala del ejercicio.
+        cuota: Cuota íntegra del ahorro.
+        perdidaArrastrable: Pérdida patrimonial del ejercicio que queda para
+            los cuatro siguientes.
+        rcmNegativoArrastrable: Rendimiento negativo del ejercicio que queda
+            para los cuatro siguientes.
+        detalleArrastres: Qué se aplicó de cada ejercicio de origen.
+    """
+
+    anio: int
+    rcm: Decimal
+    saldoGyp: Decimal
+    cruzadoGypContraRcm: Decimal = Decimal("0")
+    cruzadoRcmContraGyp: Decimal = Decimal("0")
+    arrastresAplicadosGyp: Decimal = Decimal("0")
+    arrastresAplicadosRcm: Decimal = Decimal("0")
+    baseGyp: Decimal = Decimal("0")
+    baseRcm: Decimal = Decimal("0")
+    base: Decimal = Decimal("0")
+    tramos: dict = field(default_factory=dict)
+    cuota: Decimal = Decimal("0")
+    perdidaArrastrable: Decimal = Decimal("0")
+    rcmNegativoArrastrable: Decimal = Decimal("0")
+    detalleArrastres: list = field(default_factory=list)
+
+
+def integrarBaseAhorro(rcm, saldoGyp, arrastresPrevios, anio) -> IntegracionAhorro:
+    """Integra y compensa la base del ahorro de un ejercicio (art. 49 LIRPF).
+
+    El orden es el de la ley: primero se cruzan los saldos negativos del
+    propio ejercicio con el positivo del otro grupo, con el tope del 25 %; luego
+    se aplican los saldos negativos de ejercicios anteriores, primero contra
+    ganancias y lo que sobre contra rendimientos, dentro del 25 % que no haya
+    gastado ya el cruce del propio año.
+
+    Solo se arrastran pérdidas patrimoniales de ejercicios anteriores: los
+    rendimientos negativos son raros en esta aplicación (no modela gastos de
+    administración ni cesión de capitales con pérdida) y no se guardan.
+
+    Args:
+        rcm: Saldo de rendimientos del capital mobiliario del ejercicio
+            (dividendos e intereses brutos). Puede ser negativo.
+        saldoGyp: Ganancias menos pérdidas patrimoniales computables del
+            ejercicio, sin aplicar todavía saldos de años anteriores.
+        arrastresPrevios: Saldos negativos pendientes al empezar el ejercicio,
+            como `[{"anio_origen": int, "importe": Decimal}]`. Los caducados
+            (más de cuatro ejercicios) se ignoran.
+        anio: Ejercicio que se integra; elige la escala.
+
+    Returns:
+        La integración completa, con la cuota por tramos.
+
+    Example:
+        >>> r = integrarBaseAhorro(Decimal("1000"), Decimal("-600"), [], 2026)
+        >>> r.cruzadoGypContraRcm, r.base, r.perdidaArrastrable
+        (Decimal('250.00'), Decimal('750.00'), Decimal('350.00'))
+    """
+    anio = _anioInt(anio)
+    rcm = Decimal(rcm)
+    saldoGyp = Decimal(saldoGyp)
+    resultado = IntegracionAhorro(anio=anio, rcm=rcm, saldoGyp=saldoGyp)
+
+    rcmPositivo = max(rcm, Decimal("0"))
+    gypPositivo = max(saldoGyp, Decimal("0"))
+    limiteRcm = rcmPositivo * LIMITE_COMPENSACION_CRUZADA
+    limiteGyp = gypPositivo * LIMITE_COMPENSACION_CRUZADA
+
+    resultado.cruzadoGypContraRcm = min(max(-saldoGyp, Decimal("0")), limiteRcm)
+    resultado.cruzadoRcmContraGyp = min(max(-rcm, Decimal("0")), limiteGyp)
+    resultado.perdidaArrastrable = max(-saldoGyp, Decimal("0")) - resultado.cruzadoGypContraRcm
+    resultado.rcmNegativoArrastrable = max(-rcm, Decimal("0")) - resultado.cruzadoRcmContraGyp
+
+    baseRcm = rcmPositivo - resultado.cruzadoGypContraRcm
+    baseGyp = gypPositivo - resultado.cruzadoRcmContraGyp
+    limiteRcmLibre = limiteRcm - resultado.cruzadoGypContraRcm
+
+    for arrastre in sorted(arrastresPrevios, key=lambda a: int(a["anio_origen"])):
+        origen = int(arrastre["anio_origen"])
+        pendiente = Decimal(arrastre["importe"])
+        if pendiente <= 0 or anio - origen > EJERCICIOS_ARRASTRE or origen >= anio:
+            continue
+        contraGyp = min(pendiente, baseGyp)
+        baseGyp -= contraGyp
+        pendiente -= contraGyp
+        contraRcm = min(pendiente, limiteRcmLibre, baseRcm)
+        baseRcm -= contraRcm
+        limiteRcmLibre -= contraRcm
+        resultado.arrastresAplicadosGyp += contraGyp
+        resultado.arrastresAplicadosRcm += contraRcm
+        if contraGyp > 0 or contraRcm > 0:
+            resultado.detalleArrastres.append({
+                "anio_origen": origen,
+                "contraGyp": contraGyp,
+                "contraRcm": contraRcm,
+                "restante": pendiente - contraRcm,
+                "ultimo_ejercicio": origen + EJERCICIOS_ARRASTRE,
+            })
+
+    resultado.baseGyp = baseGyp
+    resultado.baseRcm = baseRcm
+    resultado.base = baseGyp + baseRcm
+    resultado.tramos = repartirEnTramos(resultado.base, escalaDelEjercicio(anio))
+    resultado.cuota = sum(resultado.tramos.values(), Decimal("0"))
+    return resultado
+
+
 def _anioInt(value):
     try:
         return int(str(value)[:4])

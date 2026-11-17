@@ -1808,7 +1808,7 @@ function _calendarioVistaDias(estado) {
             datos: `data-fecha="${iso}"`,
             texto: dia.getDate(),
             etiqueta:
-                dia.toLocaleDateString("es-ES", { dateStyle: "full" }) +
+                dia.toLocaleDateString(uiLocale(), { dateStyle: "full" }) +
                 (textoOperaciones ? `, con ${textoOperaciones}` : ""),
             enfocable: iso === focoIso,
             elegido: iso === input.value,
@@ -1825,7 +1825,7 @@ function _calendarioVistaDias(estado) {
     const anio = mes.getFullYear()
     const numMes = mes.getMonth()
     return {
-        titulo: _calendarioCapitalizar(mes.toLocaleDateString("es-ES", { month: "long", year: "numeric" })),
+        titulo: _calendarioCapitalizar(mes.toLocaleDateString(uiLocale(), { month: "long", year: "numeric" })),
         tituloVista: "meses",
         tituloAyuda: "Elegir mes",
         pasoAyuda: ["Mes anterior", "Mes siguiente"],
@@ -1853,7 +1853,7 @@ function _calendarioVistaMeses(estado) {
                 datos: `data-mes-elegido="${mes}"`,
                 texto: nombre,
                 etiqueta: _calendarioCapitalizar(
-                    new Date(anio, mes, 1).toLocaleDateString("es-ES", { month: "long", year: "numeric" })
+                    new Date(anio, mes, 1).toLocaleDateString(uiLocale(), { month: "long", year: "numeric" })
                 ),
                 enfocable: mes === enfocado,
                 elegido: esElegido,

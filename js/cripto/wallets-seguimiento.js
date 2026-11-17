@@ -130,13 +130,13 @@ function walletsSegAnotarPublicos(lista) {
 function walletsSegNumero(valor, maximoDecimales = 8) {
     const numero = parseLooseNumber(valor)
     if (numero === null) return "—"
-    return numero.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: maximoDecimales })
+    return numero.toLocaleString(_nl(), { minimumFractionDigits: 0, maximumFractionDigits: maximoDecimales })
 }
 
 function walletsSegEuros(valor) {
     const numero = parseLooseNumber(valor)
     if (numero === null) return ""
-    return numero.toLocaleString("es-ES", { style: "currency", currency: "EUR" })
+    return numero.toLocaleString(_nl(), { style: "currency", currency: "EUR" })
 }
 
 function walletsSegFecha(iso) {
@@ -144,7 +144,7 @@ function walletsSegFecha(iso) {
     const fecha = new Date(iso)
     return Number.isNaN(fecha.getTime())
         ? "—"
-        : fecha.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })
+        : fecha.toLocaleString(uiLocale(), { dateStyle: "short", timeStyle: "short" })
 }
 
 function walletsSegAbreviar(texto) {

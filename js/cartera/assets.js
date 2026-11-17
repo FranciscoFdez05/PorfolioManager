@@ -945,7 +945,7 @@ function formatAssetLastUpdated(value) {
         return "Sin datos de mercado"
     }
 
-    return `Actualizado: ${date.toLocaleString("es-ES", {
+    return `Actualizado: ${date.toLocaleString(uiLocale(), {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",

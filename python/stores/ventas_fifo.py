@@ -899,6 +899,149 @@ def simularVenta(assetId, fechaTexto, cantidad, precio, comision=0):
     return dato, ""
 
 
+# ── Simulación de varias ventas (compensación de pérdidas) ───────────────────
+# `simularVenta` contesta por una venta; la herramienta de compensación necesita
+# la misma respuesta para cada posición en pérdidas y para todas juntas. Llamar
+# a `simularVenta` en bucle repetiría el FIFO de toda la cartera dos veces por
+# candidata; aquí se calcula una vez por activo y solo se rehace el del activo
+# que se vende.
+
+PREFIJO_SIMULACION_MULTIPLE = "simulacion:"
+
+
+def _importeEnEuros(moneda, fecha, importe, comision):
+    """Pasa a euros el importe y la comisión de una venta simulada.
+
+    Usa el tipo de la caché para esa fecha, sin descargar, como `simularVenta`.
+
+    Returns:
+        `(importe, comision, defecto)`; `defecto` es la incidencia de tipo de
+        cambio que falta, o vacío.
+    """
+    if moneda == "EUR":
+        return importe, comision, ""
+    from stores.fx_historico import tasa
+
+    tipo, _origen, _fechaUsada = tasa(moneda, fecha, permitirDescarga=False)
+    if tipo is None or tipo <= 0:
+        return importe, comision, fifo.INCIDENCIA_SIN_TIPO
+    return importe * tipo, comision * tipo, ""
+
+
+def _resultadosPorRef(operaciones, tipo):
+    resultados, lotes = fiscal_es.calcularConNormativa(operaciones, tipo)
+    return {r.ref: r for r in resultados}, lotes
+
+
+def _liquidarResultados(porRef, ventas, invalidas):
+    """Agrupa por ejercicio lo que declara y liquida todos los ejercicios."""
+    resultadosPorAnio = {}
+    for fila in ventas:
+        if (fila["year"], fila["id"]) in invalidas:
+            continue
+        resultado = porRef.get(f"venta:{fila['year']}:{fila['id']}")
+        if resultado is not None:
+            resultadosPorAnio.setdefault(str(fila["year"]), []).append(resultado)
+
+    for ref, resultado in porRef.items():
+        esPermuta = ref.startswith("permuta:") and resultado.fiscal
+        if esPermuta or ref.startswith(PREFIJO_SIMULACION_MULTIPLE):
+            resultadosPorAnio.setdefault(str(resultado.fecha.year), []).append(resultado)
+
+    return fiscal_es.liquidarEjercicios(resultadosPorAnio)
+
+
+def simularVariasVentas(ventasSimuladas, fecha, conjunto=None):
+    """Liquida el ejercicio sin ventas nuevas, con cada una por separado y juntas.
+
+    No guarda nada. Las ventas se expresan en la divisa del activo, como en
+    `simularVenta`.
+
+    Args:
+        ventasSimuladas: Lista de `{"activo", "cantidad", "precio"}` (Decimal o
+            texto). Un activo que no existe se ignora.
+        fecha: `date` de las ventas simuladas.
+        conjunto: Función `(activoId, Resultado) -> bool` que decide qué ventas
+            entran en la liquidación conjunta. Sin ella, entran todas.
+
+    Returns:
+        Diccionario con:
+          * `"base"`: `{anio: Liquidacion}` sin ninguna venta nueva.
+          * `"individuales"`: `{activoId: {"resultado": Resultado,
+            "liquidaciones": {anio: Liquidacion}}}`, una por venta.
+          * `"conjunta"`: `{anio: Liquidacion}` con las ventas elegidas por
+            `conjunto` a la vez.
+          * `"enConjunta"`: activos que entraron en la liquidación conjunta.
+          * `"lotesVivos"`: `{activoId: [Lote]}` antes de vender.
+    """
+    porActivo, activos = _operacionesDeFichas()
+    ventas = _leerVentasCrudas()
+    invalidas = _añadirVentas(porActivo, ventas, activos)
+    _añadirMovimientosPropios(porActivo, activos)
+
+    basePorActivo = {}
+    lotesVivos = {}
+    for activoId, operaciones in porActivo.items():
+        tipo = activos.get(activoId, {}).get("type", "")
+        basePorActivo[activoId], lotesVivos[activoId] = _resultadosPorRef(operaciones, tipo)
+
+    conVentaPorActivo = {}
+    for venta in ventasSimuladas:
+        activoId = venta["activo"]
+        activo = activos.get(activoId)
+        if activo is None:
+            continue
+        cantidad = _num(venta["cantidad"])
+        precio = _num(venta["precio"])
+        moneda = str(activo.get("currency") or "EUR").strip().upper() or "EUR"
+        importe, comision, defecto = _importeEnEuros(moneda, fecha, cantidad * precio, Decimal("0"))
+        operacion = Operacion(
+            ref=f"{PREFIJO_SIMULACION_MULTIPLE}{activoId}",
+            activoId=activoId,
+            fecha=fecha,
+            tipo=TRANSMISION,
+            cantidad=cantidad,
+            importe=importe,
+            comision=comision,
+            defecto=defecto,
+            orden=3_000_000,
+            origen="simulacion",
+            fiscal=True,
+        )
+        operaciones = [*porActivo.get(activoId, []), operacion]
+        conVentaPorActivo[activoId], _lotes = _resultadosPorRef(operaciones, activo.get("type", ""))
+
+    def liquidarCon(sustituidos):
+        porRef = {}
+        for activoId, resultados in basePorActivo.items():
+            porRef.update(sustituidos.get(activoId, resultados))
+        for activoId, resultados in sustituidos.items():
+            if activoId not in basePorActivo:
+                porRef.update(resultados)
+        return _liquidarResultados(porRef, ventas, invalidas)
+
+    individuales = {}
+    for activoId, resultados in conVentaPorActivo.items():
+        individuales[activoId] = {
+            "resultado": resultados.get(f"{PREFIJO_SIMULACION_MULTIPLE}{activoId}"),
+            "liquidaciones": liquidarCon({activoId: resultados}),
+        }
+
+    elegidos = {
+        activoId: conVentaPorActivo[activoId]
+        for activoId, dato in individuales.items()
+        if conjunto is None or (dato["resultado"] is not None and conjunto(activoId, dato["resultado"]))
+    }
+
+    return {
+        "base": liquidarCon({}),
+        "individuales": individuales,
+        "conjunta": liquidarCon(elegidos),
+        "enConjunta": sorted(elegidos),
+        "lotesVivos": lotesVivos,
+    }
+
+
 def _serializarFila(resultado, tramos):
     if resultado.incidencia:
         fila = filaVacia(resultado.incidencia)

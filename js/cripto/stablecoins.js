@@ -570,7 +570,7 @@ function getStablecoinPegCurrency(symbol) {
 
 function formatStablecoinUnits(value, symbol) {
     const amount = Number(value) || 0
-    return `${amount.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${symbol}`
+    return `${amount.toLocaleString(_nl(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${symbol}`
 }
 
 // Cifras de la tarjeta en la moneda por defecto: a cuánto está hoy una unidad,
@@ -787,7 +787,7 @@ function formatStablecoinQuantity(value) {
         return ""
     }
 
-    return parsedValue.toLocaleString("es-ES", {
+    return parsedValue.toLocaleString(_nl(), {
         minimumFractionDigits: 2,
         maximumFractionDigits: 8
     })

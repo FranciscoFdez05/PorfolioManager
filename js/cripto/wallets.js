@@ -141,7 +141,7 @@ function walletsActivoSugerido(red) {
 function walletsFechaLegible(iso) {
     if (!iso) return "Nunca"
     const fecha = new Date(iso)
-    return Number.isNaN(fecha.getTime()) ? iso : fecha.toLocaleString("es-ES")
+    return Number.isNaN(fecha.getTime()) ? iso : fecha.toLocaleString(uiLocale())
 }
 
 // Nombre corto y largo de lo que se enlazó; también lo usa Seguimiento.

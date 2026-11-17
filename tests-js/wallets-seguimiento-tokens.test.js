@@ -21,6 +21,7 @@ const SOL = { id: "w-sol", alias: "SOL Ledger", red: "sol", saldo: "2.33", saldo
 beforeAll(() => {
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
+    cargarScript("js/core/i18n.js")
     cargarScript("js/cripto/wallets.js")
     cargarModulo("js/cripto/wallets-seguimiento.js")
 })

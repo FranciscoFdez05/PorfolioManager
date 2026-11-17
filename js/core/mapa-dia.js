@@ -457,7 +457,7 @@ function mapaDiaMarcasFecha(inicio, fin) {
         if (dia.getHours() >= 12) dia.setDate(dia.getDate() + 1)
         dia.setHours(0, 0, 0, 0)
         const pos = ((dia.getTime() / 1000 - inicio) / duracion) * 100
-        const texto = dia.toLocaleDateString("es-ES", { day: "numeric", month: "short" }).replace(".", "")
+        const texto = dia.toLocaleDateString(uiLocale(), { day: "numeric", month: "short" }).replace(".", "")
         if (pos >= MAPA_DIA_EJE_MARGEN && pos <= 100 - MAPA_DIA_EJE_MARGEN && !marcas.some((m) => m.texto === texto)) {
             marcas.push({ pos, texto })
         }
@@ -515,7 +515,7 @@ function mapaDiaUrlTv(simbolo) {
         // 1 = velas japonesas.
         style: "1",
         theme: claro ? "light" : "dark",
-        locale: "es",
+        locale: idiomaActual(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Etc/UTC",
         // Con guion bajo: widgetembed ignora las variantes sin él (ver paneles.js).
         hide_side_toolbar: "1",

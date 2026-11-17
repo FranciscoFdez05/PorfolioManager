@@ -12,6 +12,7 @@ const DIRECCION = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
 beforeAll(() => {
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
+    cargarScript("js/core/i18n.js")
     cargarScript("js/cripto/wallets.js")
     cargarModulo("js/cripto/wallets-seguimiento.js")
     // jsdom no implementa el scroll.

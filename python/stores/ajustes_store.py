@@ -57,6 +57,8 @@ _GLOBAL_DEFAULTS = {
     "bloqueoInactividad": 0,
     "numLocale": "es-ES",
     "dateFormat": "DD/MM/YYYY",
+    # Idioma de la interfaz; independiente de numLocale (formato de números).
+    "idioma": "es",
     "maxBackups": 0,
     # Qué tipos de aviso se mandan por Telegram: {categoria: bool}. Vacío = los
     # de fábrica (ver core.telegram_notifier.CATEGORIAS_AVISO). Lo lee el propio

@@ -26,7 +26,7 @@ Referencia completa de PorfolioManager: instalación, configuración, operación
 - **Earn / Staking / Trading** — módulos adicionales para rendimientos cripto
 - **Métricas** — KPIs y gráficos interactivos, con **TWR, XIRR, máximo drawdown y volatilidad**, y comparación de la evolución contra un índice ([detalle](#rentabilidad-riesgo-y-comparación-con-índices))
 - **Histórico automático** — el servidor guarda los puntos de evolución en segundo plano, sin depender de que haya una pestaña abierta
-- **Herramientas** — calculadoras agrupadas por lo que contestan: proyección (interés compuesto, regla del 72), rendimiento (rentabilidad, CAGR, dividendo), cartera (**precio medio** con tus compras reales y **rebalanceo** por tipo de activo), **fiscalidad** (simular una venta antes de hacerla) y ratios de mercado. Ampliables dejando un fichero en una carpeta ([guía](docs/herramientas-extra.md))
+- **Herramientas** — calculadoras agrupadas por lo que contestan: proyección (interés compuesto, regla del 72, independencia financiera, desacumulación, Monte Carlo y rentabilidad real tras impuestos e inflación), rendimiento (rentabilidad, CAGR, dividendo), cartera (**precio medio** con tus compras reales, **rebalanceo** por tipo de activo, tamaño de posición por riesgo, recuperar una caída y DCA frente a aportación única con precios históricos), **fiscalidad** (simular una venta antes de hacerla, compensar pérdidas, previsión del IRPF del ahorro y doble imposición) y ratios de mercado (incluido el de cualquier pareja de tickers frente a su historia). Ampliables dejando un fichero en una carpeta ([guía](docs/herramientas-extra.md))
 - **Telegram** — avisos de copias de seguridad, alertas de precio por activo, proveedores, seguridad y estado del servidor; comandos para consultarlo desde el móvil (`/estado`, `/cartera`, `/backup`…) y un vigilante que avisa si la aplicación deja de responder ([detalle](#telegram-avisos-alertas-de-precio-y-comandos))
 - **Ajustes** — claves API, caducidad de cotizaciones, backup/restauración, tipos de cambio históricos y tema
 - **Atajo de iOS** — alta rápida de gastos e ingresos desde el Centro de Control, restringida a la LAN y a WireGuard ([guía](docs/atajo-ios.md))
@@ -549,6 +549,22 @@ El FIFO recorre **toda** la historia del activo, no solo las ventas del año abi
 **Herramientas › Fiscalidad › Simular venta** contesta qué pagarías si vendieras hoy: coste FIFO, lotes que se consumen, regla de los dos meses y cuota. No guarda nada y no repite la aritmética — `GET /api/herramientas/simular-venta` llama a `stores/ventas_fifo.simularVenta()`, el mismo motor que liquida la tabla de ventas.
 
 La cuota que devuelve es **incremental**: liquida el ejercicio con la venta y sin ella, y resta. Aplicar un tipo fijo a la ganancia daría otro número, porque la escala es progresiva y el saldo puede compensarse con pérdidas de ejercicios anteriores.
+
+### Compensar pérdidas
+
+**Herramientas › Fiscal › Compensar pérdidas** simula vender, al último precio guardado, cada posición que está en pérdidas, primero una a una y luego todas juntas. Para cada una da la cuota del ahorro que te ahorrarías este año, la parte de la pérdida que pasaría a los cuatro ejercicios siguientes y la primera fecha en que podrías recomprar sin que la regla de los dos meses bloquee la pérdida (un año en cripto). No guarda nada. `GET /api/herramientas/compensacion?fecha=dd-mm-aaaa` (por defecto, hoy) llama a `stores/ventas_fifo.simularVariasVentas()`, que hace el FIFO de cada activo una sola vez y solo rehace el del activo que se vende.
+
+Las posiciones sin cotización guardada, o con una incidencia de FIFO (venden más de lo que hay, o les falta un tipo de cambio), salen aparte como «sin evaluar».
+
+### Previsión del IRPF del ahorro
+
+**Herramientas › Fiscal › IRPF del ahorro** suma las ganancias y pérdidas de la pantalla de Ventas, los dividendos (bruto = total cobrado + impuestos anotados) y los intereses de las cuentas remuneradas de un ejercicio, y los integra según el art. 49 LIRPF: compensación cruzada de hasta el 25 % entre rendimientos del capital y ganancias patrimoniales, y luego los saldos negativos de los cuatro ejercicios anteriores. Resta las retenciones anotadas, o las que escribas a mano. `GET /api/herramientas/irpf-ahorro?anio=2026&retenciones=` llama a `stores/herramientas_fiscal.previsionIrpfAhorro()`.
+
+Esa compensación cruzada está en `core/fiscal_es.integrarBaseAhorro()` y **solo la usa esta herramienta**: la pantalla de Ventas y el informe de la Renta siguen sin ella. Los dividendos en divisa se pasan a euros con el tipo de la caché para su fecha; si falta, ese dividendo queda fuera y se avisa (no se descarga nada). No incluye staking, renta fija ni bonos.
+
+### Doble imposición internacional
+
+**Herramientas › Fiscal › Doble imposición** es una calculadora a mano, porque los dividendos guardados no distinguen la retención extranjera de la española y no hay una tabla de convenios por país. Con el bruto, la retención en origen, el límite del convenio y tu tipo del ahorro, aplica el art. 80 LIRPF: se deduce lo menor entre lo retenido fuera (como mucho, el límite del convenio) y lo que España cobraría por esa renta. Lo retenido por encima del convenio se reclama al otro país; lo que supera tu tipo español se pierde.
 
 ### Informe de la Renta
 

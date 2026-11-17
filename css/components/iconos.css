@@ -211,6 +211,10 @@
     -webkit-mask-image: url("../../img/icons/ajustes/numeros.svg");
     mask-image: url("../../img/icons/ajustes/numeros.svg");
 }
+.iconoIdioma {
+    -webkit-mask-image: url("../../img/icons/ajustes/idioma.svg");
+    mask-image: url("../../img/icons/ajustes/idioma.svg");
+}
 .iconoPaleta {
     -webkit-mask-image: url("../../img/icons/ajustes/paleta.svg");
     mask-image: url("../../img/icons/ajustes/paleta.svg");

@@ -23,7 +23,7 @@ function _initAjustesRegistro() {
     }
 
     function formatearFecha(segundos) {
-        return segundos ? new Date(segundos * 1000).toLocaleString("es-ES") : "sin actividad"
+        return segundos ? new Date(segundos * 1000).toLocaleString(uiLocale()) : "sin actividad"
     }
 
     function pintarEstado(datos) {

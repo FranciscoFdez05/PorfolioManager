@@ -276,7 +276,7 @@ function cntEstilosGrafica(elemento) {
 function cntEtiquetaEje(t, tramoMs) {
     const opciones = tramoMs > 75 * CNT_DIA_MS ? { month: "short" } : { day: "numeric", month: "short" }
     if (tramoMs > 400 * CNT_DIA_MS) opciones.year = "2-digit"
-    return new Date(t).toLocaleDateString("es-ES", opciones).replace(".", "")
+    return new Date(t).toLocaleDateString(uiLocale(), opciones).replace(".", "")
 }
 
 /**
@@ -310,7 +310,7 @@ function cntMarcasEje(t0, t1, maximo = 12) {
 }
 
 function cntFechaLarga(t) {
-    return new Date(t).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })
+    return new Date(t).toLocaleDateString(uiLocale(), { day: "numeric", month: "short", year: "numeric" })
 }
 
 /**
@@ -322,10 +322,10 @@ function cntFechaLarga(t) {
 function cntEuroCorto(valor) {
     const absoluto = Math.abs(valor)
     if (absoluto >= 1000) {
-        return `${new Intl.NumberFormat("es-ES", { notation: "compact", maximumFractionDigits: 1 }).format(valor)} €`
+        return `${new Intl.NumberFormat(_nl(), { notation: "compact", maximumFractionDigits: 1 }).format(valor)} €`
     }
     const decimales = absoluto > 0 && absoluto < 10 && !Number.isInteger(valor) ? 2 : 0
-    return `${new Intl.NumberFormat("es-ES", { maximumFractionDigits: decimales, minimumFractionDigits: decimales }).format(valor)} €`
+    return `${new Intl.NumberFormat(_nl(), { maximumFractionDigits: decimales, minimumFractionDigits: decimales }).format(valor)} €`
 }
 
 // Tooltip común: fondo del panel, borde fino y sin el cuadradito de color.
@@ -452,7 +452,7 @@ function cntPintarFlujosMes(canvas, meses) {
     if (!canvas || typeof Chart === "undefined" || !meses.length) return null
     const estilos = cntEstilosGrafica(canvas)
     const etiquetas = meses.map((m) =>
-        new Date(m.t).toLocaleDateString("es-ES", { month: "short", year: "2-digit" }).replace(".", "")
+        new Date(m.t).toLocaleDateString(uiLocale(), { month: "short", year: "2-digit" }).replace(".", "")
     )
     const barra = { borderRadius: 4, borderSkipped: false, maxBarThickness: 26, categoryPercentage: 0.7 }
     return new Chart(canvas, {

@@ -657,7 +657,7 @@ function renderAssetVentasSection(asset) {
             const cantidad = row.cantidad ? parseLooseNumber(row.cantidad) : null
             const cantidadFmt =
                 cantidad !== null
-                    ? cantidad.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 8 })
+                    ? cantidad.toLocaleString(_nl(), { minimumFractionDigits: 0, maximumFractionDigits: 8 })
                     : ""
             return `
             <tr>

@@ -201,7 +201,7 @@ function fnSetUpdatedLabel(ts) {
     const el = document.getElementById("fnUpdated")
     if (!el) return
     const fecha = new Date(ts)
-    el.textContent = `Actualizado ${fecha.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`
+    el.textContent = `Actualizado ${fecha.toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })}`
 }
 
 function fnRenderTable() {
@@ -516,7 +516,7 @@ function fnToNumber(value) {
 function fnUnixDate(value) {
     const seconds = fnToNumber(value)
     if (seconds === null) return "—"
-    return new Date(seconds * 1000).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })
+    return new Date(seconds * 1000).toLocaleDateString(uiLocale(), { day: "2-digit", month: "short", year: "numeric" })
 }
 
 function fnRatingInfo(value) {
@@ -530,7 +530,7 @@ function fnPrice(value, currency) {
     if (value === null || value === undefined || isNaN(num)) return "—"
     const decimals = Math.abs(num) >= 1000 ? 0 : Math.abs(num) >= 1 ? 2 : 4
     return (
-        num.toLocaleString("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) +
+        num.toLocaleString(_nl(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) +
         " " +
         currencySuffix(currency)
     )
@@ -545,7 +545,7 @@ function fnMarketCap(value, currency) {
     const num = typeof value === "number" ? value : parseFloat(value)
     if (value === null || value === undefined || isNaN(num)) return "—"
     return (
-        (num / 1e6).toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
+        (num / 1e6).toLocaleString(_nl(), { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
         " " +
         currencySuffix(currency)
     )
@@ -555,7 +555,7 @@ function fnMoneyFull(value, currency, decimals = 0) {
     const num = typeof value === "number" ? value : parseFloat(value)
     if (value === null || value === undefined || isNaN(num)) return "—"
     return (
-        num.toLocaleString("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) +
+        num.toLocaleString(_nl(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) +
         " " +
         currencySuffix(currency)
     )
@@ -564,13 +564,13 @@ function fnMoneyFull(value, currency, decimals = 0) {
 function fnRatio(value, decimals = 2) {
     const num = typeof value === "number" ? value : parseFloat(value)
     if (value === null || value === undefined || isNaN(num)) return "—"
-    return num.toLocaleString("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    return num.toLocaleString(_nl(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
 }
 
 function fnPercentPlain(value, decimals = 2) {
     const num = typeof value === "number" ? value : parseFloat(value)
     if (value === null || value === undefined || isNaN(num)) return "—"
-    return num.toLocaleString("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + " %"
+    return num.toLocaleString(_nl(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + " %"
 }
 
 // Se enseña como tooltip del BPA en vez de una segunda línea: una segunda
@@ -580,14 +580,12 @@ function fnGrowthTooltip(value) {
     const num = typeof value === "number" ? value : parseFloat(value)
     if (value === null || value === undefined || isNaN(num)) return ""
     const sign = num > 0 ? "+" : ""
-    return `Crecimiento del BPA interanual: ${sign}${num.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`
+    return `Crecimiento del BPA interanual: ${sign}${num.toLocaleString(_nl(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`
 }
 
 function fnPercentSigned(value, decimals = 2) {
     const num = typeof value === "number" ? value : parseFloat(value)
     if (value === null || value === undefined || isNaN(num)) return "—"
     const sign = num > 0 ? "+" : ""
-    return (
-        sign + num.toLocaleString("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + " %"
-    )
+    return sign + num.toLocaleString(_nl(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + " %"
 }

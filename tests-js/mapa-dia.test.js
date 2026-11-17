@@ -16,6 +16,7 @@ function coordenadas(d) {
 
 beforeAll(() => {
     window.escapeAttr = (s) => String(s)
+    cargarScript("js/core/i18n.js")
     cargarScript("js/core/mapa-dia.js")
 })
 

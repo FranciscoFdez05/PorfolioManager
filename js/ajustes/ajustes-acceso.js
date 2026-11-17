@@ -322,7 +322,7 @@ function _initAjustesAtajoHttps() {
         if (prefijo === 32) return "solo esta IP"
         if (prefijo === 24) return "toda la red · 256 direcciones"
         if (Number.isNaN(prefijo)) return "red"
-        return `red · ${Math.pow(2, 32 - prefijo).toLocaleString("es-ES")} direcciones`
+        return `red · ${Math.pow(2, 32 - prefijo).toLocaleString(_nl())} direcciones`
     }
 
     // Deja el rango como lo va a guardar el servidor: 192.168.1.5/24 pasa a

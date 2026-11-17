@@ -1601,3 +1601,40 @@
     color: var(--text-dim);
     margin: -2px 0 -6px;
 }
+
+/* ── Herramientas fiscales ──────────────────────────────────────────────── */
+/* Todas las columnas menos el nombre son cifras o fechas: a la derecha, para
+   compararlas en columna. La base solo alinea de la 2.ª a la 4.ª. */
+.hFiscalTable th:nth-child(n + 2),
+.hFiscalTable td:nth-child(n + 2) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.hFiscalTable td:first-child {
+    color: var(--text-primary);
+}
+/* Los avisos que acompañan a una previsión: letra pequeña y sin viñetas
+   llamativas, para que no compitan con las cifras. */
+.hFiscalAvisos {
+    margin: 12px 0 0;
+    padding-left: 18px;
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--text-dim);
+}
+.hFiscalAvisos:empty {
+    display: none;
+}
+.hFiscalAvisos li + li {
+    margin-top: 4px;
+}
+#hCompNoEvaluables {
+    margin-bottom: 12px;
+}
+
+/* Botón de «cargar mis datos» debajo de su campo: pegado a la izquierda y sin
+   ocupar todo el ancho de la columna flexible. */
+.herramientaField > .herramientaSecBtn {
+    align-self: flex-start;
+    margin-top: 2px;
+}

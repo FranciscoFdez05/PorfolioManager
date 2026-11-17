@@ -97,6 +97,7 @@ Secrets live in `.env` (copy `.env.example`; `./docker-setup` does it for you). 
    - **Telegram**: alerts and commands (`/estado`, `/cartera`, `/backup`).
    - **Cuenta**: two-step verification with a Telegram code and a recovery phrase.
    - **Módulos**: which modules appear in the menu and which one opens at startup.
+   - **Apariencia › Idioma**: interface language, Spanish or English. Independent of the number and date formats in the same page. The translation is in progress: the menu, header, sidebar and this settings page are done; the rest of the screens still show Spanish.
 
 | Where | What you do there |
 | --- | --- |
@@ -110,6 +111,9 @@ Secrets live in `.env` (copy `.env.example`; `./docker-setup` does it for you). 
 | **Dividendos › Ingresos pasivos** | Dividends of the last 12 months, monthly average and yield on cost per asset and overall |
 | **Dividendos › Reinvertir** | A dividend can be marked as reinvested: it adds a "Reinvertido" purchase to the asset sheet that counts in the position and in FIFO |
 | **Ajustes › Exportar a CSV** | Download expenses, income, dividends, operations and accounts as Excel-ready CSV |
+| **Herramientas › Proyección** | Compound interest, financial independence (how much you need and when you get there), how long savings last with yearly withdrawals, Monte Carlo with your portfolio's volatility, and real return after tax and inflation |
+| **Herramientas › Cartera / Mercado** | Position sizing by risk, how much a holding must rise to recover a drop, dollar-cost averaging versus lump sum with real historical prices, and the ratio between any two assets against its own history |
+| **Herramientas › Fiscal** | Simulate a sale, see which losing positions to sell to lower this year's Spanish income tax (and when you may buy back), forecast the savings-base tax with sales, dividends and interest, and work out double taxation on a foreign dividend |
 | **Mi dinero › Microcréditos** | Small short-term loans, either one single repayment (amount plus fee) or monthly instalments: cost, equivalent APR, due dates with overdue warnings, and a schedule for the instalment ones |
 | **Cripto › Transacciones › ··· › Wallets enlazadas** | Import your wallets' movements from the blockchain (never paste private keys or seed phrases) |
 | **Cripto › Seguimiento** | Group your own or third-party wallets, view their history, UTXOs and tokens, and get Telegram alerts |

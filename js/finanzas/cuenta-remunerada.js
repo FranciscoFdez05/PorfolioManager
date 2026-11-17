@@ -192,7 +192,7 @@ function acumularMovimientosAnio(movimientos, anio, hoy = new Date()) {
 // ----- Pintado -----
 
 function crFechaCorta(t) {
-    return new Date(t).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })
+    return new Date(t).toLocaleDateString(uiLocale(), { day: "numeric", month: "short", year: "numeric" })
 }
 
 /**
@@ -272,7 +272,7 @@ function crPintarGrafico(canvas, puntos, anio) {
                         autoSkip: false,
                         maxRotation: 0,
                         callback: (valor) =>
-                            new Date(valor).toLocaleDateString("es-ES", { month: "short" }).replace(".", "")
+                            new Date(valor).toLocaleDateString(uiLocale(), { month: "short" }).replace(".", "")
                     }
                 },
                 y: {

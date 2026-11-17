@@ -1138,7 +1138,7 @@ function renderOperationsRecorridoCell(tr, recorrido) {
 
     const isUp = recorrido.diff >= 0
     const sign = isUp ? "+" : ""
-    const pctText = recorrido.pct.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const pctText = recorrido.pct.toLocaleString(_nl(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     cell.innerHTML = `
         <span class="operationsRecorrido ${isUp ? "is-up" : "is-down"}">
             <span class="operationsRecorridoPct">${sign}${pctText} %</span>
@@ -1208,7 +1208,7 @@ function formatOperationsQuantity(value) {
 
     const decimals = getOperationsScopeConfig().quantityDecimals
 
-    return parsedValue.toLocaleString("es-ES", {
+    return parsedValue.toLocaleString(_nl(), {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals
     })

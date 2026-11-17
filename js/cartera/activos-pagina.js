@@ -420,7 +420,7 @@ function buildTVIframeUrl(tvSymbol) {
         interval: "D",
         theme,
         style: "1",
-        locale: "es",
+        locale: idiomaActual(),
         hidesidetoolbar: "0",
         symboledit: "1",
         saveimage: "1",

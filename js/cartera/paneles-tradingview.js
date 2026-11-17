@@ -18,7 +18,7 @@ function pnTvUrl(simbolo, cfg) {
         ),
         theme: claro ? "light" : "dark",
         style: pnOpcion(cfg, "estilo", ["1", "9", "8", "0", "2", "3"], "1"),
-        locale: "es",
+        locale: idiomaActual(),
         timezone:
             zona === "utc"
                 ? "Etc/UTC"
@@ -250,7 +250,7 @@ function pnPintarEmbebido(w, cuerpo, ctrls) {
     const delActivo = w.tipo !== "calendario" && !(w.tipo === "noticias" && cfg.modo !== "activo")
     // Las noticias de este widget no existen en español: con locale=es falla
     // con «Algo ha ido mal». En inglés cargan.
-    let locale = "es"
+    let locale = idiomaActual()
 
     ctrls.innerHTML = ""
     const activo = delActivo ? pnActivoDeWidget(w) : null

@@ -18,7 +18,7 @@ function mFmtPctSigno(valor, decimales = 2) {
 
 function mFechaCorta(ts) {
     if (!ts) return ""
-    return new Date(ts * 1000).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "2-digit" })
+    return new Date(ts * 1000).toLocaleDateString(uiLocale(), { day: "2-digit", month: "short", year: "2-digit" })
 }
 
 function mSetSub(id, texto, cls = "") {

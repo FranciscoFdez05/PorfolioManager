@@ -165,6 +165,12 @@ function hResetPanel(panelId) {
     panel.querySelectorAll(".herramientaResults").forEach((el) => el.classList.add("hidden"))
 
     if (panelId === "toolCapitalizacion") hCapReiniciar()
+    if (panelId === "toolCompensacion" || panelId === "toolIrpfAhorro" || panelId === "toolDobleImposicion") {
+        hFiscalReiniciar(panelId)
+    }
+    hProyReiniciar(panelId)
+    hCarReiniciar(panelId)
+    hAbReiniciar(panelId)
     if (panelId === "toolMetales") hMetReiniciar()
     if (panelId === "toolInteres" && _herramientasChart) {
         _herramientasChart.destroy()

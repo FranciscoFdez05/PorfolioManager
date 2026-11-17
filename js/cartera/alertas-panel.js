@@ -65,7 +65,7 @@ function alertasTiempo(minutos) {
 
 function alertasFecha(segundos) {
     if (!segundos) return ""
-    return new Date(segundos * 1000).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })
+    return new Date(segundos * 1000).toLocaleString(uiLocale(), { dateStyle: "short", timeStyle: "short" })
 }
 
 // El servidor guarda los números con punto decimal; la interfaz los enseña con coma.
@@ -79,7 +79,7 @@ function alertasPrecioLegible(texto) {
     const numero = Number(texto)
     if (texto === "" || texto == null || !Number.isFinite(numero)) return alertasNumeroTexto(texto)
     const decimales = Math.abs(numero) >= 1 ? 2 : 6
-    return numero.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: decimales })
+    return numero.toLocaleString(_nl(), { minimumFractionDigits: 2, maximumFractionDigits: decimales })
 }
 
 function alertasEtiquetaActivo(activo) {

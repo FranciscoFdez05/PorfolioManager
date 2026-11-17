@@ -396,6 +396,44 @@ async function initAjustesLogic() {
     _initAjustesRegistro()
     _initAjustesDatos()
 
+    // --- Idioma ---
+    // Al guardarlo se recarga la aplicación: el texto que ya generó el JS está
+    // en el DOM y repintar en caliente cada módulo no compensa.
+    const idiomaGrid = document.getElementById("ajustesIdiomaGrid")
+    const idiomaMsg = document.getElementById("ajustesIdiomaMsg")
+
+    function setActiveIdiomaBtn(val) {
+        idiomaGrid
+            ?.querySelectorAll(".ajustesRefreshBtn")
+            .forEach((b) => b.classList.toggle("active", b.dataset.idioma === val))
+    }
+    setActiveIdiomaBtn(idiomaActual())
+
+    idiomaGrid?.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".ajustesRefreshBtn")
+        if (!btn || btn.dataset.idioma === idiomaActual()) return
+        const idioma = btn.dataset.idioma
+        setActiveIdiomaBtn(idioma)
+        try {
+            const res = await fetch("/api/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ idioma })
+            })
+            const data = await res.json()
+            if (data.ok) {
+                establecerIdioma(idioma)
+                location.reload()
+            } else {
+                setActiveIdiomaBtn(idiomaActual())
+                showMsg(idiomaMsg, t("comun.error"), "error")
+            }
+        } catch {
+            setActiveIdiomaBtn(idiomaActual())
+            showMsg(idiomaMsg, t("comun.errorRed"), "error")
+        }
+    })
+
     // --- Formato de números ---
     const numLocaleGrid = document.getElementById("ajustesNumLocaleGrid")
     const numLocaleMsg = document.getElementById("ajustesNumLocaleMsg")
@@ -421,12 +459,12 @@ async function initAjustesLogic() {
             const data = await res.json()
             if (data.ok) {
                 window._numLocale = locale
-                showMsg(numLocaleMsg, "Guardado", "ok")
+                showMsg(numLocaleMsg, t("comun.guardado"), "ok")
             } else {
-                showMsg(numLocaleMsg, "Error", "error")
+                showMsg(numLocaleMsg, t("comun.error"), "error")
             }
         } catch {
-            showMsg(numLocaleMsg, "Error de red", "error")
+            showMsg(numLocaleMsg, t("comun.errorRed"), "error")
         }
     })
 
@@ -455,12 +493,12 @@ async function initAjustesLogic() {
             const data = await res.json()
             if (data.ok) {
                 window._dateFormat = fmt
-                showMsg(dateFmtMsg, "Guardado", "ok")
+                showMsg(dateFmtMsg, t("comun.guardado"), "ok")
             } else {
-                showMsg(dateFmtMsg, "Error", "error")
+                showMsg(dateFmtMsg, t("comun.error"), "error")
             }
         } catch {
-            showMsg(dateFmtMsg, "Error de red", "error")
+            showMsg(dateFmtMsg, t("comun.errorRed"), "error")
         }
     })
 

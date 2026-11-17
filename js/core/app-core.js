@@ -296,6 +296,20 @@ function etiquetarDesplegables() {
     })
 }
 
+/**
+ * Traduce los textos fijos de index.html (cabecera, menú, panel lateral y
+ * Ajustes) al idioma activo.
+ *
+ * Los desplegables guardan su nombre base en data-nombre-base la primera vez
+ * que se etiquetan; se borra para que etiquetarDesplegables lo vuelva a tomar
+ * ya traducido en vez de quedarse con el del idioma anterior.
+ */
+function traducirArmazon() {
+    aplicarI18n(document)
+    document.querySelectorAll(".navDropdownBtn").forEach((btn) => delete btn.dataset.nombreBase)
+    etiquetarDesplegables()
+}
+
 function activarBotonNav(page) {
     document.querySelectorAll(".navBtn").forEach((item) => item.classList.remove("active"))
     document.querySelectorAll(".navDropdownBtn").forEach((item) => item.classList.remove("active"))
@@ -374,6 +388,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const confirmModalAcceptButton = document.getElementById("confirmModalAcceptBtn")
     const confirmModalCancelButton = document.getElementById("confirmModalCancelBtn")
 
+    // Antes que cualquier init: varios leen textos del armazón (los
+    // desplegables guardan su nombre base, Ajustes lista los módulos).
+    traducirArmazon()
     initSidePanel(toggleButton, sideWrapper)
     initMetricsScroll(document.querySelector(".metrics"), sideWrapper)
     initNavigation(navButtons, contentArea)
@@ -465,6 +482,11 @@ async function loadGlobalSettings() {
             window._precioDecimales_cripto = data.precioDecimalesCripto ?? 4
             window._numLocale = data.numLocale ?? "es-ES"
             window._dateFormat = data.dateFormat ?? "DD/MM/YYYY"
+            // El idioma con que se pintó el armazón sale de la copia local; si
+            // el servidor dice otro (primer arranque en este navegador, o se
+            // cambió desde otro), se retraduce aquí. No se recarga la página:
+            // sin localStorage la copia nunca se guardaría y entraría en bucle.
+            if (establecerIdioma(data.idioma ?? "es")) traducirArmazon()
             applyAutoRefresh(window._autoRefreshMinutes)
             applySnapshotSchedule(window._snapshotMinutes)
             applyBloqueoInactividad(window._bloqueoInactividad)
@@ -1342,6 +1364,7 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
         const htmlContent = await CachePaginas.obtener(pageHtmlUrl(page))
         document.querySelectorAll(".csBodyMenu").forEach((m) => m.remove())
         contentArea.innerHTML = htmlContent
+        aplicarI18n(contentArea)
 
         const mainContent = document.querySelector(".mainContent")
         if (mainContent) {
@@ -1769,14 +1792,14 @@ function initMoneyToggle() {
     if (hidden) {
         document.body.classList.add("money-hidden")
         btn.classList.add("money-hidden-active")
-        btn.title = "Mostrar valores"
+        btn.title = t("menu.mostrarValores")
         btn.innerHTML = iconoHtml("OjoTachado")
         if (ocultarAlInicio) localStorage.setItem("moneyHidden", "1")
     }
     btn.addEventListener("click", () => {
         const isHidden = document.body.classList.toggle("money-hidden")
         btn.classList.toggle("money-hidden-active", isHidden)
-        btn.title = isHidden ? "Mostrar valores" : "Ocultar valores"
+        btn.title = t(isHidden ? "menu.mostrarValores" : "menu.ocultarValores")
         btn.innerHTML = iconoHtml(isHidden ? "OjoTachado" : "Ojo")
         localStorage.setItem("moneyHidden", isHidden ? "1" : "0")
     })

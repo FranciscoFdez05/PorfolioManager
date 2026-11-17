@@ -9,6 +9,7 @@ import { cargarScript } from "./cargar.js"
 const t = (anio, mes, dia) => new Date(anio, mes - 1, dia).getTime()
 
 beforeAll(() => {
+    cargarScript("js/core/shared-utils.js")
     cargarScript("js/finanzas/cuentas-graficos.js")
 })
 

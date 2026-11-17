@@ -32,10 +32,11 @@ from urllib.error import HTTPError, URLError
 
 from flask import Blueprint, jsonify, request
 
+from core import fifo
 from core.paths import BASE_DIR
 from providers import tradingview_client
 from providers.http import motivoConexion
-from stores import ventas_fifo
+from stores import herramientas_fiscal, ventas_fifo
 
 log = logging.getLogger(__name__)
 
@@ -169,6 +170,37 @@ def getSimulacionVenta():
         }), 400
 
     return jsonify({"ok": True, "simulacion": dato})
+
+
+# ── Compensación de pérdidas y previsión del IRPF del ahorro ─────────────────
+# GET por lo mismo que la simulación de venta: consultan, no cambian nada. El
+# cálculo vive en stores/herramientas_fiscal.py.
+
+
+@herramientasBp.route("/api/herramientas/compensacion", methods=["GET"])
+def getCompensacion():
+    """Posiciones en pérdidas y la cuota que ahorraría venderlas hoy (o en `?fecha=`)."""
+    texto = (request.args.get("fecha") or "").strip()
+    fecha = None
+    if texto:
+        try:
+            fecha = fifo.parseFecha(texto)
+        except fifo.FifoError:
+            return jsonify({"ok": False, "error": "La fecha no es válida (usa dd-mm-aaaa)."}), 400
+
+    return jsonify({"ok": True, "compensacion": herramientas_fiscal.compensacionDePerdidas(fecha)})
+
+
+@herramientasBp.route("/api/herramientas/irpf-ahorro", methods=["GET"])
+def getIrpfAhorro():
+    """Previsión de la cuota de la base del ahorro de `?anio=` (por defecto, el actual)."""
+    try:
+        anio = herramientas_fiscal.leerAnio(request.args.get("anio"))
+        retenciones = herramientas_fiscal.leerRetenciones(request.args.get("retenciones"))
+    except herramientas_fiscal.EntradaInvalida as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
+
+    return jsonify({"ok": True, "prevision": herramientas_fiscal.previsionIrpfAhorro(anio, retenciones)})
 
 
 # ── Calculadora de capitalización ────────────────────────────────────────────

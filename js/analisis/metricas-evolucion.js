@@ -94,15 +94,15 @@ async function mRenderEvolucion(range, mode) {
         const snap = Math.round(p.ts / roundSec) * roundSec
         const d = new Date(snap * 1000)
         if (roundSec >= 86400)
-            return d.toLocaleDateString("es-ES", {
+            return d.toLocaleDateString(uiLocale(), {
                 day: "2-digit",
                 month: "2-digit",
                 ...(roundSec >= 7 * 86400 ? { year: "2-digit" } : {})
             })
         return (
-            d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" }) +
+            d.toLocaleDateString(uiLocale(), { day: "2-digit", month: "2-digit" }) +
             " " +
-            d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+            d.toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })
         )
     })
 
@@ -119,7 +119,7 @@ async function mRenderEvolucion(range, mode) {
 
     const tooltipDates = points.map((p) => {
         const d = new Date(p.ts * 1000)
-        return d.toLocaleString("es-ES", {
+        return d.toLocaleString(uiLocale(), {
             weekday: "short",
             day: "2-digit",
             month: "short",
@@ -828,21 +828,21 @@ async function mRenderEvolucionTipos(range, mode) {
         const snap = Math.round(p.ts / roundSec) * roundSec
         const d = new Date(snap * 1000)
         if (roundSec >= 86400)
-            return d.toLocaleDateString("es-ES", {
+            return d.toLocaleDateString(uiLocale(), {
                 day: "2-digit",
                 month: "2-digit",
                 ...(roundSec >= 7 * 86400 ? { year: "2-digit" } : {})
             })
         return (
-            d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" }) +
+            d.toLocaleDateString(uiLocale(), { day: "2-digit", month: "2-digit" }) +
             " " +
-            d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+            d.toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })
         )
     })
 
     const tooltipDates = points.map((p) => {
         const d = new Date(p.ts * 1000)
-        return d.toLocaleString("es-ES", {
+        return d.toLocaleString(uiLocale(), {
             weekday: "short",
             day: "2-digit",
             month: "short",

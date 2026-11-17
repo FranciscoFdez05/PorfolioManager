@@ -150,7 +150,7 @@ function walletsSegBloqueUtxoHtml(bloque, rect, ancho, alto, alturaActual) {
     }
     const { utxo, indice } = bloque
     const edad = walletsSegEdadUtxo(utxo, alturaActual)
-    const bloqueTexto = utxo.altura == null ? "sin confirmar" : `bloque ${utxo.altura.toLocaleString("es-ES")}`
+    const bloqueTexto = utxo.altura == null ? "sin confirmar" : `bloque ${utxo.altura.toLocaleString(_nl())}`
     const titulo = `${walletsSegCantidadExacta(utxo.cantidad)} BTC · ${bloqueTexto} · ${edad.texto}`
     return `<button type="button" class="walletsSegUtxo walletsSegUtxo-${edad.clave}" style="${posicion}" data-indice="${indice}" title="${escapeHtml(titulo)}" aria-label="${escapeHtml(titulo)}">${
         conTexto
@@ -162,12 +162,12 @@ function walletsSegBloqueUtxoHtml(bloque, rect, ancho, alto, alturaActual) {
 function walletsSegResumenUtxosHtml(lista) {
     const total = lista.reduce((suma, utxo) => suma + utxo.satoshis, 0)
     const tarjetas = [
-        ["UTXOs", lista.length.toLocaleString("es-ES")],
+        ["UTXOs", lista.length.toLocaleString(_nl())],
         ["Total", `${walletsSegSatsABtc(total)} BTC`],
         ["Mayor", lista.length ? `${walletsSegSatsABtc(lista[0].satoshis)} BTC` : "—"],
-        ["Menor", lista.length ? `${lista.at(-1).satoshis.toLocaleString("es-ES")} sat` : "—"],
+        ["Menor", lista.length ? `${lista.at(-1).satoshis.toLocaleString(_nl())} sat` : "—"],
         [
-            `Polvo (< ${WALLETS_SEG_UTXO_POLVO.toLocaleString("es-ES")} sat)`,
+            `Polvo (< ${WALLETS_SEG_UTXO_POLVO.toLocaleString(_nl())} sat)`,
             String(lista.filter((u) => u.satoshis < WALLETS_SEG_UTXO_POLVO).length)
         ],
         ["Sin confirmar", String(lista.filter((u) => u.altura == null).length)]
@@ -236,7 +236,7 @@ function walletsSegUtxoDatosHtml(utxo, wallet, alturaActual) {
     const filas = [
         [
             "Importe",
-            `<strong>${walletsSegCantidadExacta(utxo.cantidad)} BTC</strong> <span class="walletsSegDato">${utxo.satoshis.toLocaleString("es-ES")} sat</span>`
+            `<strong>${walletsSegCantidadExacta(utxo.cantidad)} BTC</strong> <span class="walletsSegDato">${utxo.satoshis.toLocaleString(_nl())} sat</span>`
         ],
         ["Wallet", escapeHtml(wallet?.alias || "—")],
         ["Dirección", `<code>${escapeHtml(utxo.direccion || "—")}</code>`],
@@ -244,10 +244,10 @@ function walletsSegUtxoDatosHtml(utxo, wallet, alturaActual) {
         ["Salida", escapeHtml(String(utxo.vout))],
         [
             "Bloque",
-            escapeHtml(utxo.altura == null ? "Sin confirmar (en la mempool)" : utxo.altura.toLocaleString("es-ES"))
+            escapeHtml(utxo.altura == null ? "Sin confirmar (en la mempool)" : utxo.altura.toLocaleString(_nl()))
         ],
         ["Fecha", escapeHtml(walletsSegFechaCompleta(utxo.fecha))],
-        ["Confirmaciones", escapeHtml(confirmaciones ? confirmaciones.toLocaleString("es-ES") : "0")],
+        ["Confirmaciones", escapeHtml(confirmaciones ? confirmaciones.toLocaleString(_nl()) : "0")],
         ["Antigüedad", escapeHtml(walletsSegEdadUtxo(utxo, alturaActual).texto)]
     ]
     return filas.map(([clave, valor]) => `<div><dt>${escapeHtml(clave)}</dt><dd>${valor}</dd></div>`).join("")

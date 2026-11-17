@@ -236,7 +236,7 @@ function formatConversionQuantity(value) {
 // exchanges: «1 BTC = 35,07 ETH». Seis cifras significativas bastan para cubrir
 // desde 52,42 XRP hasta 0,0000123 BTC sin una cola de ceros.
 function formatConversionRate(value) {
-    return value.toLocaleString("es-ES", { maximumSignificantDigits: 6 })
+    return value.toLocaleString(_nl(), { maximumSignificantDigits: 6 })
 }
 
 // Una fila como en el historial de conversiones de un exchange: qué se vendió,

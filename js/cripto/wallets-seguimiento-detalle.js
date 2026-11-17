@@ -258,7 +258,7 @@ function walletsSegPestanasHtml(estado, grupo, activa, movimientos) {
         const elegida = pestana.clave === activa
         const contador = contadores[pestana.clave]
         return `<button type="button" role="tab" class="walletsSegPestana${elegida ? " activo" : ""}" data-pestana="${pestana.clave}" aria-selected="${elegida}">${escapeHtml(pestana.nombre)}${
-            contador == null ? "" : `<span class="walletsSegContador">${contador.toLocaleString("es-ES")}</span>`
+            contador == null ? "" : `<span class="walletsSegContador">${contador.toLocaleString(_nl())}</span>`
         }</button>`
     })
     return `<div class="walletsSegPestanas" role="tablist" aria-label="Secciones del seguimiento">${botones.join("")}</div>`
@@ -283,7 +283,7 @@ function walletsSegRedesSelectorHtml(estado, grupo, todos) {
     const redDe = new Map(grupo.wallets.map((wallet) => [wallet.id, wallet.red]))
     const elegida = walletsSegGrupoVisible(estado, grupo) === grupo ? "" : estado.red
     const boton = (clave, texto, titulo, cuantos) =>
-        `<button type="button" class="walletsSegFiltro walletsSegRedBtn${elegida === clave ? " activo" : ""}" data-red="${escapeHtml(clave)}" aria-pressed="${elegida === clave}" title="${escapeHtml(titulo)}">${escapeHtml(texto)} (${cuantos.toLocaleString("es-ES")})</button>`
+        `<button type="button" class="walletsSegFiltro walletsSegRedBtn${elegida === clave ? " activo" : ""}" data-red="${escapeHtml(clave)}" aria-pressed="${elegida === clave}" title="${escapeHtml(titulo)}">${escapeHtml(texto)} (${cuantos.toLocaleString(_nl())})</button>`
     const botones = redes.map((clave) => {
         const red = walletsEstado.redes.find((r) => r.clave === clave)
         const cuantos = todos.filter((mov) => redDe.get(mov.walletId) === clave).length
@@ -677,7 +677,7 @@ function abrirGrafoActivoSeguimiento(grupo, activo, porId) {
         subtitulo: partes.join(" · "),
         movimientos: walletsSegFlujosGrafo(movimientos, porId),
         formato: (n) =>
-            `${n.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 8 })} ${simbolo}`.trim(),
+            `${n.toLocaleString(_nl(), { minimumFractionDigits: 0, maximumFractionDigits: 8 })} ${simbolo}`.trim(),
         vacio: "No hay movimientos entre direcciones distintas con este filtro."
     })
 }
@@ -734,7 +734,7 @@ function walletsSegFechaCompleta(iso) {
     const fecha = new Date(iso)
     return Number.isNaN(fecha.getTime())
         ? "—"
-        : fecha.toLocaleString("es-ES", { dateStyle: "full", timeStyle: "medium" })
+        : fecha.toLocaleString(uiLocale(), { dateStyle: "full", timeStyle: "medium" })
 }
 
 // El servidor manda las cantidades como texto decimal exacto («0.000120» ya
