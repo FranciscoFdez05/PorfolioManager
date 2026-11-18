@@ -8,7 +8,8 @@ es lo que se puede probar sin levantar un proxy.
     POST /api/tls            activar o desactivar
     POST /api/tls/comprobacion  levantar el puerto donde se comprueba desde el aparato
     GET  /api/tls/prueba     comprobación real del cifrado, nombre por nombre
-    GET  /api/tls/http-alternativo/prueba  si el puerto HTTP de rescate responde
+    POST /api/tls/puerto     elegir el puerto del HTTPS (lo publica docker-update.sh)
+    GET  /api/tls/puerto/prueba  si el puerto del HTTPS escucha y lleva a la aplicación
     GET  /api/tls/ca.crt     certificado raíz, para instalar en cada aparato
 
 **Por qué preparar y activar son dos peticiones.** Porque la respuesta a activar
@@ -57,7 +58,7 @@ def _estadoPublico() -> dict:
         # El puerto donde vive la página de comprobación. Lo necesita el
         # frontend para armar la URL con el nombre por el que ha entrado ESTE
         # aparato, que es el único que sabe el navegador y no el servidor.
-        "puertoPrueba": tls.PUERTO_PREPARACION,
+        "puertoPrueba": tls.PUERTO_HTTPS,
         # Cuando el HTTPS viene impuesto por .env (dominio público con Let's
         # Encrypt), la interfaz no debe ofrecer un interruptor que machacaría
         # esa configuración. Se lo dice al frontend en vez de dejarle adivinar.
@@ -77,15 +78,16 @@ def _estadoPublico() -> dict:
         # que ya enruta hacia la LAN. Ver `tls.nombrePorDefecto()`.
         "nombrePorDefecto": tls.nombrePorDefecto(estado["nombres"]),
         "ipLan": tls.ipLan(),
-        # La preferencia guardada y si de verdad está sirviendo ahora (solo con
-        # el HTTPS puesto). El puerto lo fija docker-compose, no la interfaz.
-        "httpAlternativo": estado["httpAlternativo"],
-        "httpAlternativoActivo": tls.httpAlternativoActivo(),
-        "puertoHttpAlternativo": tls.PUERTO_HTTP_ALTERNATIVO,
-        "porHttpAlternativo": seguridad_app.porHttpAlternativo(),
-        # Adónde volver al desactivar el HTTPS entrando por el puerto
-        # alternativo, que en ese momento se cierra.
+        # El HTTPS va en su propio puerto. `puertoHttps` es el que Docker
+        # publica ahora; el pedido, el elegido en el panel, que no se abre hasta
+        # ejecutar docker-update.sh (`puertoHttpsPendiente`).
+        "puertoHttps": tls.PUERTO_HTTPS,
+        "puertoHttpsPedido": tls.puertoHttpsPedido(),
+        "puertoHttpsPendiente": tls.puertoHttpsPendiente(),
+        # El principal, que sigue en claro: adónde volver al desactivar el
+        # HTTPS entrando por el puerto cifrado, que en ese momento se cierra.
         "puertoPrincipal": settings.puerto(),
+        "porHttpConHttps": seguridad_app.porHttpConHttps(),
     }
 
 
@@ -138,39 +140,31 @@ def _validarQueNoTeDejaFuera(nombres: list[str]) -> None:
     )
 
 
-def _httpAlternativoPedido(datos: dict) -> bool:
-    """Lo que pide la interfaz para el puerto HTTP alternativo.
+def _validarPuertoHttps(valor) -> int:
+    """El puerto pedido para el HTTPS, si se puede usar.
 
     Args:
-        datos: cuerpo JSON de la petición.
+        valor: lo que manda la interfaz.
 
     Returns:
-        El valor enviado, o el guardado si la petición no lo trae (un cliente
-        anterior a esta opción no debe apagarla sin querer).
-    """
-    valor = datos.get("httpAlternativo")
-    return tls.leerEstado()["httpAlternativo"] if valor is None else bool(valor)
-
-
-def _validarQueNoCierrasTuPuerto(httpAlternativo: bool) -> None:
-    """No se cierra el puerto HTTP alternativo desde el propio puerto alternativo.
-
-    Caddy recarga y corta esa conexión: la respuesta no llegaría y la página
-    quedaría sin servidor detrás. Se apaga entrando por HTTPS.
-
-    Args:
-        httpAlternativo: el valor pedido.
+        El puerto como entero.
 
     Raises:
-        ValidationError: si se pide apagarlo entrando justo por él.
+        ValidationError: fuera de rango, o igual que el principal, que ya
+            ocupa el propio Caddy en claro.
     """
-    if httpAlternativo or not seguridad_app.porHttpAlternativo():
-        return
-    raise ValidationError(
-        "Estás entrando por el puerto HTTP alternativo: si lo cierras desde aquí "
-        "perderías esta conexión. Entra por https:// y desactívalo desde allí.",
-        field="httpAlternativo",
-    )
+    puerto = tls._puertoValido(valor)
+    if puerto is None:
+        raise ValidationError(
+            f"El puerto tiene que ser un número entre {tls.PUERTO_MIN} y {tls.PUERTO_MAX}.",
+            field="puertoHttps",
+        )
+    if puerto == settings.puerto():
+        raise ValidationError(
+            f"El {puerto} ya es el principal, que sigue en http://: el HTTPS necesita uno propio.",
+            field="puertoHttps",
+        )
+    return puerto
 
 
 @tlsBp.route("/api/tls", methods=["GET"])
@@ -213,7 +207,7 @@ def postPreparar():
     # justo lo que se va a hacer, porque instalar la CA lleva a Ajustes del
     # móvil y de vuelta—, y el estado sigue diciendo la verdad: esto todavía va
     # en claro, y las cookies siguen saliendo sin `Secure`.
-    tls.guardarEstado(False, nombres, _httpAlternativoPedido(datos))
+    tls.guardarEstado(False, nombres)
 
     log.info(
         "[tls] certificado preparado para %s; el HTTPS sigue sin activar",
@@ -235,15 +229,13 @@ def setTls():
     datos = request.get_json(silent=True) or {}
     activar = bool(datos.get("activado"))
     nombres = tls.normalizarNombres(datos.get("nombres"))
-    httpAlternativo = _httpAlternativoPedido(datos)
 
     if activar:
         _validarNombres(nombres)
         _validarQueNoTeDejaFuera(nombres)
-        _validarQueNoCierrasTuPuerto(httpAlternativo)
 
     try:
-        tls.aplicar(activar, nombres, httpAlternativo=httpAlternativo)
+        tls.aplicar(activar, nombres)
     except tls.ErrorCaddy as e:
         # 502 y no 500: el fallo es del proxy, no de esta aplicación, y el
         # mensaje ya dice qué mirar.
@@ -252,7 +244,7 @@ def setTls():
     # Solo se guarda si Caddy ha aceptado la configuración. Al revés, un estado
     # que dijera «HTTPS activo» sobre un proxy sirviendo en claro haría que las
     # cookies salieran con `Secure` y nadie pudiera iniciar sesión.
-    estado = tls.guardarEstado(activar, nombres, httpAlternativo)
+    estado = tls.guardarEstado(activar, nombres)
 
     # Las banderas de la cookie se leen de app.config en cada respuesta, así que
     # actualizarlas aquí surte efecto inmediato: la propia respuesta a esta
@@ -284,7 +276,7 @@ def postComprobacion():
     en la misma configuración que sirve la aplicación.
     """
     if tls.httpsActivo():
-        return jsonify({"ok": True, "listo": True, "puerto": tls.PUERTO_PREPARACION})
+        return jsonify({"ok": True, "listo": True, "puerto": tls.PUERTO_HTTPS})
 
     estado = tls.leerEstado()
     if not estado["nombres"]:
@@ -300,7 +292,7 @@ def postComprobacion():
     except tls.ErrorCaddy as e:
         raise ApiError(str(e), statusCode=502) from e
 
-    return jsonify({"ok": True, "listo": True, "puerto": tls.PUERTO_PREPARACION})
+    return jsonify({"ok": True, "listo": True, "puerto": tls.PUERTO_HTTPS})
 
 
 @tlsBp.route("/api/tls/prueba", methods=["GET"])
@@ -317,17 +309,38 @@ def getPrueba():
     pintarlo entero (qué nombre falla y por qué) en vez de un 500 sin detalle.
     Solo el proxy caído o la CA ausente llenan `error`, y también con 200.
     """
-    return jsonify({"ok": True, "puertoPrueba": tls.PUERTO_PREPARACION, **tls.probar()})
+    return jsonify({"ok": True, "puertoPrueba": tls.PUERTO_HTTPS, **tls.probar()})
 
 
-@tlsBp.route("/api/tls/http-alternativo/prueba", methods=["GET"])
-def getPruebaHttpAlternativo():
-    """¿Está abierto el puerto HTTP alternativo y lleva a la aplicación?
+@tlsBp.route("/api/tls/puerto", methods=["POST"])
+def postPuertoHttps():
+    """Guarda el puerto elegido para el HTTPS.
+
+    No lo abre: Docker solo publica puertos al crear el contenedor, así que el
+    cambio se aplica al ejecutar ./docker-update.sh, que lo lee de estado.json.
+    La respuesta lo dice con `puertoHttpsPendiente`.
+    """
+    if _gestionadoPorEntorno():
+        raise ApiError(
+            "El HTTPS está fijado por la configuración del servidor "
+            "(HTTPS_ENABLED en .env). Cámbialo allí, no desde aquí.",
+            statusCode=409,
+        )
+    datos = request.get_json(silent=True) or {}
+    puerto = _validarPuertoHttps(datos.get("puertoHttps"))
+    tls.guardarPuertoHttps(puerto)
+    log.info("[tls] Puerto del HTTPS elegido: %d (publicado ahora: %d)", puerto, tls.PUERTO_HTTPS)
+    return jsonify({"ok": True, **_estadoPublico()})
+
+
+@tlsBp.route("/api/tls/puerto/prueba", methods=["GET"])
+def getPruebaPuertoHttps():
+    """¿Está abierto el puerto del HTTPS y lleva a la aplicación?
 
     Como `/api/tls/prueba`, siempre 200: que esté cerrado es un resultado (y
-    con la opción apagada, el esperado), no un fallo de la petición.
+    con el HTTPS apagado, el esperado), no un fallo de la petición.
     """
-    return jsonify({"ok": True, **tls.probarHttpAlternativo()})
+    return jsonify({"ok": True, **tls.probarPuertoHttps()})
 
 
 @tlsBp.route("/api/tls/ca.crt", methods=["GET"])

@@ -360,7 +360,7 @@ PORT=$(env_get PORT)
 if [ -z "$PORT" ]; then
     PORT=$(run_py_file tools/leer_ajuste.py server.port) || PORT=""
 fi
-[ -n "$PORT" ] || PORT=5050
+[ -n "$PORT" ] || PORT=5080
 
 # Se pregunta en cada arranque con terminal, con el valor actual como respuesta
 # por defecto. Que el 5000 esté ocupado en el host es el tropiezo más común de
@@ -399,6 +399,38 @@ if [ -t 0 ]; then
     [ "$PORT" = "$(env_get PORT)" ] || env_set PORT "$PORT"
 fi
 export PORT
+
+# ── Puerto del HTTPS ──────────────────────────────────────────────────────────
+# El HTTPS va en su propio puerto; PORT sigue siempre en claro. El que se elige
+# en Ajustes › HTTPS se guarda en data/tls/estado.json y gana al .env: Docker
+# solo publica puertos al crear el contenedor, y esto es lo que aplica un
+# cambio hecho en el panel. Si coincide con el principal o lo usa otro servicio
+# del host, se busca el siguiente libre y se avisa.
+
+# ¿Escucha en ese puerto del host otro servicio que no es este stack? Los que ya
+# publica nuestro propio proxy no cuentan. Sin `ss` no se puede saber y se da
+# por libre.
+puerto_ajeno() {
+    command -v ss >/dev/null 2>&1 || return 1
+    ss -ltnH "( sport = :$1 )" 2>/dev/null | grep -q . || return 1
+    docker compose port caddy "$1" >/dev/null 2>&1 && return 1
+    return 0
+}
+
+CADDY_HTTPS_PORT=$(sed -n 's/.*"puertoHttps"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' data/tls/estado.json 2>/dev/null | head -n 1)
+[ -n "$CADDY_HTTPS_PORT" ] || CADDY_HTTPS_PORT=$(env_get CADDY_HTTPS_PORT)
+[ -n "$CADDY_HTTPS_PORT" ] && [ "$CADDY_HTTPS_PORT" != "$PORT" ] || CADDY_HTTPS_PORT=5443
+PEDIDO_HTTPS=$CADDY_HTTPS_PORT
+INTENTOS=0
+while { [ "$CADDY_HTTPS_PORT" = "$PORT" ] || puerto_ajeno "$CADDY_HTTPS_PORT"; } && [ "$INTENTOS" -lt 20 ]; do
+    CADDY_HTTPS_PORT=$((CADDY_HTTPS_PORT + 1))
+    INTENTOS=$((INTENTOS + 1))
+done
+if [ "$CADDY_HTTPS_PORT" != "$PEDIDO_HTTPS" ]; then
+    echo "AVISO: el puerto $PEDIDO_HTTPS lo usa otro servicio: el HTTPS irá en el $CADDY_HTTPS_PORT." >&2
+    echo "       Puedes elegir otro en Ajustes › HTTPS." >&2
+fi
+export CADDY_HTTPS_PORT
 
 # ── 6. Volúmenes y usuario ────────────────────────────────────────────────────
 # Los tres directorios se crean AQUÍ, con el usuario que lanza el stack. Si no
@@ -514,15 +546,18 @@ fi
 
 echo
 echo "PorfolioManager $PORTFOLIO_VERSION levantado:"
-echo "  Esta máquina : $ESQUEMA://localhost:$PORT"
-echo "  Red local    : $ESQUEMA://$LAN_IP:$PORT"
+echo "  Esta máquina : http://localhost:$PORT"
+echo "  Red local    : http://$LAN_IP:$PORT"
+if [ "$ESQUEMA" = "https" ]; then
+    echo "  Con HTTPS    : https://$LAN_IP:$CADDY_HTTPS_PORT"
+fi
 echo "  Escribe como : uid $PUID, gid $PGID"
 echo
 if [ "$ESQUEMA" = "http" ]; then
     echo "Sin HTTPS: la contraseña y la cookie de sesión viajan en claro por la red."
     echo "Se activa desde la propia aplicación, en Ajustes › Seguridad › HTTPS: genera el"
     echo "certificado y te lo da para instalarlo en el móvil y en el portátil."
-    echo "La dirección no cambia, solo pasa a ser https://"
+    echo "El HTTPS irá en el puerto $CADDY_HTTPS_PORT; el $PORT sigue en http://"
 else
     echo "HTTPS activo. Si un aparato aún avisa del certificado, es que le falta"
     echo "la CA: descárgala desde Ajustes › Seguridad › HTTPS e instálala en él."

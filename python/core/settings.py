@@ -111,7 +111,7 @@ CATALOGO: tuple[Ajuste, ...] = (
     # docker-up.sh ya lee de ahí el puerto para el mapeo del contenedor.
     Ajuste("server", "host", TEXTO, "0.0.0.0", env="HOST",
            descripcion="Interfaz en la que escucha el servidor de desarrollo."),
-    Ajuste("server", "port", ENTERO, 5050, env="PORT", minimo=1, maximo=65535,
+    Ajuste("server", "port", ENTERO, 5080, env="PORT", minimo=1, maximo=65535,
            descripcion="Puerto HTTP. Fuente de verdad del proyecto: docker-up.sh lo lee de aquí."),
     Ajuste("server", "tareas_en_web", BOOLEANO, True, env="PORTFOLIO_TAREAS_EN_WEB",
            descripcion="Si la web arranca los hilos de fondo (copias, snapshots, Telegram, avisos). "

@@ -383,3 +383,47 @@ def testElTokenSeMuestraSoloPorPost(clienteAutenticado, bpAtajo, claveAislada):
     datos = client.post("/api/atajo/token", headers=cab).get_json()
 
     assert datos["token"] == firma_hmac.tokenDispositivo()
+
+
+def testConHttpsDeAjustesElAtajoVaAlPuertoDelHttps(crearApp, bpAtajo, tmp_path, monkeypatch):
+    """El HTTPS de Ajustes va en su propio puerto y el principal sigue en claro.
+
+    El Atajo tiene que llamar por el cifrado aunque se descargue viendo el panel
+    por el principal: si copiara el puerto de la barra, iría en https:// a un
+    puerto que no habla TLS.
+    """
+    from conftest import CSRF_PRUEBA
+
+    from core import sesion, tls
+
+    monkeypatch.setattr(tls, "ESTADO_FILE", tmp_path / "estado.json", raising=False)
+    monkeypatch.delenv("HTTPS_ENABLED", raising=False)
+    tls.guardarEstado(True, ["192.168.1.50"])
+    base = "http://192.168.1.50:5050"
+    client = crearApp(bpAtajo).test_client()
+    # La sesión se abre en el mismo host y esquema: por http:// con el HTTPS
+    # activo la cookie es la del puerto en claro.
+    with client.session_transaction(base_url=base) as sesionPrueba:
+        sesionPrueba["logged_in"] = True
+        sesionPrueba["csrf_token"] = CSRF_PRUEBA
+        sesion.abrir(sesionPrueba)
+
+    datos = client.get("/api/atajo", base_url=base).get_json()
+
+    assert datos["urlBase"] == f"https://192.168.1.50:{tls.PUERTO_HTTPS}"
+
+
+@pytest.mark.parametrize(
+    ("host", "esperado"),
+    [
+        ("192.168.1.50:5050", "192.168.1.50"),
+        ("192.168.1.50", "192.168.1.50"),
+        ("portfolio.casa:5050", "portfolio.casa"),
+        ("[::1]:5050", "[::1]"),
+        ("[::1]", "[::1]"),
+    ],
+)
+def testSeQuitaElPuertoDelHost(host, esperado):
+    from routes.atajo import _sinPuerto
+
+    assert _sinPuerto(host) == esperado

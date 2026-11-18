@@ -962,6 +962,8 @@ function _initAjustesAtajoHttps() {
     const tlsActivarBtn = document.getElementById("ajustesTlsActivarBtn")
     const tlsDesactivarBtn = document.getElementById("ajustesTlsDesactivarBtn")
     const tlsCaEl = document.getElementById("ajustesTlsCa")
+    const tlsCaBtn = document.getElementById("ajustesTlsCaBtn")
+    const tlsCaMsg = document.getElementById("ajustesTlsCaMsg")
     const tlsPaso2El = document.getElementById("ajustesTlsPaso2")
     const tlsConfirmaEl = document.getElementById("ajustesTlsConfirma")
     const tlsActivarMsg = document.getElementById("ajustesTlsActivarMsg")
@@ -976,56 +978,95 @@ function _initAjustesAtajoHttps() {
     const tlsAparatoResEl = document.getElementById("ajustesTlsAparatoRes")
     const tlsConfianzaEl = document.getElementById("ajustesTlsConfianza")
     const tlsConfirmaFila = document.getElementById("ajustesTlsConfirmaFila")
-    const tlsHttpAltFila = document.getElementById("ajustesTlsHttpAltFila")
-    const tlsHttpAltEl = document.getElementById("ajustesTlsHttpAlt")
-    const tlsHttpAltAyuda = document.getElementById("ajustesTlsHttpAltAyuda")
-    const tlsHttpAltMsg = document.getElementById("ajustesTlsHttpAltMsg")
-    const tlsHttpAltProbarBtn = document.getElementById("ajustesTlsHttpAltProbarBtn")
-    const tlsHttpAltAbrirEl = document.getElementById("ajustesTlsHttpAltAbrir")
-    // Lo último que ha contado el servidor. El interruptor del HTTP alternativo
-    // lo necesita para reaplicar con los mismos nombres, y desactivar desde el
-    // puerto alternativo, para saber adónde volver.
+    const tlsPuertoFila = document.getElementById("ajustesTlsPuertoFila")
+    const tlsPuertoEl = document.getElementById("ajustesTlsPuerto")
+    const tlsPuertoBtn = document.getElementById("ajustesTlsPuertoBtn")
+    const tlsPuertoAyuda = document.getElementById("ajustesTlsPuertoAyuda")
+    const tlsPuertoMsg = document.getElementById("ajustesTlsPuertoMsg")
+    const tlsPuertoProbarBtn = document.getElementById("ajustesTlsPuertoProbarBtn")
+    const tlsPuertoAbrirEl = document.getElementById("ajustesTlsPuertoAbrir")
+    // Lo último que ha contado el servidor: hace falta para saber adónde saltar
+    // al activar (el puerto del HTTPS) y adónde volver al desactivar.
     let _tlsUltimo = null
 
-    // Ayuda del interruptor: el puerto real, la dirección a la que lleva y si
-    // se está entrando justo por él, que es lo que explica por qué no se deja
-    // apagar desde aquí.
-    function _pintarHttpAlternativo(data, editable) {
-        if (!tlsHttpAltFila) return
-        tlsHttpAltFila.style.display = data.gestionadoPorEntorno ? "none" : ""
-        if (tlsHttpAltEl) {
-            tlsHttpAltEl.checked = data.httpAlternativo !== false
-            tlsHttpAltEl.disabled = !editable || !!data.porHttpAlternativo
+    // El puerto del HTTPS: el número elegido, la dirección a la que lleva y si
+    // falta ejecutar docker-update.sh para que Docker lo publique.
+    function _pintarPuertoHttps(data, editable) {
+        if (!tlsPuertoFila) return
+        tlsPuertoFila.style.display = data.gestionadoPorEntorno ? "none" : ""
+        // Solo se rellena si el campo no tiene el foco: al repintar tras otra
+        // acción no se pisa lo que se esté escribiendo.
+        if (tlsPuertoEl && document.activeElement !== tlsPuertoEl) {
+            tlsPuertoEl.value = data.puertoHttpsPedido || ""
         }
-        const url = `http://${location.hostname}:${data.puertoHttpAlternativo}`
-        if (tlsHttpAltAbrirEl) tlsHttpAltAbrirEl.href = url + "/"
-        if (tlsHttpAltProbarBtn) tlsHttpAltProbarBtn.disabled = !data.proxyDisponible
-        if (!tlsHttpAltAyuda) return
+        if (tlsPuertoEl) tlsPuertoEl.disabled = !editable
+        if (tlsPuertoBtn) tlsPuertoBtn.disabled = !editable
+        if (tlsPuertoProbarBtn) tlsPuertoProbarBtn.disabled = !data.proxyDisponible
+        const url = `https://${location.hostname}:${data.puertoHttps}`
+        if (tlsPuertoAbrirEl) tlsPuertoAbrirEl.href = url + "/"
+        if (!tlsPuertoAyuda) return
         let ayuda =
-            `Con el HTTPS activo, la aplicación sigue respondiendo sin cifrar en <code>${escapeHtml(url)}</code>, ` +
-            "para no perder el acceso si el certificado deja de valer. Por ahí la contraseña viaja en claro: úsalo solo de rescate."
-        if (data.porHttpAlternativo) {
-            ayuda += " <strong>Estás entrando por este puerto</strong>: para cerrarlo, entra por <code>https://</code>."
-        } else if (data.activado && !data.httpAlternativoActivo) {
-            ayuda += " Ahora está cerrado."
+            `El HTTPS va en su propio puerto: <code>${escapeHtml(url)}</code>. ` +
+            `El de siempre (<code>${escapeHtml(String(data.puertoPrincipal))}</code>) sigue en <code>http://</code>, ` +
+            "así que si el certificado deja de valer no te quedas fuera."
+        if (data.puertoHttpsPendiente) {
+            ayuda +=
+                ` <strong>Has elegido el ${escapeHtml(String(data.puertoHttpsPedido))}, pero Docker publica el ${escapeHtml(String(data.puertoHttps))}</strong>: ` +
+                "ejecuta <code>./docker-update.sh</code> en el servidor para aplicarlo."
         }
-        tlsHttpAltAyuda.innerHTML = ayuda
+        tlsPuertoAyuda.innerHTML = ayuda
+    }
+
+    async function _cambiarPuertoHttps() {
+        const puerto = Number(tlsPuertoEl?.value)
+        if (!Number.isInteger(puerto)) {
+            showMsg(tlsPuertoMsg, "Escribe un número de puerto", "error")
+            return
+        }
+        if (tlsPuertoBtn) tlsPuertoBtn.disabled = true
+        showMsg(tlsPuertoMsg, "Guardando el puerto…", "")
+        try {
+            const res = await fetch("/api/tls/puerto", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ puertoHttps: puerto })
+            })
+            const data = await res.json()
+            if (!data.ok) {
+                showMsg(tlsPuertoMsg, data.error || "No se ha podido cambiar", "error")
+                return
+            }
+            tlsPuertoEl?.blur()
+            _pintarTls(data)
+            showMsg(
+                tlsPuertoMsg,
+                data.puertoHttpsPendiente
+                    ? `Puerto ${puerto} guardado. Se aplica al ejecutar ./docker-update.sh en el servidor.`
+                    : `Puerto ${puerto}: es el que ya está publicado.`,
+                "ok"
+            )
+        } catch {
+            showMsg(tlsPuertoMsg, "Error de red", "error")
+        } finally {
+            if (tlsPuertoBtn) tlsPuertoBtn.disabled = false
+        }
     }
 
     // Desde el servidor solo se sabe si Caddy escucha y lleva a la aplicación;
     // si Docker lo publica en el host lo dice el enlace de al lado, abierto
     // desde el aparato.
-    function _textoPruebaHttpAlternativo(r) {
+    function _textoPruebaPuerto(r) {
         const puerto = r.puerto
+        const pendiente = r.pendiente ? ` (el ${r.puertoPedido} se abrirá al ejecutar ./docker-update.sh)` : ""
         if (r.escucha && r.llegaALaApp) {
             return [
-                `Abierto: el puerto ${puerto} lleva a la aplicación. Ábrelo en una pestaña para comprobarlo desde este aparato.`,
+                `Abierto: el puerto ${puerto} lleva a la aplicación por HTTPS${pendiente}. Ábrelo en una pestaña para comprobarlo desde este aparato.`,
                 "ok"
             ]
         }
         if (r.escucha) {
             return [
-                `Algo responde en el puerto ${puerto}, pero no es esta aplicación${r.error ? " (" + r.error + ")" : ""}.`,
+                `El puerto ${puerto} escucha, pero no lleva a la aplicación${r.error ? ": " + r.error : ""}.`,
                 "error"
             ]
         }
@@ -1035,55 +1076,30 @@ function _initAjustesAtajoHttps() {
                 "error"
             ]
         }
-        const motivo = _tlsUltimo?.activado ? "la opción está apagada" : "el HTTPS está desactivado"
-        return [`Cerrado: nada escucha en el puerto ${puerto}. Es lo esperado, porque ${motivo}.`, ""]
+        // "ok" y no "": el vacío es el estado «pendiente» de showMsg, con su
+        // icono de carga, y esto es un resultado ya terminado.
+        return [
+            `Cerrado: nada escucha en el puerto ${puerto}. Es lo esperado, porque el HTTPS está desactivado${pendiente}.`,
+            "ok"
+        ]
     }
 
-    async function _probarHttpAlternativo() {
-        if (tlsHttpAltProbarBtn) tlsHttpAltProbarBtn.disabled = true
-        showMsg(tlsHttpAltMsg, "Probando…", "")
+    async function _probarPuertoHttps() {
+        if (tlsPuertoProbarBtn) tlsPuertoProbarBtn.disabled = true
+        showMsg(tlsPuertoMsg, "Probando…", "")
         try {
-            const res = await fetch("/api/tls/http-alternativo/prueba")
+            const res = await fetch("/api/tls/puerto/prueba")
             const data = await res.json()
             if (!data.ok) {
-                showMsg(tlsHttpAltMsg, data.error || "No se ha podido probar", "error")
+                showMsg(tlsPuertoMsg, data.error || "No se ha podido probar", "error")
                 return
             }
-            const [texto, tipo] = _textoPruebaHttpAlternativo(data)
-            showMsg(tlsHttpAltMsg, texto, tipo)
+            const [texto, tipo] = _textoPruebaPuerto(data)
+            showMsg(tlsPuertoMsg, texto, tipo)
         } catch {
-            showMsg(tlsHttpAltMsg, "Error de red", "error")
+            showMsg(tlsPuertoMsg, "Error de red", "error")
         } finally {
-            if (tlsHttpAltProbarBtn) tlsHttpAltProbarBtn.disabled = false
-        }
-    }
-
-    // Con el HTTPS apagado solo se guarda la preferencia al emitir o activar;
-    // con el HTTPS puesto se aplica en el momento, con los nombres de siempre.
-    async function _cambiarHttpAlternativo() {
-        if (!tlsHttpAltEl || !_tlsUltimo?.activado) return
-        const pedido = tlsHttpAltEl.checked
-        tlsHttpAltEl.disabled = true
-        showMsg(tlsHttpAltMsg, pedido ? "Abriendo el puerto HTTP…" : "Cerrando el puerto HTTP…", "")
-        try {
-            const res = await fetch("/api/tls", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ activado: true, nombres: _tlsUltimo.nombres, httpAlternativo: pedido })
-            })
-            const data = await res.json()
-            if (!data.ok) {
-                tlsHttpAltEl.checked = !pedido
-                showMsg(tlsHttpAltMsg, data.error || "No se ha podido aplicar", "error")
-                return
-            }
-            _pintarTls(data)
-            showMsg(tlsHttpAltMsg, pedido ? "Puerto HTTP abierto" : "Puerto HTTP cerrado", "ok")
-        } catch {
-            tlsHttpAltEl.checked = !pedido
-            showMsg(tlsHttpAltMsg, "Error de red", "error")
-        } finally {
-            tlsHttpAltEl.disabled = !!_tlsUltimo?.porHttpAlternativo
+            if (tlsPuertoProbarBtn) tlsPuertoProbarBtn.disabled = false
         }
     }
 
@@ -1121,7 +1137,7 @@ function _initAjustesAtajoHttps() {
         // un botón que solo puede devolver un error es peor que ninguno.
         const editable = data.proxyDisponible && !data.gestionadoPorEntorno
         _tlsUltimo = data
-        _pintarHttpAlternativo(data, editable)
+        _pintarPuertoHttps(data, editable)
         if (tlsNombresEl) {
             tlsNombresEl.disabled = !editable
             // Solo se rellena si el usuario no ha escrito nada: al recargar tras
@@ -1158,9 +1174,18 @@ function _initAjustesAtajoHttps() {
         // después era el problema —para descargarlo había que atravesar el aviso
         // que provocaba no tenerlo—, así que se enseña en cuanto existe algo que
         // descargar.
+        // Se enseña siempre que se pueda emitir, pero la descarga solo vale con
+        // el certificado emitido para tus direcciones: una CA suelta de un
+        // intento anterior se instalaba y luego no había nada que comprobar.
+        const descargable = cifrando || preparado
         if (tlsCaEl) {
-            tlsCaEl.style.display = cifrando || conCa ? "" : "none"
+            tlsCaEl.style.display = cifrando || editable ? "" : "none"
         }
+        if (tlsCaBtn) {
+            tlsCaBtn.classList.toggle("ajustesTlsCaBloqueado", !descargable)
+            tlsCaBtn.setAttribute("aria-disabled", String(!descargable))
+        }
+        if (descargable) showMsg(tlsCaMsg, "", "")
         // Y colgando de él, el segundo paso: encender. Solo mientras esté
         // apagado; con el HTTPS puesto, lo que se ofrece debajo es comprobarlo.
         if (tlsPaso2El) {
@@ -1174,7 +1199,7 @@ function _initAjustesAtajoHttps() {
         // —comprobar después de apostarse la sesión es un diagnóstico, no una
         // comprobación—, y es lo que se viene a arreglar.
         if (tlsPruebaEl) {
-            tlsPruebaEl.style.display = cifrando || conCa ? "" : "none"
+            tlsPruebaEl.style.display = descargable ? "" : "none"
         }
         _pintarPruebaAparato(data)
         // La guía explica cómo encenderlo: con el HTTPS ya puesto sobra, y lo
@@ -1313,7 +1338,7 @@ function _initAjustesAtajoHttps() {
             const res = await fetch("/api/tls/preparar", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ nombres, httpAlternativo: tlsHttpAltEl ? tlsHttpAltEl.checked : undefined })
+                body: JSON.stringify({ nombres })
             })
             const data = await res.json()
             if (!data.ok) {
@@ -1334,22 +1359,22 @@ function _initAjustesAtajoHttps() {
         }
     }
 
-    // Tras activar, la página actual está en http:// y el servidor ya solo
-    // atiende TLS en ese mismo puerto: cualquier petición siguiente fallaría sin
-    // explicar por qué. Se avisa y se salta sola, dando margen para leerlo.
-    function _saltarAHttps(nombres) {
+    // Tras activar, el HTTPS está en su propio puerto y esta página sigue en el
+    // principal, en claro. Se avisa y se salta sola, dando margen para leerlo.
+    function _saltarAHttps(nombres, puertoHttps) {
         // Se mantiene el host por el que ha entrado si está entre los nombres
         // del certificado; si no, se usa el primero, que sí lo está. Saltar a un
         // nombre que no cubre el certificado daría un aviso evitable.
         const actual = location.hostname
         const destino = nombres.includes(actual) ? actual : nombres[0]
-        const url = `https://${destino}${location.port ? ":" + location.port : ""}${location.pathname}`
+        const url = `https://${destino}:${puertoHttps}${location.pathname}`
 
         const aviso = document.createElement("div")
         aviso.className = "ajustesTlsSaltando"
         aviso.innerHTML =
             `<strong>HTTPS activado.</strong> Esta página se va a recargar en <code>${url}</code>. ` +
-            "Si algún aparato avisa del certificado, es que ahí falta por instalar: el enlace para descargarlo sigue en este mismo panel."
+            "Si algún aparato avisa del certificado, es que ahí falta por instalar: el enlace para descargarlo sigue en este mismo panel. " +
+            `La dirección de siempre, por <code>http://</code>, sigue funcionando.`
         tlsPaso2El?.appendChild(aviso)
 
         setTimeout(() => {
@@ -1382,24 +1407,19 @@ function _initAjustesAtajoHttps() {
             const res = await fetch("/api/tls", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    activado,
-                    nombres,
-                    httpAlternativo: tlsHttpAltEl ? tlsHttpAltEl.checked : undefined
-                })
+                body: JSON.stringify({ activado, nombres })
             })
             const data = await res.json()
             if (!data.ok) {
                 showMsg(msg, data.error || "No se ha podido aplicar", "error")
                 return
             }
-            const veniaPorHttpAlternativo = !!_tlsUltimo?.porHttpAlternativo
             _pintarTls(data)
             showMsg(msg, activado ? "HTTPS activado" : "HTTPS desactivado", "ok")
-            if (activado) _saltarAHttps(data.nombres)
-            // Sin HTTPS el puerto alternativo se cierra: el sitio vuelve a estar
-            // en el puerto de siempre, ya en claro.
-            else if (veniaPorHttpAlternativo) _volverAlPuertoPrincipal(data.puertoPrincipal)
+            if (activado) _saltarAHttps(data.nombres, data.puertoHttps)
+            // Desactivado desde el puerto del HTTPS, que se acaba de cerrar: se
+            // vuelve al de siempre, en claro.
+            else if (location.protocol === "https:") _volverAlPuertoPrincipal(data.puertoPrincipal)
         } catch {
             // Al activar, el proxy recarga su configuración mientras esta misma
             // petición está en vuelo: es posible que haya funcionado y que la
@@ -1408,7 +1428,7 @@ function _initAjustesAtajoHttps() {
             // salta igualmente y que lo confirme el propio navegador.
             if (activado) {
                 showMsg(msg, "Aplicado; comprobando por https…", "")
-                _saltarAHttps(nombres)
+                _saltarAHttps(nombres, _tlsUltimo?.puertoHttps || location.port)
             } else {
                 showMsg(msg, "Error de red", "error")
             }
@@ -1511,8 +1531,11 @@ function _initAjustesAtajoHttps() {
 
             try {
                 // cache: no-store para que no conteste un resultado viejo: lo
-                // que se mide es el apretón de manos de ahora mismo.
-                await fetch(url, { cache: "no-store" })
+                // que se mide es el apretón de manos de ahora mismo. no-cors
+                // porque el puerto del HTTPS, ya activado, sirve la aplicación
+                // y esta no manda cabeceras CORS: la respuesta llega opaca,
+                // pero solo llega si el navegador ha aceptado el certificado.
+                await fetch(url, { cache: "no-store", mode: "no-cors" })
                 _aparatoDeConfianza = true
                 showMsg(tlsPruebaMsg, "Este aparato se fía", "ok")
                 _pintarAparato(
@@ -1551,9 +1574,9 @@ function _initAjustesAtajoHttps() {
         }
         if (tlsPruebaAparatoHint) {
             tlsPruebaAparatoHint.innerHTML = url
-                ? `Pide <code>${url}</code> desde este mismo navegador: una página servida con el mismo certificado ` +
-                  "que servirá el HTTPS. Es la comprobación que el servidor no puede hacer por ti, y hay que repetirla " +
-                  "en cada aparato desde el que entres."
+                ? `Pide <code>${url}</code> desde este mismo navegador: el puerto del HTTPS, que antes de activarlo ` +
+                  "sirve solo una página de prueba con el mismo certificado. Es la comprobación que el servidor no puede " +
+                  "hacer por ti, y hay que repetirla en cada aparato desde el que entres."
                 : ""
         }
         // Un «se fía» de antes de tocar los nombres ya no vale para nada.
@@ -1581,7 +1604,12 @@ function _initAjustesAtajoHttps() {
         } else if (r.dias === null || r.dias === undefined) {
             detalle.textContent = "Certificado válido"
         } else {
-            detalle.textContent = `Certificado válido, caduca en ${r.dias} días (${r.caduca})`
+            // Caddy emite certificados de horas y los renueva solo: «caduca en 0
+            // días» asustaba sin motivo. Lo que caduca de verdad es la CA, años.
+            detalle.textContent =
+                r.dias < 2
+                    ? "Certificado válido; Caddy lo renueva solo cada pocas horas"
+                    : `Certificado válido, caduca en ${r.dias} días (${r.caduca})`
         }
         fila.appendChild(detalle)
 
@@ -1605,7 +1633,7 @@ function _initAjustesAtajoHttps() {
         // de activar se lee como «ya está cifrado», que es justo lo que no es.
         if (data.modo === "previo") {
             const pie = document.createElement("div")
-            pie.className = "ajustesTlsPruebaDetalle"
+            pie.className = "ajustesTlsPruebaCabecera"
             pie.textContent = `Comprobado en el puerto ${data.puerto}, sobre el certificado que servirá el HTTPS. Todavía no está activado.`
             tlsPruebaRes.appendChild(pie)
         }
@@ -1654,10 +1682,23 @@ function _initAjustesAtajoHttps() {
     if (tlsPruebaBtn) tlsPruebaBtn.addEventListener("click", _probarTls)
     if (tlsPruebaAparatoBtn) tlsPruebaAparatoBtn.addEventListener("click", _comprobarEnEsteAparato)
     if (tlsPrepararBtn) tlsPrepararBtn.addEventListener("click", _prepararTls)
+    if (tlsCaBtn) {
+        tlsCaBtn.addEventListener("click", (evento) => {
+            if (tlsCaBtn.getAttribute("aria-disabled") !== "true") return
+            evento.preventDefault()
+            showMsg(
+                tlsCaMsg,
+                "Primero pulsa «Emitir el certificado»: todavía no hay ninguno para tus direcciones.",
+                "error"
+            )
+            tlsPrepararBtn?.scrollIntoView({ behavior: "smooth", block: "center" })
+            tlsPrepararBtn?.focus({ preventScroll: true })
+        })
+    }
     if (tlsActivarBtn) tlsActivarBtn.addEventListener("click", () => _guardarTls(true))
     if (tlsDesactivarBtn) tlsDesactivarBtn.addEventListener("click", () => _guardarTls(false))
-    if (tlsHttpAltEl) tlsHttpAltEl.addEventListener("change", _cambiarHttpAlternativo)
-    if (tlsHttpAltProbarBtn) tlsHttpAltProbarBtn.addEventListener("click", _probarHttpAlternativo)
+    if (tlsPuertoBtn) tlsPuertoBtn.addEventListener("click", _cambiarPuertoHttps)
+    if (tlsPuertoProbarBtn) tlsPuertoProbarBtn.addEventListener("click", _probarPuertoHttps)
     // El botón de activar no se habilita hasta que se marca que el certificado
     // ya está instalado. Es la única pulsación de este panel que puede dejar a
     // alguien fuera, y basta una casilla para que no se dé por accidente.

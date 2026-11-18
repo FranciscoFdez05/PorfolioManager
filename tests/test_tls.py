@@ -53,7 +53,7 @@ def caddy(monkeypatch):
 
 def testSinFicheroElHttpsEstaApagado():
     assert tls.leerEstado() == {
-        "activado": False, "nombres": [], "actualizado": None, "httpAlternativo": True,
+        "activado": False, "nombres": [], "actualizado": None, "puertoHttps": None,
     }
     assert tls.httpsActivo() is False
 
@@ -249,13 +249,13 @@ def testPreparandoElPuertoDeSiempreNoCambiaDeEsquema():
 
 
 def testPreparandoSeEmiteElCertificadoEnUnPuertoInterno():
-    """El puerto no está publicado en docker-compose: no es una segunda puerta
-    de entrada, solo la excusa para que haya un certificado que emitir."""
+    """Se emite en el puerto del HTTPS, que hasta activarlo no lleva a la
+    aplicación: solo es la excusa para que haya un certificado que emitir."""
     conf = tls.construirCaddyfile(False, ["portfolio.casa"], preparando=True)
 
-    assert f"https://portfolio.casa:{tls.PUERTO_PREPARACION}" in conf
+    assert f"https://portfolio.casa:{tls.PUERTO_HTTPS}" in conf
     assert "tls internal" in conf
-    assert f"reverse_proxy porfoliomanager:{tls.PUERTO_PREPARACION}" not in conf
+    assert f"reverse_proxy porfoliomanager:{tls.PUERTO_HTTPS}" not in conf
 
 
 def testSePreparaConLosMismosNombresConLosQueSeActivará():
@@ -270,14 +270,18 @@ def testSePreparaConLosMismosNombresConLosQueSeActivará():
 
 
 def testElSitioDeComprobaciónExisteEnLosDosEstados():
-    """Antes de encender sirve para probar sin arriesgar nada; con el HTTPS ya
-    puesto, para que un aparato nuevo se compruebe sin jugarse la entrada."""
-    for conf in (
-        tls.construirCaddyfile(False, ["casa"], preparando=True),
-        tls.construirCaddyfile(True, ["casa"]),
-    ):
-        assert f"https://casa:{tls.PUERTO_PREPARACION}" in conf
-        assert "El certificado funciona en este aparato" in conf
+    """Antes de encender, el puerto del HTTPS sirve la página de prueba; con el
+    HTTPS ya puesto, ese mismo puerto sirve la aplicación y un aparato nuevo se
+    comprueba contra ella. En los dos casos se pregunta por el mismo puerto, y
+    nunca hay dos sitios en él (Caddy los rechazaría por ambiguos)."""
+    preparando = tls.construirCaddyfile(False, ["casa"], preparando=True)
+    activado = tls.construirCaddyfile(True, ["casa"])
+
+    assert f"https://casa:{tls.PUERTO_HTTPS}" in preparando
+    assert "El certificado funciona en este aparato" in preparando
+    assert f"https://casa:{tls.PUERTO_HTTPS}" in activado
+    assert "El certificado funciona en este aparato" not in activado
+    assert activado.count(f"https://casa:{tls.PUERTO_HTTPS}") == 1
 
 
 def testElSitioDeComprobaciónNoLlevaALaAplicación():
@@ -285,7 +289,7 @@ def testElSitioDeComprobaciónNoLlevaALaAplicación():
     publica, y lo que se publica tiene que poder mirarse sin encogerse."""
     conf = tls.construirCaddyfile(False, ["casa"], preparando=True)
 
-    bloque = conf.split(f"https://casa:{tls.PUERTO_PREPARACION}")[1]
+    bloque = conf.split(f"https://casa:{tls.PUERTO_HTTPS}")[1]
     assert "reverse_proxy" not in bloque
 
 
@@ -561,8 +565,8 @@ def testElCertificadoSeCompruebaAntesDeActivar(caddy, monkeypatch):
 
     assert salida["https"] is False
     assert salida["modo"] == "previo"
-    assert salida["puerto"] == tls.PUERTO_PREPARACION
-    assert puertos == [tls.PUERTO_PREPARACION]
+    assert salida["puerto"] == tls.PUERTO_HTTPS
+    assert puertos == [tls.PUERTO_HTTPS]
     assert salida["error"] is None
 
 
@@ -583,7 +587,8 @@ def testConElHttpsPuestoSeCompruebaElPuertoDeVerdad(caddy, monkeypatch):
     salida = tls.probar()
 
     assert salida["modo"] == "activo"
-    assert puertos == [tls.settings.puerto()]
+    # El HTTPS va en su propio puerto; el principal sigue en claro.
+    assert puertos == [tls.PUERTO_HTTPS]
 
 
 def testLaPruebaVuelveALevantarElSitioDeComprobación(monkeypatch):
@@ -615,7 +620,7 @@ def testLaPruebaVuelveALevantarElSitioDeComprobación(monkeypatch):
     tls.probar()
 
     assert cargas, "no se ha vuelto a levantar el sitio de comprobación"
-    assert f"https://casa:{tls.PUERTO_PREPARACION}".encode() in cargas[-1]
+    assert f"https://casa:{tls.PUERTO_HTTPS}".encode() in cargas[-1]
 
 
 def testConElProxyCaidoLaPruebaDiceDóndeMirar(monkeypatch):
@@ -718,7 +723,7 @@ def testElEstadoSugiereElNombrePorElQueHasEntrado(clienteAutenticado, bpTls, cad
     assert datos["activado"] is False
     # El puerto de comprobación lo pone el servidor y el nombre lo pone el
     # navegador: la URL para probar desde el aparato se arma con los dos.
-    assert datos["puertoPrueba"] == tls.PUERTO_PREPARACION
+    assert datos["puertoPrueba"] == tls.PUERTO_HTTPS
 
 
 def testPrepararEmiteElCertificadoSinEncenderNada(clienteAutenticado, bpTls, caddy):
@@ -755,7 +760,7 @@ def testPrepararDejaElPuertoDeLaAplicacionEnClaro(clienteAutenticado, bpTls, cad
 
     cargado = _ultimoLoad(caddy).decode()
     assert f"http://:{tls.settings.puerto()} {{" in cargado
-    assert f"https://portfolio.casa:{tls.PUERTO_PREPARACION}" in cargado
+    assert f"https://portfolio.casa:{tls.PUERTO_HTTPS}" in cargado
 
 
 def testPrepararSinNombresSeRechaza(clienteAutenticado, bpTls, caddy):
@@ -776,8 +781,8 @@ def testPrepararConElHttpsYaPuestoNoTocaElProxy(clienteAutenticado, bpTls, caddy
     client, cab, _app = clienteAutenticado(bpTls)
     client.post("/api/tls", headers=cab, json={"activado": True, "nombres": ["casa"]})
 
-    # Tras activar, el navegador ya entra por https:// (por http:// solo se
-    # llega por el puerto alternativo, que lleva su propia sesión).
+    # Tras activar, el navegador salta a https://; por http:// (el puerto
+    # principal) la sesión es otra, con sus propias cookies.
     res = client.post(
         "/api/tls/preparar", headers=cab, json={"nombres": ["casa"]}, base_url="https://localhost"
     )
@@ -812,7 +817,7 @@ def testLaComprobacionLevantaElPuertoSiSeHaCaido(clienteAutenticado, bpTls, monk
 
     assert res.status_code == 200
     assert res.get_json()["listo"] is True
-    assert f"https://192.168.1.163:{tls.PUERTO_PREPARACION}".encode() in cargas[-1]
+    assert f"https://192.168.1.163:{tls.PUERTO_HTTPS}".encode() in cargas[-1]
     # Y sigue sin encender nada: el puerto de la aplicación en claro.
     assert f"http://:{tls.settings.puerto()}".encode() in cargas[-1]
 
@@ -828,7 +833,7 @@ def testLaComprobacionNoTocaElProxySiYaEstáEnPie(clienteAutenticado, bpTls, mon
             return b"{}"
         if ruta.startswith("/pki/ca/"):
             return json.dumps({"root_certificate": "-----BEGIN CERTIFICATE-----\nX\n"}).encode()
-        return f'{{"listen": [":{tls.PUERTO_PREPARACION}"]}}'.encode()
+        return f'{{"listen": [":{tls.PUERTO_HTTPS}"]}}'.encode()
 
     monkeypatch.setattr(tls, "_admin", _admin)
     client, cab, _app = clienteAutenticado(bpTls)
@@ -981,84 +986,113 @@ def testLaPruebaContestaAunqueNoHayaNadaQueComprobar(clienteAutenticado, bpTls, 
     assert datos["https"] is False
 
 
-# ── HTTP alternativo con el HTTPS activo ──────────────────────────────────────
+# ── HTTPS en su propio puerto; el principal sigue en claro ────────────────────
 #
-# Con el HTTPS puesto, un segundo puerto sigue sirviendo en claro para no perder
-# el acceso si el certificado deja de valer. Lo delicado son las cookies: las de
-# ese puerto llevan otro nombre y no van `Secure`, y las del HTTPS no cambian.
+# Con el HTTPS activo, el puerto principal sigue sirviendo en claro y el HTTPS
+# va en `PUERTO_HTTPS`. Lo delicado son las cookies: por el puerto en claro
+# llevan otro nombre y no van `Secure`, y las del HTTPS no cambian.
 
-HTTP_ALT = f"http://:{tls.PUERTO_HTTP_ALTERNATIVO} {{"
+HTTP_PRINCIPAL = "http://:{puerto} {{"
 
 
-def testConHttpsYHttpAlternativoCaddySirveLosDos():
-    conf = tls.construirCaddyfile(True, ["casa"], httpAlternativo=True)
+def _httpPrincipal():
+    from core import settings
 
-    assert "tls internal" in conf
-    assert HTTP_ALT in conf
-    # El puerto en claro lleva a la aplicación, no a la página de comprobación.
-    bloque = conf.split(HTTP_ALT, 1)[1].split("}", 1)[0]
+    return HTTP_PRINCIPAL.format(puerto=settings.puerto())
+
+
+def testConHttpsElPrincipalSigueEnClaroYElHttpsVaAparte():
+    conf = tls.construirCaddyfile(True, ["casa"])
+
+    assert _httpPrincipal() in conf
+    assert f"https://casa:{tls.PUERTO_HTTPS}" in conf
+    # Los dos llevan a la aplicación.
+    bloque = conf.split(_httpPrincipal(), 1)[1].split("}", 1)[0]
     assert "reverse_proxy porfoliomanager:" in bloque
 
 
-@pytest.mark.parametrize(
-    ("activado", "preparando"), [(True, False), (False, True), (False, False)]
-)
-def testSinPedirloNoHayPuertoHttpAlternativo(activado, preparando):
-    conf = tls.construirCaddyfile(activado, ["casa"], preparando=preparando)
-    assert HTTP_ALT not in conf
+def testElHttpsNoVaEnElPuertoPrincipal():
+    from core import settings
+
+    conf = tls.construirCaddyfile(True, ["casa"])
+
+    assert f"https://casa:{settings.puerto()}" not in conf
 
 
-@pytest.mark.parametrize("preparando", [True, False])
-def testSinHttpsElPuertoAlternativoNoSeAbre(preparando):
-    """Sin HTTPS el puerto de siempre ya va en claro: otro sobraría."""
-    conf = tls.construirCaddyfile(False, ["casa"], preparando=preparando, httpAlternativo=True)
-    assert HTTP_ALT not in conf
+def testSinHttpsNiPreparacionNoSeAbreSuPuerto():
+    conf = tls.construirCaddyfile(False, ["casa"])
+    assert f":{tls.PUERTO_HTTPS}" not in conf
 
 
-def testElHttpAlternativoVieneEncendidoDeFabrica():
-    assert tls.leerEstado()["httpAlternativo"] is True
+def testPreparandoElPuertoDelHttpsNoLlevaTodaviaALaAplicacion():
+    conf = tls.construirCaddyfile(False, ["casa"], preparando=True)
+
+    bloque = conf.split(f"https://casa:{tls.PUERTO_HTTPS}", 1)[1]
+    assert "reverse_proxy" not in bloque
 
 
-def testUnEstadoAnteriorALaOpcionLaLeeEncendida(estadoAislado):
-    estadoAislado.mkdir(parents=True, exist_ok=True)
-    (estadoAislado / "estado.json").write_text(
-        json.dumps({"activado": True, "nombres": ["casa"], "actualizado": None}), "utf-8"
-    )
-    assert tls.leerEstado()["httpAlternativo"] is True
+def testSinPuertoElegidoValeElPublicado():
+    assert tls.leerEstado()["puertoHttps"] is None
+    assert tls.puertoHttpsPedido() == tls.PUERTO_HTTPS
+    assert tls.puertoHttpsPendiente() is False
 
 
-def testGuardarSinDecirNadaConservaLaPreferencia():
-    """Emitir o desactivar no deben reencender un puerto que el usuario cerró."""
-    tls.guardarEstado(True, ["casa"], httpAlternativo=False)
+def testElegirOtroPuertoQuedaPendienteHastaActualizar():
+    """Docker solo publica puertos al crear el contenedor: hasta docker-update.sh
+    sigue valiendo el publicado, y el panel tiene que decirlo."""
+    tls.guardarPuertoHttps(tls.PUERTO_HTTPS + 1)
+
+    assert tls.puertoHttpsPedido() == tls.PUERTO_HTTPS + 1
+    assert tls.puertoHttpsPendiente() is True
+    # La configuración de Caddy sigue usando el publicado.
+    assert f":{tls.PUERTO_HTTPS}" in tls.construirCaddyfile(True, ["casa"])
+
+
+def testEmitirOActivarNoTocanElPuertoElegido():
+    tls.guardarPuertoHttps(6443)
+    tls.guardarEstado(True, ["casa"])
     tls.guardarEstado(False, ["casa"])
 
-    assert tls.leerEstado()["httpAlternativo"] is False
+    assert tls.leerEstado()["puertoHttps"] == 6443
 
 
-def testElHttpAlternativoSoloEstaActivoConHttps(monkeypatch):
-    assert tls.httpAlternativoActivo() is False
+@pytest.mark.parametrize("valor", ["abc", 80, 70000, True, None, [6443]])
+def testUnPuertoRaroEnElFicheroSeIgnora(estadoAislado, valor):
+    estadoAislado.mkdir(parents=True, exist_ok=True)
+    (estadoAislado / "estado.json").write_text(json.dumps({"puertoHttps": valor}), "utf-8")
+
+    assert tls.leerEstado()["puertoHttps"] is None
+
+
+def testDockerUpdateLeeElPuertoDelFichero(estadoAislado):
+    """docker-update.sh lo saca con sed de estado.json: tiene que quedar en una
+    línea con la forma `"puertoHttps": 6443`."""
+    import re
+
+    tls.guardarPuertoHttps(6443)
+    texto = (estadoAislado / "estado.json").read_text("utf-8")
+
+    assert re.search(r'"puertoHttps"\s*:\s*6443', texto)
+
+
+def testConviveConHttpSoloConHttpsDeAjustes(monkeypatch):
+    assert tls.conviveConHttp() is False
 
     tls.guardarEstado(True, ["casa"])
-    assert tls.httpAlternativoActivo() is True
+    assert tls.conviveConHttp() is True
 
-    tls.guardarEstado(True, ["casa"], httpAlternativo=False)
-    assert tls.httpAlternativoActivo() is False
-
-
-def testConHttpsPorEntornoNoSeAbrePuertoAlternativo(monkeypatch):
-    """Ese proxy no es nuestro: no se le añaden puertos."""
     monkeypatch.setenv("HTTPS_ENABLED", "true")
-    tls.guardarEstado(True, ["casa"])
-
-    assert tls.httpAlternativoActivo() is False
+    assert tls.conviveConHttp() is False
 
 
-def testAlArrancarSeReabreElPuertoAlternativo(caddy, monkeypatch):
+def testAlArrancarSeReabreElHttpsEnSuPuerto(caddy, monkeypatch):
     monkeypatch.setenv("PROXY_FIX_HOPS", "1")
     tls.guardarEstado(True, ["casa"])
     tls.converger()
 
-    assert HTTP_ALT.encode() in _ultimoLoad(caddy)
+    carga = _ultimoLoad(caddy)
+    assert _httpPrincipal().encode() in carga
+    assert f"https://casa:{tls.PUERTO_HTTPS}".encode() in carga
 
 
 def _clienteCon(crearApp, bpTls, baseUrl):
@@ -1091,28 +1125,28 @@ def testPorHttpsLasCookiesSiguenSiendoSecure(crearApp, bpTls, caddy):
     res = client.get("/api/tls", base_url="https://localhost")
 
     assert res.status_code == 200
-    assert res.get_json()["porHttpAlternativo"] is False
+    assert res.get_json()["porHttpConHttps"] is False
     csrf = _cookie(res, "csrf_token=")
     assert csrf and "Secure" in csrf[0]
 
 
-def testPorElPuertoHttpSeEntraConSuPropiaCookie(crearApp, bpTls, caddy):
+def testPorElPuertoEnClaroSeEntraConSuPropiaCookie(crearApp, bpTls, caddy):
     """Una cookie `Secure` por http:// el navegador la descarta, y Chromium no deja
     que un origen en claro pise una `Secure` del mismo nombre: sin nombre propio
-    no se podría iniciar sesión por el puerto de rescate."""
+    no se podría iniciar sesión por el puerto principal con el HTTPS activo."""
     tls.guardarEstado(True, ["localhost"])
     client, _cab = _clienteCon(crearApp, bpTls, "http://localhost")
 
     res = client.get("/api/tls")
 
     assert res.status_code == 200
-    assert res.get_json()["porHttpAlternativo"] is True
+    assert res.get_json()["porHttpConHttps"] is True
     csrf = _cookie(res, "csrf_token_http=")
     assert csrf and "Secure" not in csrf[0]
     assert not _cookie(res, "csrf_token=")
 
 
-def testLaSesionDelHttpsNoValePorElPuertoHttp(crearApp, bpTls, caddy):
+def testLaSesionDelHttpsNoValePorElPuertoEnClaro(crearApp, bpTls, caddy):
     """Son sesiones separadas: la del HTTPS no se acepta en claro."""
     tls.guardarEstado(True, ["localhost"])
     client, _cab = _clienteCon(crearApp, bpTls, "https://localhost")
@@ -1120,9 +1154,31 @@ def testLaSesionDelHttpsNoValePorElPuertoHttp(crearApp, bpTls, caddy):
     assert client.get("/api/tls").status_code == 401
 
 
-def testConPuertoHttpAbiertoNoSeEmiteHsts(crearApp, bpTls, caddy):
-    """HSTS vale para el host entero: por nombre, convertiría el http:// de
-    rescate en https:// y lo dejaría inservible."""
+def testPorHttpsNoSeBorraLaCookieCsrfDelPuertoEnClaro(crearApp, bpTls, caddy):
+    """El navegador manda csrf_token_http también por https://. Borrarla ahí
+    dejaría sin token a la pestaña abierta por el puerto en claro."""
+    tls.guardarEstado(True, ["localhost"])
+    client, _cab = _clienteCon(crearApp, bpTls, "https://localhost")
+    client.set_cookie("csrf_token_http", "token-de-la-otra-pestana", domain="localhost")
+
+    res = client.get("/api/tls", base_url="https://localhost")
+
+    assert not _cookie(res, "csrf_token_http=")
+
+
+def testSinHttpsSeBorraLaCookieCsrfQueQuedoDelPuertoEnClaro(clienteAutenticado, bpTls, caddy):
+    client, _cab, _app = clienteAutenticado(bpTls)
+    client.set_cookie("csrf_token_http", "token-viejo", domain="localhost")
+
+    res = client.get("/api/tls")
+
+    borrada = _cookie(res, "csrf_token_http=")
+    assert borrada and "Expires=Thu, 01 Jan 1970" in borrada[0]
+
+
+def testConElPrincipalEnClaroNoSeEmiteHsts(crearApp, bpTls, caddy):
+    """HSTS vale para el host entero: por nombre, convertiría el http:// del
+    puerto principal en https:// y lo dejaría inservible."""
     tls.guardarEstado(True, ["localhost"])
     client, _cab = _clienteCon(crearApp, bpTls, "https://localhost")
 
@@ -1131,93 +1187,64 @@ def testConPuertoHttpAbiertoNoSeEmiteHsts(crearApp, bpTls, caddy):
     assert "Strict-Transport-Security" not in res.headers
 
 
-def testConPuertoHttpCerradoSeEmiteHsts(crearApp, bpTls, caddy):
-    tls.guardarEstado(True, ["localhost"], httpAlternativo=False)
-    client, _cab = _clienteCon(crearApp, bpTls, "https://localhost")
+def testElEstadoDiceDondeVaElHttps(clienteAutenticado, bpTls, caddy):
+    from core import settings
 
-    res = client.get("/api/tls", base_url="https://localhost")
+    client, _cab, _app = clienteAutenticado(bpTls)
 
-    assert "max-age=31536000" in res.headers["Strict-Transport-Security"]
+    datos = client.get("/api/tls").get_json()
+
+    assert datos["puertoHttps"] == tls.PUERTO_HTTPS
+    assert datos["puertoHttpsPedido"] == tls.PUERTO_HTTPS
+    assert datos["puertoHttpsPendiente"] is False
+    assert datos["puertoPrincipal"] == settings.puerto()
 
 
-def testElPuertoHttpSeCierraDesdeElHttps(crearApp, bpTls, caddy):
-    tls.guardarEstado(True, ["localhost"])
-    client, cab = _clienteCon(crearApp, bpTls, "https://localhost")
+def testSeElijeElPuertoDelHttps(clienteAutenticado, bpTls, caddy):
+    client, cab, _app = clienteAutenticado(bpTls)
 
-    res = client.post(
-        "/api/tls", headers=cab, base_url="https://localhost",
-        json={"activado": True, "nombres": ["localhost"], "httpAlternativo": False},
-    )
+    res = client.post("/api/tls/puerto", headers=cab, json={"puertoHttps": 6443})
 
     assert res.status_code == 200
-    assert tls.leerEstado()["httpAlternativo"] is False
-    assert HTTP_ALT.encode() not in _ultimoLoad(caddy)
+    datos = res.get_json()
+    assert datos["puertoHttpsPedido"] == 6443
+    assert datos["puertoHttpsPendiente"] is (tls.PUERTO_HTTPS != 6443)
+    assert tls.leerEstado()["puertoHttps"] == 6443
+    # Elegirlo no recarga Caddy: el puerto lo abre docker-update.sh.
+    assert _ultimoLoad(caddy) is None
 
 
-def testNoSeCierraElPuertoHttpEntrandoPorEl(crearApp, bpTls, caddy):
-    """Caddy cortaría la conexión por la que llega la petición."""
-    tls.guardarEstado(True, ["localhost"])
-    client, cab = _clienteCon(crearApp, bpTls, "http://localhost")
+@pytest.mark.parametrize("valor", ["abc", 80, 70000, None])
+def testUnPuertoFueraDeRangoSeRechaza(clienteAutenticado, bpTls, caddy, valor):
+    client, cab, _app = clienteAutenticado(bpTls)
 
-    res = client.post(
-        "/api/tls", headers=cab,
-        json={"activado": True, "nombres": ["localhost"], "httpAlternativo": False},
-    )
+    res = client.post("/api/tls/puerto", headers=cab, json={"puertoHttps": valor})
 
     assert res.status_code == 400
-    assert res.get_json()["field"] == "httpAlternativo"
-    assert _ultimoLoad(caddy) is None
-    assert tls.leerEstado()["httpAlternativo"] is True
+    assert res.get_json()["field"] == "puertoHttps"
 
 
-def testUnClienteQueNoMandaLaOpcionNoLaApaga(clienteAutenticado, bpTls, caddy):
+def testElPuertoDelHttpsNoPuedeSerElPrincipal(clienteAutenticado, bpTls, caddy):
+    from core import settings
+
     client, cab, _app = clienteAutenticado(bpTls)
-    tls.guardarEstado(False, ["casa"], httpAlternativo=False)
 
-    client.post("/api/tls/preparar", headers=cab, json={"nombres": ["casa"]})
+    res = client.post("/api/tls/puerto", headers=cab, json={"puertoHttps": settings.puerto()})
 
-    assert tls.leerEstado()["httpAlternativo"] is False
+    assert res.status_code == 400
+    assert tls.leerEstado()["puertoHttps"] is None
 
 
-# ── Probar el puerto HTTP alternativo ─────────────────────────────────────────
+def testConHttpsPorEntornoNoSeEligePuerto(clienteAutenticado, bpTls, caddy, monkeypatch):
+    monkeypatch.setenv("HTTPS_ENABLED", "true")
+    client, cab, _app = clienteAutenticado(bpTls)
 
-@pytest.fixture
-def servidorEnElPuerto(monkeypatch):
-    """Levanta un HTTP local que hace de Caddy en el puerto alternativo.
+    res = client.post("/api/tls/puerto", headers=cab, json={"puertoHttps": 6443})
 
-    Devuelve una función que recibe el cuerpo JSON a contestar. El puerto se
-    elige libre y se parchean el puerto y el host del proxy, no la red.
-    """
-    import http.server
-    import threading
+    assert res.status_code == 409
 
-    servidores = []
 
-    def _levantar(cuerpo: dict):
-        datos = json.dumps(cuerpo).encode()
-
-        class Manejador(http.server.BaseHTTPRequestHandler):
-            def do_GET(self):  # nombre impuesto por http.server
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(datos)))
-                self.end_headers()
-                self.wfile.write(datos)
-
-            def log_message(self, *args):
-                pass
-
-        servidor = http.server.HTTPServer(("127.0.0.1", 0), Manejador)
-        threading.Thread(target=servidor.serve_forever, daemon=True).start()
-        servidores.append(servidor)
-        monkeypatch.setattr(tls, "PUERTO_HTTP_ALTERNATIVO", servidor.server_address[1])
-        monkeypatch.setattr(tls, "_hostDelProxy", lambda: "127.0.0.1")
-
-    yield _levantar
-    for servidor in servidores:
-        servidor.shutdown()
-        servidor.server_close()
-
+# ── Probar el puerto del HTTPS ────────────────────────────────────────────────
 
 def _puertoCerrado(monkeypatch):
     import socket
@@ -1225,35 +1252,14 @@ def _puertoCerrado(monkeypatch):
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         libre = s.getsockname()[1]
-    monkeypatch.setattr(tls, "PUERTO_HTTP_ALTERNATIVO", libre)
+    monkeypatch.setattr(tls, "PUERTO_HTTPS", libre)
     monkeypatch.setattr(tls, "_hostDelProxy", lambda: "127.0.0.1")
-
-
-def testElPuertoAbiertoLlevaALaAplicacion(servidorEnElPuerto):
-    tls.guardarEstado(True, ["casa"])
-    servidorEnElPuerto({"ok": True, "estado": "ok", "version": "5.6.0"})
-
-    r = tls.probarHttpAlternativo()
-
-    assert r["escucha"] is True
-    assert r["llegaALaApp"] is True
-    assert r["esperado"] is True
-    assert r["error"] is None
-
-
-def testOtraCosaEnElPuertoNoCuentaComoLaAplicacion(servidorEnElPuerto):
-    servidorEnElPuerto({"hola": "mundo"})
-
-    r = tls.probarHttpAlternativo()
-
-    assert r["escucha"] is True
-    assert r["llegaALaApp"] is False
 
 
 def testConElPuertoCerradoSeDiceYNoRevienta(monkeypatch):
     _puertoCerrado(monkeypatch)
 
-    r = tls.probarHttpAlternativo()
+    r = tls.probarPuertoHttps()
 
     assert r["escucha"] is False
     assert r["llegaALaApp"] is False
@@ -1266,18 +1272,57 @@ def testCerradoCuandoDeberiaEstarAbiertoSeNota(monkeypatch):
     tls.guardarEstado(True, ["casa"])
     _puertoCerrado(monkeypatch)
 
-    r = tls.probarHttpAlternativo()
+    r = tls.probarPuertoHttps()
 
     assert r["esperado"] is True
     assert r["escucha"] is False
 
 
+def testLaPruebaDiceSiHayUnPuertoPendiente(monkeypatch):
+    _puertoCerrado(monkeypatch)
+    tls.guardarPuertoHttps(tls.PUERTO_HTTPS + 1)
+
+    r = tls.probarPuertoHttps()
+
+    assert r["pendiente"] is True
+    assert r["puertoPedido"] == tls.PUERTO_HTTPS + 1
+
+
+def testSiAlgoEscuchaPeroNoHablaTlsSeDice(monkeypatch):
+    """Un puerto ocupado por otra cosa no puede pasar por el HTTPS de la app."""
+    import socket
+    import threading
+
+    servidor = socket.socket()
+    servidor.bind(("127.0.0.1", 0))
+    servidor.listen(1)
+
+    def _atender():
+        conexion, _ = servidor.accept()
+        conexion.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+        conexion.close()
+
+    threading.Thread(target=_atender, daemon=True).start()
+    monkeypatch.setattr(tls, "PUERTO_HTTPS", servidor.getsockname()[1])
+    monkeypatch.setattr(tls, "_hostDelProxy", lambda: "127.0.0.1")
+    monkeypatch.setattr(tls, "_contextoDeConfianza", lambda: __import__("ssl").create_default_context())
+
+    try:
+        r = tls.probarPuertoHttps()
+    finally:
+        servidor.close()
+
+    assert r["escucha"] is True
+    assert r["llegaALaApp"] is False
+    assert r["error"]
+
+
 def testLaPruebaDelPuertoExigeSesionYContesta200(crearApp, clienteAutenticado, bpTls, monkeypatch):
-    assert crearApp(bpTls).test_client().get("/api/tls/http-alternativo/prueba").status_code == 401
+    assert crearApp(bpTls).test_client().get("/api/tls/puerto/prueba").status_code == 401
 
     _puertoCerrado(monkeypatch)
     client, _cab, _app = clienteAutenticado(bpTls)
-    res = client.get("/api/tls/http-alternativo/prueba")
+    res = client.get("/api/tls/puerto/prueba")
 
     assert res.status_code == 200
     assert res.get_json()["ok"] is True

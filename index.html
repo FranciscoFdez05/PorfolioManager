@@ -1227,7 +1227,7 @@
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">HTTPS</div>
-                        <div class="ajustesSectionDesc">Sin esto, la contraseña y la cookie de sesión viajan en claro por la red. Al activarlo se emite el certificado y la dirección pasa a <code>https://</code>, en el mismo puerto de siempre.</div>
+                        <div class="ajustesSectionDesc">Sin esto, la contraseña y la cookie de sesión viajan en claro por la red. Al activarlo se emite el certificado y el HTTPS se abre en su propio puerto; el de siempre sigue en <code>http://</code>, así que no te quedas fuera si el certificado falla.</div>
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
@@ -1252,7 +1252,8 @@
                         a decir «importación completada» dejándolo en el almacén que no es—, así que esto es lo
                         único que lo confirma.</li>
                     <li><strong>Y entonces sí, «Activar HTTPS».</strong> La página se recarga sola en
-                        <code>https://</code>. No se reinicia nada y el puerto sigue siendo el mismo.</li>
+                        <code>https://</code>, en el puerto del HTTPS. No se reinicia nada y la dirección de
+                        siempre sigue funcionando por <code>http://</code>.</li>
                 </ol>
 
                 <div class="ajustesField">
@@ -1272,20 +1273,21 @@
                     </div>
                 </div>
 
-                <div class="ajustesSwitchRow" id="ajustesTlsHttpAltFila">
-                    <div class="ajustesSwitchLabel">
-                        <span>Mantener también el acceso por HTTP</span>
-                        <small id="ajustesTlsHttpAltAyuda">Con el HTTPS activo, la aplicación sigue respondiendo sin cifrar en otro puerto, para no perder el acceso si el certificado deja de valer.</small>
+                <div class="ajustesField" id="ajustesTlsPuertoFila">
+                    <div class="ajustesLabelRow">
+                        <label class="ajustesLabel" for="ajustesTlsPuerto">Puerto del HTTPS</label>
                     </div>
-                    <label class="ajustesSwitch">
-                        <input type="checkbox" id="ajustesTlsHttpAlt" checked>
-                        <span class="ajustesSwitchTrack"></span>
-                    </label>
-                </div>
-                <div class="ajustesTlsHttpAltAcciones">
-                    <button id="ajustesTlsHttpAltProbarBtn" class="ajustesTlsAvisoBtn" type="button">Probar el puerto</button>
-                    <a id="ajustesTlsHttpAltAbrir" class="ajustesTlsHttpAltAbrir" href="#" target="_blank" rel="noopener">Abrir en una pestaña</a>
-                    <span id="ajustesTlsHttpAltMsg" class="ajustesStatusMsg"></span>
+                    <div class="ajustesInputRow ajustesTlsPuertoFila">
+                        <input id="ajustesTlsPuerto" class="ajustesInput ajustesTlsPuertoInput" type="number" min="1024" max="65535" inputmode="numeric" placeholder="5443">
+                        <button id="ajustesTlsPuertoBtn" class="ajustesTlsAvisoBtn" type="button">Cambiar puerto</button>
+                        <button id="ajustesTlsPuertoProbarBtn" class="ajustesTlsAvisoBtn" type="button">Probar el puerto</button>
+                        <a id="ajustesTlsPuertoAbrir" class="ajustesTlsPuertoAbrir" href="#" target="_blank" rel="noopener">Abrir en una pestaña</a>
+                    </div>
+                    <div class="ajustesFieldHint" id="ajustesTlsPuertoAyuda">
+                        El HTTPS va en su propio puerto. El de siempre sigue en <code>http://</code>, así que si el
+                        certificado deja de valer no te quedas fuera.
+                    </div>
+                    <div class="ajustesTlsPuertoMsgFila"><span id="ajustesTlsPuertoMsg" class="ajustesStatusMsg"></span></div>
                 </div>
 
                 <div class="ajustesActions">
@@ -1309,6 +1311,7 @@
                             <span class="icono iconoDescargar" aria-hidden="true"></span>
                             Descargar certificado
                         </a>
+                        <span id="ajustesTlsCaMsg" class="ajustesStatusMsg"></span>
                     </div>
                     <details class="ajustesTlsAyuda">
                         <summary>Cómo instalarlo</summary>
@@ -1318,7 +1321,7 @@
                             Ajustes › General › Información › Ajustes de confianza de certificados, y activa el interruptor.
                             Sin eso queda instalado pero no es de confianza, y el aviso sigue igual.</p>
                             <p><strong>Por la VPN del router (iPhone / iPad).</strong> Usa la <strong>misma IP de la LAN</strong>
-                            que en casa (por ejemplo <code>https://192.168.1.50:5050</code>): con la VPN conectada el router
+                            que en casa (por ejemplo <code>https://192.168.1.50:5443</code>): con la VPN conectada el router
                             ya te lleva a ella por el túnel, y no hay que tocar la configuración de la VPN. El certificado solo
                             puede presentarse para una IP, así que no añadas otras. Safari y el Atajo usan entonces una sola
                             dirección dentro y fuera de casa, y la CA instalada vale para las dos.</p>
@@ -1375,8 +1378,8 @@
                     <div class="ajustesSectionDivider"></div>
                     <div class="ajustesTlsCaTexto">
                         <strong>Y ahora sí, enciéndelo.</strong>
-                        La dirección no cambia: el mismo puerto de siempre pasa a ser <code>https://</code>
-                        y la página se recarga sola. A partir de ahí, los aparatos donde hayas instalado el
+                        El HTTPS se abre en su propio puerto y la página se recarga sola en él; la dirección
+                        de siempre sigue funcionando por <code>http://</code>. A partir de ahí, los aparatos donde hayas instalado el
                         certificado entran sin ver un solo aviso.
                         <br><br>
                         Si usas el <strong>Atajo de iOS</strong>, vuelve a descargarlo después: lleva la

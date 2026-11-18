@@ -3394,6 +3394,7 @@ html[data-theme="light"] .ajustesAtajoAviso,
 html[data-theme="light"] .ajustesTlsAyudaCuerpo,
 html[data-theme="light"] .ajustesTlsGuia,
 html[data-theme="light"] .ajustesTlsPruebaDetalle,
+html[data-theme="light"] .ajustesTlsPruebaCabecera,
 html[data-theme="light"] .ajustesAtajoDatos dt,
 html[data-theme="light"] .ajustesFieldHint {
     color: var(--text-dim);

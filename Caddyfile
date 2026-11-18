@@ -30,11 +30,11 @@
 	auto_https off
 }
 
-# Mismo puerto que usa la aplicación: al activar el HTTPS la dirección no
-# cambia de sitio, solo de esquema. `PORT` lo inyecta docker-compose.yml desde
-# el mismo config.ini que lee todo lo demás.
-:{$PORT:5050} {
-	reverse_proxy porfoliomanager:{$PORT:5050} {
+# Mismo puerto que usa la aplicación, en claro. El HTTPS va en otro puerto y
+# lo monta la aplicación en caliente desde Ajustes. `PORT` lo inyecta
+# docker-compose.yml desde el mismo config.ini que lee todo lo demás.
+:{$PORT:5080} {
+	reverse_proxy porfoliomanager:{$PORT:5080} {
 		# Backups, restauraciones e importaciones mueven ficheros de decenas de
 		# MB; el minuto por defecto los cortaba a media respuesta.
 		transport http {

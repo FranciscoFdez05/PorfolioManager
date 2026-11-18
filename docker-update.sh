@@ -178,9 +178,59 @@ PORT=$(sed -n 's/^PORT=//p' .env | head -n 1)
 if [ -z "$PORT" ]; then
     PORT=$(run_py_file tools/leer_ajuste.py server.port) || PORT=""
 fi
-[ -n "$PORT" ] || PORT=5050
+[ -n "$PORT" ] || PORT=5080
+
+# ¿Escucha en ese puerto del host otro servicio que no es este stack? Los que ya
+# publica nuestro propio proxy no cuentan: en una actualización están en uso por
+# nosotros. Sin `ss` no se puede saber y se da por libre.
+puerto_ajeno() {
+    command -v ss >/dev/null 2>&1 || return 1
+    ss -ltnH "( sport = :$1 )" 2>/dev/null | grep -q . || return 1
+    docker compose port caddy "$1" >/dev/null 2>&1 && return 1
+    return 0
+}
+
+# ── Puerto principal: del 5050 al 5080 ────────────────────────────────────────
+# Hasta la 5.6 el de fábrica era el 5050, y docker-up.sh lo dejaba escrito en el
+# .env aunque nadie lo hubiera elegido. El de fábrica pasa a ser el 5080 y se
+# migra una sola vez: la marca en el .env evita volver a moverlo si después
+# alguien vuelve a poner el 5050 a propósito. Si el 5080 lo usa otro servicio,
+# se queda donde estaba.
+MARCA_PUERTO='# puerto-principal-migrado-a-5080'
+if [ "$PORT" = 5050 ] && ! grep -qx "$MARCA_PUERTO" .env; then
+    if puerto_ajeno 5080; then
+        aviso "El puerto 5080 lo usa otro servicio del servidor: la aplicación sigue en el 5050."
+    else
+        if grep -q '^PORT=5050$' .env; then
+            sed -i 's/^PORT=5050$/PORT=5080/' .env
+        fi
+        PORT=5080
+        aviso "El puerto principal pasa del 5050 al 5080 (el nuevo de fábrica). Actualiza marcadores y el Atajo de iOS. Para volver al 5050, pon PORT=5050 en el .env."
+    fi
+    printf '%s\n' "$MARCA_PUERTO" >> .env
+fi
 export PORT
 export PORTFOLIO_VERSION="$VERSION_NUEVA"
+
+# ── Puerto del HTTPS ──────────────────────────────────────────────────────────
+# El HTTPS va en su propio puerto; PORT sigue siempre en claro. El que se elige
+# en Ajustes › HTTPS se guarda en data/tls/estado.json y gana al .env: Docker
+# solo publica puertos al crear el contenedor, y esto es lo que aplica un
+# cambio hecho en el panel. Si coincide con el principal o lo usa otro servicio
+# del host, se busca el siguiente libre y se avisa.
+CADDY_HTTPS_PORT=$(sed -n 's/.*"puertoHttps"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' data/tls/estado.json 2>/dev/null | head -n 1)
+[ -n "$CADDY_HTTPS_PORT" ] || CADDY_HTTPS_PORT=$(sed -n 's/^CADDY_HTTPS_PORT=//p' .env 2>/dev/null | head -n 1)
+[ -n "$CADDY_HTTPS_PORT" ] && [ "$CADDY_HTTPS_PORT" != "$PORT" ] || CADDY_HTTPS_PORT=5443
+PEDIDO_HTTPS=$CADDY_HTTPS_PORT
+INTENTOS=0
+while { [ "$CADDY_HTTPS_PORT" = "$PORT" ] || puerto_ajeno "$CADDY_HTTPS_PORT"; } && [ "$INTENTOS" -lt 20 ]; do
+    CADDY_HTTPS_PORT=$((CADDY_HTTPS_PORT + 1))
+    INTENTOS=$((INTENTOS + 1))
+done
+if [ "$CADDY_HTTPS_PORT" != "$PEDIDO_HTTPS" ]; then
+    aviso "El puerto $PEDIDO_HTTPS lo usa otro servicio: el HTTPS irá en el $CADDY_HTTPS_PORT. Puedes elegir otro en Ajustes › HTTPS."
+fi
+export CADDY_HTTPS_PORT
 
 # ── 4. Volúmenes y usuario ────────────────────────────────────────────────────
 # Lo mismo que hace docker-up.sh. Los directorios ya existirán en una

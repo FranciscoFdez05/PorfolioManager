@@ -1644,18 +1644,62 @@
     color: var(--text-subtle);
     font-weight: 600;
 }
-/* Probar el puerto HTTP de rescate: desde el servidor (botón) y desde este
-   aparato (enlace), con el resultado al lado. */
-.ajustesTlsHttpAltAcciones {
+/* Puerto del HTTPS: el número, cambiarlo, probarlo desde el servidor (botón)
+   y desde este aparato (enlace). */
+/* Una tarjeta propia dentro de la sección: separa el puerto de la lista de
+   nombres de arriba y de los botones de emitir de abajo, que se mezclaban. */
+#ajustesTlsPuertoFila {
+    margin: 12px 20px 6px;
+    padding: 14px 16px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-inset);
+}
+.ajustesTlsPuertoFila {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 12px;
-    padding: 0 20px 6px;
+    gap: 8px 10px;
 }
-.ajustesTlsHttpAltAbrir {
-    font-size: 12px;
+.ajustesTlsPuertoFila .ajustesTlsPuertoInput {
+    flex: 0 0 110px;
+    width: 110px;
+    height: 36px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    text-align: center;
+}
+.ajustesTlsPuertoFila .ajustesTlsAvisoBtn {
+    height: 36px;
+    padding: 0 14px;
+    font-size: 12.5px;
+}
+.ajustesTlsPuertoFila .ajustesTlsAvisoBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.ajustesTlsPuertoAbrir {
+    margin-left: 4px;
+    font-size: 12.5px;
     color: var(--accent);
+    white-space: nowrap;
+}
+#ajustesTlsPuertoFila .ajustesFieldHint {
+    margin-top: 10px;
+}
+/* El resultado alineado a la izquierda, debajo, y no centrado a media fila. */
+.ajustesTlsPuertoMsgFila {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: 10px;
+}
+.ajustesTlsPuertoMsgFila:has(.ajustesStatusMsg:empty) {
+    display: none;
+}
+
+/* Descargar sin haber emitido: se ve, pero apagado, y al pulsarlo dice qué falta. */
+.ajustesTlsCaBloqueado {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* Sin aire el botón quedaba pegado a la última línea del párrafo y parecía
@@ -1947,17 +1991,27 @@
     overflow: hidden;
 }
 .ajustesTlsPruebaRes.roto {
-    padding: 11px 12px;
+    padding: 14px 18px;
     font-size: 12.5px;
     line-height: 1.55;
     color: var(--text-subtle);
+}
+
+/* Qué se ha comprobado («antes de activar», en qué puerto): encabeza las filas
+   con el mismo margen que ellas, en vez de ir pegado al borde. */
+.ajustesTlsPruebaCabecera {
+    padding: 14px 18px 12px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-subtle);
+    border-bottom: 1px solid var(--border-soft);
 }
 
 .ajustesTlsPruebaFila {
     display: flex;
     align-items: baseline;
     gap: 10px;
-    padding: 10px 12px;
+    padding: 12px 18px;
     font-size: 12.5px;
     border-bottom: 1px solid var(--border-soft);
 }

@@ -37,8 +37,26 @@ def _urlBase() -> str:
     estado del HTTPS y no de `request.scheme`, porque con el proxy delante lo que
     ve Flask es la conexión interna, en claro.
     """
+    if tls.conviveConHttp():
+        # El HTTPS de Ajustes va en su propio puerto: el Atajo llama siempre
+        # por él, aunque el panel se esté viendo por el principal en claro.
+        return f"https://{_sinPuerto(request.host)}:{tls.PUERTO_HTTPS}"
     esquema = "https" if tls.httpsActivo() else "http"
     return f"{esquema}://{request.host}"
+
+
+def _sinPuerto(host: str) -> str:
+    """El host sin el `:puerto` final; respeta los corchetes de IPv6.
+
+    Args:
+        host: el `Host` de la petición, p. ej. `192.168.1.50:5080` o `[::1]:5080`.
+
+    Returns:
+        `192.168.1.50`, `[::1]`.
+    """
+    if host.startswith("["):
+        return host[: host.index("]") + 1] if "]" in host else host
+    return host.rsplit(":", 1)[0] if host.count(":") == 1 else host
 
 
 def _comoTeVeElServidor() -> dict:

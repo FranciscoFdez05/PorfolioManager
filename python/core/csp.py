@@ -19,11 +19,11 @@ Decisiones que no son obvias:
 * **connect-src 'self' y el puerto de comprobación del certificado.** Todas las
   llamadas a proveedores de mercado las hace el servidor; el navegador solo
   habla con /api/. La única excepción es la comprobación del HTTPS: el panel de
-  Ajustes pide `https://<este mismo host>:9443` para averiguar si **este**
+  Ajustes pide `https://<este mismo host>:<puerto del HTTPS>` para averiguar si **este**
   navegador se fía del certificado, que es lo único que el servidor no puede
-  contestar por él. Es el mismo host por el que ha llegado la petición y un
-  puerto que solo sirve una página fija, así que no abre nada que no estuviera
-  ya abierto. Si alguna vez el frontend llamara a una API externa de verdad,
+  contestar por él. Es el mismo host por el que ha llegado la petición y el
+  puerto del HTTPS de esta misma aplicación, así que no abre nada que no
+  estuviera ya abierto. Si alguna vez el frontend llamara a una API externa de verdad,
   esta directiva lo seguiría delatando.
 * **frame-ancestors 'self'** duplica X-Frame-Options a propósito: la cabecera
   antigua la ignoran los navegadores modernos cuando hay CSP, y la nueva no la

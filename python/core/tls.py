@@ -21,14 +21,15 @@ hablaría TLS con un certificado que el aparato todavía no reconoce; el navegad
 corta ahí, y corta justo antes de que diera tiempo a descargar lo único que le
 habría dejado entrar.
 
-    1. Preparar ──POST /load (claro + TLS en un puerto interno)─> caddy:2019
+    1. Preparar ──POST /load (claro + página de prueba en PUERTO_HTTPS)─> caddy:2019
                                               └─ emite el certificado y crea la CA
        Ajustes  ──GET /pki/ca/local─────────> raíz de la CA, se instala en cada aparato
                                               (la conexión sigue en claro y por el
                                                mismo puerto: no se ha movido nada)
 
     2. Activar  ──POST /load (text/caddyfile)─> caddy:2019
-                                              └─ el puerto pasa a hablar solo TLS
+                                              └─ abre el HTTPS en PUERTO_HTTPS; el
+                                                 principal sigue en claro
 
 **Dónde vive el estado.** En `data/tls/estado.json`, no en config.ini: es una
 decisión del usuario tomada desde la interfaz, y config.ini está versionado y se
@@ -36,10 +37,12 @@ sobrescribe en cada `git pull`. `[server] https_activado` sigue existiendo como
 override de despliegue —para el caso de un dominio público con Let's Encrypt,
 que se configura por .env— y cuando está puesto manda sobre el fichero.
 
-**El puerto no cambia.** Caddy escucha en el mismo `[server] port` que ya usabas
-(la aplicación deja de publicarlo y solo se llega a ella a través de Caddy), así
-que activar el HTTPS no mueve la dirección: `http://IP:5000` pasa a ser
-`https://IP:5000`. Y ese puerto deja de aceptar texto plano, que era el objetivo.
+**Dos puertos.** El principal (`[server] port`, 5080 de fábrica) sirve siempre en
+claro, también con el HTTPS activo: así un certificado que deja de valer no deja
+a nadie fuera. El HTTPS va en su propio puerto (`PUERTO_HTTPS`, 5443 de
+fábrica), que se elige en Ajustes y publica docker-update.sh. Antes de activarlo,
+ese puerto sirve solo la página de prueba. Por el puerto en
+claro la sesión es aparte (cookies con sufijo `_http`, ver `seguridad_app`).
 """
 
 import http.client
@@ -80,35 +83,35 @@ TIMEOUT = 10
 # El identificador que Caddy da a su CA interna. Es fijo.
 CA_INTERNA = "local"
 
-# Dónde se emite el certificado antes de encender el HTTPS. Tiene que ser un
-# puerto distinto del de la aplicación —el de siempre se queda en claro, que es
-# justo lo que permite instalar la CA sin perder la sesión— y no se publica en
-# docker-compose: solo existe dentro de la red de Compose, así que a este puerto
-# no llega nadie desde la LAN. La variable está por si choca con otra cosa.
+# Puerto en el que se sirve el HTTPS, aparte del principal. El principal sigue
+# siempre en claro: si el certificado deja de valer (volumen de Caddy borrado,
+# un aparato que deja de fiarse), por ahí se sigue entrando como siempre.
+#
+# Este es el puerto que Docker publica AHORA (`CADDY_HTTPS_PORT`). El que se
+# elige en Ajustes se guarda en estado.json y lo publica docker-update.sh al
+# ejecutarse: Docker solo abre puertos al crear el contenedor, y recrearlo desde
+# aquí exigiría montar el socket de Docker, que es ser root en el host.
+#
+# Antes de activar, este mismo puerto sirve solo la página de prueba con el
+# certificado ya emitido: así «Comprobar en este aparato» pregunta por el mismo
+# puerto que se va a usar, y no hace falta publicar otro.
+PUERTO_HTTPS_POR_DEFECTO = 5443
 try:
-    PUERTO_PREPARACION = int(os.environ.get("CADDY_PREP_PORT") or 9443)
+    PUERTO_HTTPS = int(os.environ.get("CADDY_HTTPS_PORT") or PUERTO_HTTPS_POR_DEFECTO)
 except ValueError:
-    PUERTO_PREPARACION = 9443
+    PUERTO_HTTPS = PUERTO_HTTPS_POR_DEFECTO
 
-# Puerto en claro que se mantiene abierto con el HTTPS ya activo. Existe para no
-# depender del certificado: si la CA se pierde (volumen de Caddy borrado) o un
-# aparato deja de fiarse, por aquí se sigue entrando a Ajustes para arreglarlo.
-# No puede ser el mismo que el principal —un puerto habla TLS o habla claro—, y
-# tiene que estar publicado en docker-compose, por eso se fija por entorno y no
-# desde la interfaz: un puerto elegido allí no lo vería nadie desde la LAN.
-try:
-    PUERTO_HTTP_ALTERNATIVO = int(os.environ.get("CADDY_HTTP_PORT") or 5080)
-except ValueError:
-    PUERTO_HTTP_ALTERNATIVO = 5080
+# Por debajo de 1024 el contenedor necesitaría privilegios para escuchar.
+PUERTO_MIN = 1024
+PUERTO_MAX = 65535
 
 # Reintentos al arrancar, solo para la convergencia inicial. Suman 8 segundos en
 # el peor caso; el arranque de gunicorn tiene 120 s de margen.
 _REINTENTOS_ARRANQUE = 5
 _ESPERA_REINTENTO = 2
 
-# `httpAlternativo` encendido de fábrica: quien activa el HTTPS no debería poder
-# quedarse sin acceso por un certificado que deja de valer.
-_ESTADO_POR_DEFECTO = {"activado": False, "nombres": [], "actualizado": None, "httpAlternativo": True}
+# `puertoHttps` a None: no se ha elegido ninguno y vale el publicado.
+_ESTADO_POR_DEFECTO = {"activado": False, "nombres": [], "actualizado": None, "puertoHttps": None}
 
 
 # ── Estado ────────────────────────────────────────────────────────────────────
@@ -136,38 +139,91 @@ def leerEstado() -> dict:
         "activado": bool(datos.get("activado")),
         "nombres": [str(n) for n in datos.get("nombres", []) if str(n).strip()],
         "actualizado": datos.get("actualizado"),
-        # Un estado.json anterior a esta opción no la trae: se lee como
-        # encendida, igual que en una instalación nueva.
-        "httpAlternativo": bool(datos.get("httpAlternativo", True)),
+        # Un valor raro (editado a mano) se ignora: vale el puerto publicado.
+        "puertoHttps": _puertoValido(datos.get("puertoHttps")),
     }
 
 
-def guardarEstado(activado: bool, nombres: list[str], httpAlternativo: bool | None = None) -> dict:
-    """Guarda el estado del HTTPS de forma atómica.
+def _puertoValido(valor) -> int | None:
+    """El puerto como entero si está en rango, o None.
 
     Args:
-        activado: si el puerto principal sirve TLS.
-        nombres: direcciones que cubre el certificado.
-        httpAlternativo: si se mantiene el puerto en claro con el HTTPS
-            activo. `None` conserva lo que hubiera guardado, para que emitir o
-            desactivar no reinicien una preferencia que no han tocado.
+        valor: lo que haya en el JSON o llegue de la interfaz.
 
     Returns:
-        El estado tal y como ha quedado escrito.
+        El puerto, o None si no es un entero entre PUERTO_MIN y PUERTO_MAX.
     """
-    if httpAlternativo is None:
-        httpAlternativo = leerEstado()["httpAlternativo"]
-    estado = {
-        "activado": bool(activado),
-        "nombres": list(nombres),
-        "actualizado": datetime.now(UTC).isoformat(timespec="seconds"),
-        "httpAlternativo": bool(httpAlternativo),
-    }
+    if isinstance(valor, bool):
+        return None
+    try:
+        puerto = int(valor)
+    except (TypeError, ValueError):
+        return None
+    return puerto if PUERTO_MIN <= puerto <= PUERTO_MAX else None
+
+
+def _escribir(estado: dict) -> dict:
     # Escritura atómica: un corte de corriente a medias dejaría un JSON truncado,
     # y este fichero decide si las cookies salen con Secure. Temporal único por
     # proceso e hilo (core.escritura), no un `.json.tmp` fijo.
     escribirJsonAtomico(ESTADO_FILE, estado)
     return estado
+
+
+def guardarEstado(activado: bool, nombres: list[str]) -> dict:
+    """Guarda si el HTTPS está activo y para qué nombres, de forma atómica.
+
+    Conserva el puerto elegido: emitir, activar o desactivar no lo tocan.
+
+    Args:
+        activado: si Caddy sirve el HTTPS.
+        nombres: direcciones que cubre el certificado.
+
+    Returns:
+        El estado tal y como ha quedado escrito.
+    """
+    return _escribir({
+        "activado": bool(activado),
+        "nombres": list(nombres),
+        "actualizado": datetime.now(UTC).isoformat(timespec="seconds"),
+        "puertoHttps": leerEstado()["puertoHttps"],
+    })
+
+
+def guardarPuertoHttps(puerto: int) -> dict:
+    """Guarda el puerto elegido para el HTTPS.
+
+    No lo abre: lo publica docker-update.sh la próxima vez que se ejecute,
+    leyéndolo de estado.json. Hasta entonces sigue valiendo `PUERTO_HTTPS`.
+
+    Args:
+        puerto: el puerto pedido, ya validado por quien llama.
+
+    Returns:
+        El estado tal y como ha quedado escrito.
+    """
+    estado = leerEstado()
+    estado["puertoHttps"] = int(puerto)
+    estado["actualizado"] = datetime.now(UTC).isoformat(timespec="seconds")
+    return _escribir(estado)
+
+
+def puertoHttpsPedido() -> int:
+    """El puerto que se ha elegido para el HTTPS, o el publicado si no hay elección.
+
+    Returns:
+        El puerto que estará publicado tras el próximo docker-update.sh.
+    """
+    return leerEstado()["puertoHttps"] or PUERTO_HTTPS
+
+
+def puertoHttpsPendiente() -> bool:
+    """¿Se ha elegido un puerto que Docker todavía no publica?
+
+    Returns:
+        True hasta que docker-update.sh recree el proxy con el puerto nuevo.
+    """
+    return puertoHttpsPedido() != PUERTO_HTTPS
 
 
 def httpsActivo() -> bool:
@@ -181,21 +237,20 @@ def httpsActivo() -> bool:
     return settings.httpsActivado() or leerEstado()["activado"]
 
 
-def httpAlternativoActivo() -> bool:
-    """¿Hay, además del HTTPS, un puerto en claro sirviendo la aplicación?
+def conviveConHttp() -> bool:
+    """¿Se sirven a la vez HTTP (puerto principal) y HTTPS (`PUERTO_HTTPS`)?
 
-    Solo con el HTTPS gestionado desde Ajustes: con `HTTPS_ENABLED` en .env el
-    proxy es ajeno y este módulo no le añade puertos. Y solo con nombres, que es
-    cuando `construirCaddyfile` monta de verdad el TLS.
+    Es lo que pasa siempre con el HTTPS gestionado desde Ajustes y con nombres,
+    que es cuando `construirCaddyfile` monta de verdad el TLS. Con
+    `HTTPS_ENABLED` en .env el proxy es ajeno y solo hay HTTPS.
 
     Returns:
-        True si Caddy está sirviendo también `http://` en
-        `PUERTO_HTTP_ALTERNATIVO`.
+        True si el puerto principal sigue en claro junto al HTTPS.
     """
     if settings.httpsActivado():
         return False
     estado = leerEstado()
-    return estado["activado"] and bool(estado["nombres"]) and estado["httpAlternativo"]
+    return estado["activado"] and bool(estado["nombres"])
 
 
 # ── Nombres ───────────────────────────────────────────────────────────────────
@@ -332,7 +387,7 @@ def _sitioDePrueba(nombres: list[str]) -> str:
     está bien instalado ahí; si protesta, protestaría igual con el HTTPS puesto,
     y esto se ha averiguado sin haberlo puesto.
     """
-    sitios = ", ".join(f"https://{n}:{PUERTO_PREPARACION}" for n in nombres)
+    sitios = ", ".join(f"https://{n}:{PUERTO_HTTPS}" for n in nombres)
     return (
         f"{sitios} {{\n"
         "\ttls internal\n"
@@ -423,18 +478,7 @@ def _opcionesTlsGlobales(nombres: list[str]) -> str:
     return lineas
 
 
-def _sitioHttpAlternativo(proxy: str) -> str:
-    """Sitio en claro que sigue llevando a la aplicación con el HTTPS puesto.
-
-    El `http://` explícito es lo que impide que Caddy le aplique HTTPS
-    automático: sin él, con nombres declarados, intentaría servirlo cifrado.
-    """
-    return f"http://:{PUERTO_HTTP_ALTERNATIVO} {{\n" + proxy + "}\n\n"
-
-
-def construirCaddyfile(
-    activado: bool, nombres: list[str], preparando: bool = False, httpAlternativo: bool = False
-) -> str:
+def construirCaddyfile(activado: bool, nombres: list[str], preparando: bool = False) -> str:
     """Configuración completa de Caddy para el estado pedido.
 
     Se genera un Caddyfile y no el JSON nativo porque la API de admin sabe
@@ -444,13 +488,13 @@ def construirCaddyfile(
     `preparando` es el estado intermedio, el que existe para que el certificado
     se pueda instalar antes de que haga falta: el puerto de siempre sigue en
     claro —quien está mirando el panel no nota nada— y en paralelo se monta un
-    sitio TLS en un puerto interno con esos mismos nombres, solo para obligar a
-    Caddy a emitir el certificado y, con él, la CA que hay que instalar.
+    sitio TLS en el puerto del HTTPS con esos mismos nombres que solo sirve la
+    página de prueba: obliga a Caddy a emitir el certificado y, con él, la CA
+    que hay que instalar.
 
-    `httpAlternativo` solo cuenta con el HTTPS activo: añade un segundo puerto
-    en claro (`PUERTO_HTTP_ALTERNATIVO`) que lleva a la misma aplicación, para
-    no perder el acceso si el certificado deja de valer. Sin HTTPS, el puerto de
-    siempre ya va en claro y no hace falta otro.
+    Con el HTTPS activo, el puerto principal **sigue en claro** y el HTTPS va
+    aparte, en `PUERTO_HTTPS`. Así un certificado que deja de valer no deja a
+    nadie fuera: el puerto de siempre funciona igual que antes de activarlo.
     """
     puerto = settings.puerto()
     admin = """{
@@ -465,22 +509,23 @@ def construirCaddyfile(
         # disable_redirects: el redirector automático de Caddy escucha en el 80,
         # que aquí no se publica. Sin esto, el log se llena de avisos por un
         # puerto que nadie puede alcanzar.
-        sitios = ", ".join(f"https://{n}:{puerto}" for n in _conLocalhost(nombres))
+        sitios = ", ".join(f"https://{n}:{PUERTO_HTTPS}" for n in _conLocalhost(nombres))
         return (
             admin
             + "\tauto_https disable_redirects\n"
             + _opcionesTlsGlobales(nombres)
             + "}\n\n"
+            # El `http://` explícito impide que Caddy le aplique HTTPS
+            # automático: con nombres declarados intentaría cifrarlo.
+            + f"http://:{puerto} {{\n"
+            + proxy
+            + "}\n\n"
             + f"{sitios} {{\n"
             + "\ttls internal\n"
             + proxy
-            + "}\n\n"
-            # El sitio de comprobación se queda también con el HTTPS puesto: es
-            # por donde se averigua si un aparato nuevo se fía del certificado
-            # **sin** tener que arriesgarse a entrar por la puerta principal y
-            # descubrir que no, que es como se descubre ahora.
-            + _sitioDePrueba(_conLocalhost(nombres))
-            + (_sitioHttpAlternativo(proxy) if httpAlternativo else "")
+            + "}\n"
+            # Sin sitio de prueba aparte: va en el mismo puerto, y un aparato
+            # nuevo se comprueba contra la propia aplicación.
         )
 
     if preparando and nombres:
@@ -524,20 +569,14 @@ class ErrorCaddy(RuntimeError):
     """El proxy no ha aceptado la configuración, o no responde."""
 
 
-def aplicar(
-    activado: bool, nombres: list[str], preparando: bool = False, httpAlternativo: bool = False
-) -> None:
+def aplicar(activado: bool, nombres: list[str], preparando: bool = False) -> None:
     """Carga la configuración en Caddy. Lanza ErrorCaddy si no la acepta.
 
     Que Caddy valide antes de aplicar es lo que hace segura la activación desde
     la interfaz: si el Caddyfile generado no es válido, responde 400, no toca su
     configuración en marcha y el usuario sigue conectado como estaba.
-
-    `httpAlternativo` se pasa siempre de forma explícita y por defecto es False:
-    el sitio de comprobación y la preparación reaplican sin HTTPS, y ahí no debe
-    aparecer un puerto en claro extra.
     """
-    caddyfile = construirCaddyfile(activado, nombres, preparando, httpAlternativo)
+    caddyfile = construirCaddyfile(activado, nombres, preparando)
     try:
         _admin("/load", caddyfile.encode("utf-8"), "text/caddyfile")
     except urllib.error.HTTPError as e:
@@ -622,7 +661,8 @@ def preparar(nombres: list[str]) -> str:
     arreglarlo; queda saltarse un aviso de seguridad, o el SSH.
 
     Aquí se le pide a Caddy que emita exactamente los mismos certificados, pero
-    en un puerto interno que no está publicado. El puerto de siempre sigue en
+    en el puerto del HTTPS, que de momento solo sirve una página de prueba. El
+    puerto de siempre sigue en
     claro y la sesión no se entera. Lo que cambia es que a partir de este
     momento la CA existe y se puede instalar en cada aparato con calma.
 
@@ -662,31 +702,41 @@ def _hostDelProxy() -> str:
     return urllib.parse.urlsplit(CADDY_ADMIN).hostname or "caddy"
 
 
-def probarHttpAlternativo() -> dict:
-    """Comprueba si el puerto HTTP alternativo está abierto y lleva a la aplicación.
+def probarPuertoHttps() -> dict:
+    """Comprueba si el puerto del HTTPS está abierto y lleva a la aplicación.
 
-    Pide `/api/health` a Caddy por ese puerto, dentro de la red de Compose. Así
-    se distingue «no escucha nada» (lo normal con la opción o el HTTPS
-    apagados) de «responde, pero no es esta aplicación». Lo que no puede ver es
-    si Docker lo publica en el host: eso solo se sabe abriéndolo desde fuera.
+    Abre TLS contra Caddy por `PUERTO_HTTPS`, dentro de la red de Compose, y
+    pide `/api/health`. Se presenta como `localhost`, que va siempre en el
+    certificado, y se valida contra la CA del propio Caddy: es una prueba del
+    puerto, no de los nombres (eso lo hace `probar()`), pero sin desactivar la
+    verificación. Lo que no puede ver es si Docker lo publica en el host: eso
+    solo se sabe abriéndolo desde fuera.
 
     Returns:
-        `puerto`, `esperado` (si según el estado debería estar abierto),
-        `escucha`, `llegaALaApp` y `error` con el motivo si no escucha.
+        `puerto`, `puertoPedido`, `pendiente`, `esperado` (si según el estado
+        debería estar abierto), `escucha`, `llegaALaApp` y `error`.
     """
     salida = {
-        "puerto": PUERTO_HTTP_ALTERNATIVO,
-        "esperado": httpAlternativoActivo(),
+        "puerto": PUERTO_HTTPS,
+        "puertoPedido": puertoHttpsPedido(),
+        "pendiente": puertoHttpsPendiente(),
+        "esperado": conviveConHttp(),
         "escucha": False,
         "llegaALaApp": False,
         "error": None,
     }
-    conexion = http.client.HTTPConnection(_hostDelProxy(), PUERTO_HTTP_ALTERNATIVO, timeout=TIMEOUT_PRUEBA)
     try:
+        bruto = socket.create_connection((_hostDelProxy(), PUERTO_HTTPS), timeout=TIMEOUT_PRUEBA)
+    except OSError as e:
+        salida["error"] = str(e) or e.__class__.__name__
+        return salida
+
+    salida["escucha"] = True
+    conexion = http.client.HTTPConnection("localhost", PUERTO_HTTPS, timeout=TIMEOUT_PRUEBA)
+    try:
+        conexion.sock = _contextoDeConfianza().wrap_socket(bruto, server_hostname="localhost")
         conexion.request("GET", "/api/health")
-        respuesta = conexion.getresponse()
-        cuerpo = respuesta.read(4096)
-        salida["escucha"] = True
+        cuerpo = conexion.getresponse().read(4096)
         try:
             datos = json.loads(cuerpo)
         except ValueError:
@@ -694,14 +744,15 @@ def probarHttpAlternativo() -> dict:
         # `version` solo la manda /api/health de esta aplicación: un 200 de otra
         # cosa escuchando en el mismo puerto no cuenta.
         salida["llegaALaApp"] = isinstance(datos, dict) and "version" in datos
-    except OSError as e:
-        salida["error"] = str(e) or e.__class__.__name__
-    except http.client.HTTPException as e:
-        # Algo acepta la conexión pero no habla HTTP: escucha, pero no es Caddy.
-        salida["escucha"] = True
-        salida["error"] = f"Responde, pero no en HTTP: {e.__class__.__name__}"
+    except ErrorCaddy as e:
+        salida["error"] = str(e)
+    except ssl.SSLError as e:
+        salida["error"] = f"Escucha, pero el TLS no levanta: {e.reason or e}"
+    except (OSError, http.client.HTTPException) as e:
+        salida["error"] = f"Escucha, pero no responde como la aplicación: {e.__class__.__name__}"
     finally:
         conexion.close()
+        bruto.close()
     return salida
 
 
@@ -779,7 +830,7 @@ def sitioDePruebaLevantado() -> bool:
         cargada = _admin("/config/")
     except (OSError, ValueError):
         return False
-    return f":{PUERTO_PREPARACION}".encode() in cargada
+    return f":{PUERTO_HTTPS}".encode() in cargada
 
 
 def probar() -> dict:
@@ -825,7 +876,9 @@ def probar() -> dict:
         return salida
 
     if activo:
-        puerto = settings.puerto()
+        # Con el HTTPS de Ajustes va en su propio puerto; con el de .env, el
+        # proxy es ajeno y el TLS está en el principal.
+        puerto = settings.puerto() if settings.httpsActivado() else PUERTO_HTTPS
     else:
         if not estado["nombres"]:
             # No es un fallo: es que todavía no se ha emitido nada. Servir en
@@ -836,7 +889,7 @@ def probar() -> dict:
                 "el certificado» y vuelve a probar."
             )
             return salida
-        puerto = PUERTO_PREPARACION
+        puerto = PUERTO_HTTPS
         # El sitio de comprobación se cae al reiniciar la aplicación, porque al
         # arrancar se reaplica el estado guardado y ahí el HTTPS está apagado.
         # Volver a levantarlo es gratis y no toca el puerto por el que entras;
@@ -938,7 +991,7 @@ def converger() -> None:
     ultimo = None
     for intento in range(_REINTENTOS_ARRANQUE):
         try:
-            aplicar(estado["activado"], estado["nombres"], httpAlternativo=estado["httpAlternativo"])
+            aplicar(estado["activado"], estado["nombres"])
             break
         except ErrorCaddy as e:
             ultimo = e
@@ -950,7 +1003,13 @@ def converger() -> None:
 
     if estado["activado"]:
         log.info("[tls] HTTPS activo para %s", ", ".join(estado["nombres"]))
-        if httpAlternativoActivo():
-            log.info("[tls] HTTP sin cifrar también abierto en el puerto %d", PUERTO_HTTP_ALTERNATIVO)
+        log.info(
+            "[tls] HTTPS en el puerto %d; el %d sigue en claro", PUERTO_HTTPS, settings.puerto()
+        )
+        if puertoHttpsPendiente():
+            log.warning(
+                "[tls] Elegido el puerto %d para el HTTPS, pero Docker publica el %d: "
+                "ejecuta ./docker-update.sh para aplicarlo", puertoHttpsPedido(), PUERTO_HTTPS,
+            )
     else:
         log.info("[tls] HTTPS desactivado: el proxy sirve en claro")

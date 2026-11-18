@@ -25,6 +25,6 @@ RUN chmod +x /app/entrypoint.sh
 
 # Solo documentativo: el puerto real sale de [server] port en config.ini y lo
 # aplican entrypoint.sh (dentro) y docker-compose.yml (en el mapeo).
-EXPOSE 5050
+EXPOSE 5080
 
 ENTRYPOINT ["/app/entrypoint.sh"]

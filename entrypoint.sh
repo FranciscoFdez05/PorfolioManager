@@ -130,7 +130,7 @@ ajuste() {
     [ -n "$valor" ] && echo "$valor" || echo "$2"
 }
 
-PORT=$(ajuste server.port "${PORT:-5050}")
+PORT=$(ajuste server.port "${PORT:-5080}")
 WORKERS=$(ajuste gunicorn.workers 2)
 THREADS=$(ajuste gunicorn.threads 4)
 TIMEOUT=$(ajuste gunicorn.timeout 120)

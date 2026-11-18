@@ -7,7 +7,7 @@
 <h1 align="center">PorfolioManager</h1>
 
 <p align="center">
-  <a href="../CHANGELOG.md"><img src="https://img.shields.io/badge/versi%C3%B3n-5.6.0-blue" alt="Versión"></a>
+  <a href="../CHANGELOG.md"><img src="https://img.shields.io/badge/versi%C3%B3n-5.7.0-blue" alt="Versión"></a>
   <a href="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml"><img src="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB" alt="Python">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED" alt="Docker">
@@ -48,7 +48,7 @@ cd PorfolioManager
 ./docker-setup   # crea .env, genera SECRET_KEY, pide credenciales y puerto, levanta el stack
 ```
 
-El stack levanta la web, un servicio **worker** con la misma imagen para las tareas de fondo (copias automáticas, snapshots, Telegram y avisos de precios, wallets y monedas de Satoshi, para que nunca ocupen los hilos de gunicorn), el proxy Caddy y el vigilante de actualizaciones. Ejecútalo con tu usuario normal, sin `sudo`. La aplicación queda en `http://localhost:5050` (o `http://<IP_DEL_SERVIDOR>:5050` desde otro equipo de la red local). Los datos se guardan en `data/`, `logs/` y `API/`.
+El stack levanta la web, un servicio **worker** con la misma imagen para las tareas de fondo (copias automáticas, snapshots, Telegram y avisos de precios, wallets y monedas de Satoshi, para que nunca ocupen los hilos de gunicorn), el proxy Caddy y el vigilante de actualizaciones. Ejecútalo con tu usuario normal, sin `sudo`. La aplicación queda en `http://localhost:5080` (o `http://<IP_DEL_SERVIDOR>:5080` desde otro equipo de la red local). Los datos se guardan en `data/`, `logs/` y `API/`.
 
 > [!WARNING]
 > De serie la aplicación se sirve por HTTP plano, así que la contraseña y la cookie de sesión viajan sin cifrar. Antes de usarla desde otro dispositivo, activa HTTPS en **Ajustes › Seguridad › HTTPS**. Consulta [SECURITY.md](../SECURITY.md).
@@ -67,7 +67,7 @@ git clone https://github.com/FranciscoFdez05/PorfolioManager.git
 cd PorfolioManager
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python python/server.py   # http://localhost:5050
+python python/server.py   # http://localhost:5080
 ```
 
 ### Variables de entorno
@@ -83,13 +83,13 @@ Los secretos van en `.env` (copia `.env.example`; `./docker-setup` lo hace por t
 | `ETHERSCAN_API_KEY` | Clave de Etherscan v2 para leer wallets de Ethereum (BNB solo con un plan de pago de Etherscan); también se puede guardar desde la pantalla de wallets, desde **Editar** en un seguimiento o en **Ajustes › API** (es una sola: guardar otra la sustituye) | No | vacío |
 | `NODEREAL_API_KEY` | Clave de NodeReal, alternativa con plan gratuito para leer wallets de BNB Smart Chain; la API de BNB se elige en **Ajustes › API › Estado de las APIs**. También se puede guardar en **Ajustes › API** (es una sola: guardar otra la sustituye) | No | vacío |
 | `TZ` | Zona horaria del contenedor (logs y backups) | No | `Europe/Madrid` |
-| `PORT` | Puerto HTTP; sobrescribe `config.ini` | No | `5050` |
+| `PORT` | Puerto HTTP; sobrescribe `config.ini` | No | `5080` |
 | `PUID` / `PGID` | Usuario y grupo con los que escribe el contenedor (Linux) | No | Los fija `docker-setup` |
 
 ## 📋 Guía de uso 🕹️
 
 1. Ejecuta `docker-setup` y elige cómo crear la cuenta: **1** web (te da la dirección de `/setup` y un código de un solo uso), **2** terminal, **3** cerrar.
-2. Abre `http://localhost:5050` e inicia sesión.
+2. Abre `http://localhost:5080` e inicia sesión.
 3. Añade tus activos y operaciones. Sin claves de API, los precios se introducen a mano.
 4. Opcional, en **Ajustes**:
    - **API**: claves de Finnhub, EODHD o Alpha Vantage para cotizaciones automáticas.

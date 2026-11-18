@@ -26,7 +26,7 @@ services:
       # Sobrescribe el PORT de .env con el que exporta docker-up.sh
       # (leído de config.ini), para que el contenedor y el mapeo de
       # puertos de abajo nunca puedan desincronizarse.
-      - PORT=${PORT:-5050}
+      - PORT=${PORT:-5080}
       # En Docker SIEMPRE hay un proxy delante (el servicio caddy de abajo), así
       # que ProxyFix va activado aquí y no en config.ini: ese fichero lo comparte
       # la instalación sin Docker, donde no hay ningún proxy y confiar en las
@@ -35,16 +35,11 @@ services:
       # Dirección de la API de admin del proxy dentro de la red de Compose. Es
       # por donde Ajustes enciende y apaga el HTTPS.
       - CADDY_ADMIN_URL=http://caddy:2019
-      # Puerto donde el proxy emite el certificado antes de encender el HTTPS,
-      # para que dé tiempo a instalarlo sin que cambie el puerto por el que se
-      # está entrando. NO se publica abajo a propósito: solo existe dentro de
-      # esta red. Solo hay que tocarlo si choca con algo del despliegue.
-      - CADDY_PREP_PORT=${CADDY_PREP_PORT:-9443}
-      # Puerto en claro que se mantiene abierto con el HTTPS activo, para no
-      # perder el acceso si el certificado deja de valer. Se enciende y apaga
-      # desde Ajustes; el número va aquí porque tiene que coincidir con el que
-      # se publica abajo en el servicio caddy.
-      - CADDY_HTTP_PORT=${CADDY_HTTP_PORT:-5080}
+      # Puerto del HTTPS. El principal (PORT) sigue siempre en claro, para no
+      # perder el acceso si el certificado deja de valer. Se elige en Ajustes ›
+      # HTTPS; docker-update.sh lo lee de data/tls/estado.json y lo exporta
+      # aquí. Tiene que coincidir con el que se publica abajo en caddy.
+      - CADDY_HTTPS_PORT=${CADDY_HTTPS_PORT:-5443}
       # Dirección del servidor en la LAN, que calcula docker-up.sh en el host.
       # Dentro del contenedor solo se ve la red de Compose, así que sin esto el
       # panel de HTTPS no puede proponer la dirección por la que entran el móvil
@@ -77,7 +72,7 @@ services:
     # puerta en claro por la que saltarse el TLS escribiendo el puerto en la
     # barra, con lo que tener el proxy delante no serviría de nada.
     expose:
-      - "${PORT:-5050}"
+      - "${PORT:-5080}"
     volumes:
       # El config.ini del host, no la copia que quedó dentro de la imagen al
       # construirla. Sin este montaje, editar el fichero no hacía nada hasta la
@@ -118,7 +113,7 @@ services:
       # disco, así que respondía 200 con la base de datos corrupta o sin montar.
       # Este endpoint ejecuta una consulta contra la BD activa y devuelve 503 si
       # falla, que es lo que hace que Docker marque el contenedor como enfermo.
-      test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT', '5050') + '/api/health')\" || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT', '5080') + '/api/health')\" || exit 1"]
       interval: ${HEALTHCHECK_INTERVAL:-30s}
       timeout: ${HEALTHCHECK_TIMEOUT:-10s}
       retries: ${HEALTHCHECK_RETRIES:-3}
@@ -206,24 +201,16 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
-      # El MISMO puerto de siempre. Activar el HTTPS no mueve la dirección: solo
-      # cambia el esquema, de http:// a https://.
-      - "${PORT:-5050}:${PORT:-5050}"
-      # El puerto de comprobación del certificado. Sirve UNA página fija por
-      # HTTPS con el mismo certificado que el puerto de arriba, y no hace
-      # reverse_proxy a nada: no es una segunda entrada a la aplicación. Se
-      # publica porque la pregunta que contesta —«¿se fía este móvil del
-      # certificado?»— solo la puede contestar el móvil, abriéndolo. Sin
-      # publicarlo, lo único que puede probarlo es el propio servidor, y eso ya
-      # se sabía antes de mirar.
-      - "${CADDY_PREP_PORT:-9443}:${CADDY_PREP_PORT:-9443}"
-      # El acceso por HTTP que convive con el HTTPS (Ajustes › HTTPS ›
-      # «Mantener también el acceso por HTTP»). Publicado siempre, pero Caddy
-      # solo escucha en él con el HTTPS activo y la opción encendida: el resto
-      # del tiempo la conexión se rechaza.
-      - "${CADDY_HTTP_PORT:-5080}:${CADDY_HTTP_PORT:-5080}"
+      # El puerto de siempre, en http://. Sigue en claro también con el HTTPS
+      # activo: si el certificado deja de valer, por aquí se sigue entrando.
+      - "${PORT:-5080}:${PORT:-5080}"
+      # El HTTPS, en su propio puerto (Ajustes › HTTPS). Antes de activarlo
+      # sirve solo una página fija con el certificado ya emitido, para
+      # comprobar desde cada aparato que se fía de él; al activarlo, la
+      # aplicación. Con el HTTPS sin preparar, la conexión se rechaza.
+      - "${CADDY_HTTPS_PORT:-5443}:${CADDY_HTTPS_PORT:-5443}"
     environment:
-      - PORT=${PORT:-5050}
+      - PORT=${PORT:-5080}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # La CA interna y los certificados emitidos. Con un volumen anónimo, cada
@@ -246,7 +233,7 @@ services:
       # certificate porque el certificado lo firma la CA interna de Caddy, que
       # no está en el almacén del contenedor: aquí se comprueba que el proxy
       # contesta y que el TLS levanta, no a quién pertenece el certificado.
-      test: ["CMD-SHELL", "wget -q --spider --no-check-certificate https://127.0.0.1:${PORT:-5050}/api/health || wget -q --spider http://127.0.0.1:${PORT:-5050}/api/health"]
+      test: ["CMD-SHELL", "wget -q --spider --no-check-certificate https://127.0.0.1:${PORT:-5080}/api/health || wget -q --spider http://127.0.0.1:${PORT:-5080}/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -276,12 +263,12 @@ services:
     entrypoint: ["python", "/app/python/vigilante.py"]
     env_file: .env
     environment:
-      - PORT=${PORT:-5050}
+      - PORT=${PORT:-5080}
       - PORTFOLIO_DATA_DIR=/app/data
       - PORTFOLIO_LOGS_DIR=/app/logs
       - PORTFOLIO_API_DIR=/app/API
       # El worker no atiende HTTP: se le vigila por el latido que escribe en data/tmp.
-      - VIGILANTE_URL=La aplicación=https://caddy:${PORT:-5050}/api/health|http://caddy:${PORT:-5050}/api/health,El worker=latido:/app/data/tmp/worker.latido
+      - VIGILANTE_URL=La aplicación=https://caddy:${PORT:-5080}/api/health|http://caddy:${PORT:-5080}/api/health,El worker=latido:/app/data/tmp/worker.latido
     volumes:
       - ./config.ini:/app/config.ini:ro
       # Solo lo que necesita: el token de Telegram (cifrado) y los ajustes de

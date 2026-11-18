@@ -162,8 +162,8 @@ def vaciarCacheGzip():
 CSRF_COOKIE = "csrf_token"
 CSRF_HEADER = "X-CSRF-Token"
 
-# Con el HTTPS activo y el puerto HTTP alternativo abierto, las cookies que se
-# emiten por ese puerto llevan este sufijo. Las cookies no distinguen puertos, y
+# Con el HTTPS activo, las cookies que se emiten por el puerto principal (que
+# sigue en claro) llevan este sufijo. Las cookies no distinguen puertos, y
 # Chromium no deja que un origen en claro sobrescriba una cookie `Secure` con el
 # mismo nombre: sin nombre propio, el login por HTTP fallaría en silencio en
 # cualquier navegador que hubiera entrado antes por HTTPS. js/core/csrf.js
@@ -171,29 +171,32 @@ CSRF_HEADER = "X-CSRF-Token"
 SUFIJO_COOKIE_HTTP = "_http"
 
 
-def porHttpAlternativo() -> bool:
-    """¿Llega esta petición por el puerto en claro que convive con el HTTPS?
+def porHttpConHttps() -> bool:
+    """¿Llega esta petición en claro mientras el HTTPS está activo?
 
     Se decide con `request.is_secure`, que con Caddy delante sale de
     X-Forwarded-Proto (ProxyFix). Caddy la fija él mismo en cada petición y no
     deja pasar la que mande el cliente, así que no se puede falsificar.
 
     Returns:
-        True solo si hay contexto de petición, el HTTPS está activo con el
-        puerto alternativo abierto y esta petición no viene cifrada.
+        True solo si hay contexto de petición, el HTTPS de Ajustes está activo
+        (con el puerto principal en claro a su lado) y esta petición no viene
+        cifrada.
     """
-    return has_request_context() and not request.is_secure and tls.httpAlternativoActivo()
+    return has_request_context() and not request.is_secure and tls.conviveConHttp()
 
 
 def cookieSegura() -> bool:
     """¿Las cookies de esta respuesta deben llevar `Secure`?
 
     Returns:
-        True con el HTTPS activo, salvo por el puerto en claro alternativo,
-        donde una cookie `Secure` el navegador la descartaría y no se podría
-        iniciar sesión.
+        True con el HTTPS activo, salvo por el puerto en claro, donde una
+        cookie `Secure` el navegador la descartaría y no se podría iniciar
+        sesión.
     """
-    return tls.httpsActivo() and not porHttpAlternativo()
+    return tls.httpsActivo() and not porHttpConHttps()
+
+
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
 # POST que en realidad solo leen del proveedor de cotizaciones y refrescan un
@@ -285,12 +288,13 @@ def _origenesDeComprobacion() -> tuple[str, ...]:
     Va en `connect-src` porque, si no, la comprobación la bloquea la propia CSP
     y el navegador no dice por qué: parecería que el certificado falla cuando lo
     que ha fallado es la política. Se arma con el host de esta misma petición
-    —no se abre a nadie más— y con el puerto que sirve una página fija.
+    —no se abre a nadie más— y con el puerto del HTTPS, que antes de
+    activarlo solo sirve una página fija.
     """
     host = (request.host or "").split(":")[0]
     if not host:
         return ()
-    return (f"https://{host}:{tls.PUERTO_PREPARACION}",)
+    return (f"https://{host}:{tls.PUERTO_HTTPS}",)
 
 
 def instalar(app, *, limiteEscrituras=None, limitePesadas=None):
@@ -444,7 +448,7 @@ def instalar(app, *, limiteEscrituras=None, limitePesadas=None):
     @app.after_request
     def setCsrfCookie(response):
         if session.get("logged_in"):
-            porHttp = porHttpAlternativo()
+            porHttp = porHttpConHttps()
             response.set_cookie(
                 CSRF_COOKIE + SUFIJO_COOKIE_HTTP if porHttp else CSRF_COOKIE,
                 tokenCsrfActual(),
@@ -453,10 +457,12 @@ def instalar(app, *, limiteEscrituras=None, limitePesadas=None):
                 # Mismo criterio que la cookie de sesión (_SesionConSecureDinamico).
                 secure=cookieSegura(),
             )
-            # Una cookie con sufijo de cuando el puerto alternativo estaba
-            # abierto llevaría un token viejo, y por HTTP el JS la prefiere a
-            # la normal: se borra en cuanto deja de ser la vigente.
-            if not porHttp and CSRF_COOKIE + SUFIJO_COOKIE_HTTP in request.cookies:
+            # Una cookie con sufijo de cuando el HTTPS estaba activo llevaría
+            # un token viejo, y por HTTP el JS la prefiere a la normal: se
+            # borra al volver a solo HTTP. Con el HTTPS activo no se toca: el
+            # navegador la manda también por https://, y borrarla ahí dejaría
+            # sin token a la pestaña abierta por el puerto en claro.
+            if not tls.conviveConHttp() and CSRF_COOKIE + SUFIJO_COOKIE_HTTP in request.cookies:
                 response.delete_cookie(CSRF_COOKIE + SUFIJO_COOKIE_HTTP)
         return response
 
@@ -468,11 +474,11 @@ def instalar(app, *, limiteEscrituras=None, limitePesadas=None):
         # Ninguna pantalla necesita cámara, micrófono ni geolocalización:
         # cerrarlas evita que un script inyectado pueda siquiera pedir permiso.
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=(), payment=()"
-        # Con el puerto HTTP alternativo abierto no se manda HSTS: la cabecera
-        # vale para el host entero, sin mirar el puerto, y por nombre de host
-        # el navegador convertiría ese http:// en https:// y lo dejaría
-        # inservible justo cuando hace falta.
-        if tls.httpsActivo() and not tls.httpAlternativoActivo():
+        # Con el HTTPS de Ajustes no se manda HSTS: el puerto principal sigue
+        # en claro, la cabecera vale para el host entero sin mirar el puerto,
+        # y por nombre de host el navegador convertiría ese http:// en https://
+        # y lo dejaría inservible justo cuando hace falta.
+        if tls.httpsActivo() and not tls.conviveConHttp():
             # Sin HSTS, tener HTTPS delante no impide que la primera visita
             # («escribo la dirección en la barra») salga por HTTP y sea
             # interceptable antes de la redirección del proxy. Con la cabecera,
@@ -596,14 +602,14 @@ def aplicarProxyInverso(app) -> int:
 class _SesionConSecureDinamico(SecureCookieSessionInterface):
     """La cookie de sesión lleva Secure según el estado del HTTPS en cada momento.
 
-    Por el puerto HTTP alternativo la cookie cambia también de nombre (ver
+    Por el puerto en claro con el HTTPS activo la cookie cambia también de nombre (ver
     `SUFIJO_COOKIE_HTTP`): es una sesión aparte de la del HTTPS, y la cookie
     cifrada nunca viaja por el puerto en claro.
     """
 
     def get_cookie_name(self, app) -> str:
         nombre = super().get_cookie_name(app)
-        return nombre + SUFIJO_COOKIE_HTTP if porHttpAlternativo() else nombre
+        return nombre + SUFIJO_COOKIE_HTTP if porHttpConHttps() else nombre
 
     def get_cookie_secure(self, app) -> bool:
         return cookieSegura()

@@ -30,7 +30,7 @@ Cómo se usa cada parte de la aplicación. La instalación y la configuración d
 ## Primeros pasos
 
 1. **Crea la cuenta.** En el primer arranque `docker-setup` pregunta cómo: **1** desde la web, **2** desde la terminal, **3** cerrar (si te equivocas, vuelve a preguntar). Con la opción web imprime la dirección de `/setup` y un código de un solo uso, que también queda en `data/tmp/alta-inicial.txt` y en el log del contenedor, para que nadie más de la red se quede con la cuenta antes que tú.
-2. **Entra** en `http://localhost:5050` con esas credenciales.
+2. **Entra** en `http://localhost:5080` con esas credenciales.
 3. **Añade activos y operaciones.** Sin claves de API, los precios se introducen a mano.
 4. **Cotizaciones automáticas (opcional):** claves de Finnhub, EODHD o Alpha Vantage en **Ajustes › API**.
 5. **HTTPS:** actívalo en **Ajustes › Seguridad › HTTPS** si entras desde otros dispositivos.

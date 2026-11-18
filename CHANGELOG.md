@@ -22,6 +22,62 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.7.0] — 2026-11-18
+
+Se perfecciona el HTTPS: va en su propio puerto y el de siempre sigue en HTTP,
+así que un certificado que deja de valer ya no deja a nadie fuera.
+
+**Esquema de base de datos:** no lo toca (sigue en el **41**).
+
+**Al actualizar:** `./docker-update.sh` pasa el puerto principal del 5050 al
+5080 y publica el del HTTPS (5443). Cambian las direcciones: actualiza los
+marcadores y vuelve a descargar el Atajo de iOS desde Ajustes › API.
+
+### Añadido
+
+- **HTTPS en su propio puerto; el de siempre sigue en HTTP.** Activar el HTTPS
+  ya no convierte el puerto principal en `https://`: el HTTPS va aparte, en el
+  **5443** de fábrica, y el principal sigue en claro, así que un certificado
+  que deja de valer no deja a nadie fuera. El puerto del HTTPS se elige en
+  Ajustes › HTTPS (`POST /api/tls/puerto`) y se publica al ejecutar
+  `./docker-update.sh`, que lo lee de `data/tls/estado.json`
+  (`CADDY_HTTPS_PORT`); hasta entonces el panel avisa de que está pendiente. Si
+  otro servicio del servidor ya usa ese puerto, los scripts buscan el siguiente
+  libre y lo avisan. «Probar el puerto» comprueba desde el servidor si escucha
+  y lleva a la aplicación (`GET /api/tls/puerto/prueba`), y un enlace lo abre
+  desde el aparato. Por el puerto en claro con el HTTPS activo la sesión es
+  aparte (cookies con sufijo `_http`, sin `Secure`); las del HTTPS siguen
+  `Secure`. Con el HTTPS de Ajustes ya no se manda HSTS, que rompería el puerto
+  en claro al entrar por nombre.
+- **HTTPS: la comprobación del certificado va en el mismo puerto del HTTPS.**
+  Desaparece el 9443 (`CADDY_PREP_PORT`): antes de activar, el puerto del HTTPS
+  sirve solo la página de prueba, y después la aplicación. «Comprobar en este
+  aparato» pide en modo `no-cors`, que vale para las dos.
+
+### Cambiado
+
+- **Puerto principal por defecto: 5080 en vez de 5050.** `docker-update.sh`
+  migra una sola vez el `PORT=5050` del `.env` al 5080, salvo que otro servicio
+  del servidor ya lo use (entonces avisa y lo deja). Para volver al 5050, pon
+  `PORT=5050` en el `.env`: no se vuelve a migrar. **Al actualizar:** cambian
+  las direcciones (`http://IP:5080`, y con HTTPS `https://IP:5443`); actualiza
+  los marcadores y vuelve a descargar el Atajo de iOS desde Ajustes › API.
+- **HTTPS: «Descargar certificado» no descarga hasta haberlo emitido.** Una CA
+  de un intento anterior se podía instalar sin certificado para tus
+  direcciones; ahora el botón sale apagado y, al pulsarlo, pide emitirlo.
+- **HTTPS: «caduca en 0 días» ya no asusta.** Caddy emite certificados de horas
+  y los renueva solo; el panel lo dice así en vez de contar días.
+
+### Corregido
+
+- **HTTPS: «Emitir el certificado» desaparecía con la CA ya creada.** Si la raíz
+  de Caddy existía de un intento anterior pero no había nombres guardados, el
+  panel escondía «Emitir» y ofrecía comprobar y activar; la comprobación pedía
+  pulsar un botón que no estaba y el puerto 9443 rechazaba la conexión. Ahora
+  «Emitir» sale mientras no haya un certificado emitido para algún nombre.
+
+---
+
 ## [5.6.0] — 2026-11-17
 
 **Esquema de base de datos:** no lo toca (sigue en el **41**).
@@ -83,15 +139,6 @@ decide cómo se deshace la actualización:
   de pantallas sigue en español. Ajuste global nuevo `idioma` (`es`/`en`) en
   `/api/settings`. Los textos están en `js/locales/` y el idioma de respaldo es
   el español.
-- **HTTPS: acceso por HTTP de rescate.** Con el HTTPS activo, la aplicación
-  sigue respondiendo sin cifrar en otro puerto (5080, `CADDY_HTTP_PORT`), para
-  no perder el acceso si el certificado deja de valer. Se enciende y apaga en
-  Ajustes › HTTPS y viene encendido. Por ese puerto las cookies llevan sufijo
-  `_http` y no van `Secure`; las del HTTPS no cambian. Mientras está abierto no
-  se manda HSTS. «Probar el puerto» comprueba desde el servidor si está abierto
-  y lleva a la aplicación (`GET /api/tls/http-alternativo/prueba`), y un enlace
-  lo abre desde el aparato. Hay que publicar el puerto nuevo: `./docker-update.sh` recrea
-  el contenedor de Caddy con él.
 
 ### Corregido
 
@@ -124,11 +171,6 @@ decide cómo se deshace la actualización:
   confianza», en vez del asistente, que lo dejaba en *Personal*. Y avisa de
   que hay que cerrar el navegador del todo tras instalarlo: Chromium no ve la
   CA nueva hasta reiniciarse y la comprobación seguía fallando.
-- **HTTPS: «Emitir el certificado» desaparecía con la CA ya creada.** Si la raíz
-  de Caddy existía de un intento anterior pero no había nombres guardados, el
-  panel escondía «Emitir» y ofrecía comprobar y activar; la comprobación pedía
-  pulsar un botón que no estaba y el puerto 9443 rechazaba la conexión. Ahora
-  «Emitir» sale mientras no haya un certificado emitido para algún nombre.
 
 ---
 

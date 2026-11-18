@@ -72,14 +72,14 @@ No hace falta tener Python instalado en el servidor: si no lo encuentra, usa la 
 
 | Acceso | URL |
 |---|---|
-| Misma máquina | `http://localhost:5050` |
-| Red local | `http://<IP_DEL_SERVIDOR>:5050` |
+| Misma máquina | `http://localhost:5080` |
+| Red local | `http://<IP_DEL_SERVIDOR>:5080` |
 
-El contenedor publica el puerto en todas las interfaces del host, así que cualquier dispositivo de la misma red llega poniendo la IP del servidor y el puerto. Si no responde desde otro equipo, casi siempre es el firewall del host: hay que abrir ese puerto (por ejemplo `sudo ufw allow 5050/tcp`).
+El contenedor publica el puerto en todas las interfaces del host, así que cualquier dispositivo de la misma red llega poniendo la IP del servidor y el puerto. Si no responde desde otro equipo, casi siempre es el firewall del host: hay que abrir ese puerto (por ejemplo `sudo ufw allow 5080/tcp`).
 
-> **Eso es HTTP plano.** La contraseña del login y la cookie de sesión viajan en claro por la red, así que cualquiera con acceso a la misma wifi puede leerlas. Para la máquina local da igual; en cuanto entres desde el móvil o desde otro equipo, activa [HTTPS](#https) desde Ajustes › Seguridad › HTTPS — emites el certificado, lo instalas en el aparato y lo enciendes; la dirección no cambia.
+> **Eso es HTTP plano.** La contraseña del login y la cookie de sesión viajan en claro por la red, así que cualquiera con acceso a la misma wifi puede leerlas. Para la máquina local da igual; en cuanto entres desde el móvil o desde otro equipo, activa [HTTPS](#https) desde Ajustes › Seguridad › HTTPS — emites el certificado, lo instalas en el aparato y lo enciendes; el HTTPS va en su propio puerto (5443) y el de siempre sigue en claro.
 
-El puerto por defecto es `5050`. `docker-setup` lo pregunta en cada arranque —Enter deja el que ya hay— y guarda en `.env` el que elijas, así que también puedes ponerlo ahí a mano (ver [Configuración](#configuración)). El valor de partida se resuelve con la misma capa que usa la aplicación —`.env`, luego `config.ini`, luego el defecto— y se exporta antes de levantar el stack, de modo que `docker-compose.yml`, `entrypoint.sh` y el healthcheck no puedan desincronizarse. `docker-update.sh` respeta lo que haya en `.env`, para que actualizar no te cambie el puerto.
+El puerto por defecto es `5080`. `docker-setup` lo pregunta en cada arranque —Enter deja el que ya hay— y guarda en `.env` el que elijas, así que también puedes ponerlo ahí a mano (ver [Configuración](#configuración)). El valor de partida se resuelve con la misma capa que usa la aplicación —`.env`, luego `config.ini`, luego el defecto— y se exporta antes de levantar el stack, de modo que `docker-compose.yml`, `entrypoint.sh` y el healthcheck no puedan desincronizarse. `docker-update.sh` respeta lo que haya en `.env`, para que actualizar no te cambie el puerto.
 
 ```bash
 # Ver logs en tiempo real
@@ -150,7 +150,7 @@ pip install -r requirements.txt
 python python/server.py
 ```
 
-Abre `http://localhost:5050`.
+Abre `http://localhost:5080`.
 
 ---
 
@@ -281,7 +281,7 @@ cd PorfolioManager
 ### Qué versión estoy corriendo
 
 ```bash
-curl -s http://localhost:5050/api/health
+curl -s http://localhost:5080/api/health
 ```
 
 ```json
@@ -454,7 +454,7 @@ El primer rango es tu LAN; el segundo, el de WireGuard — ajústalo al `Address
 
 ### 3. Averiguar la dirección del servidor
 
-El Atajo necesita una IP y un puerto. El puerto es el de `[server] port` (5050 por defecto).
+El Atajo necesita una IP y un puerto. El puerto es el de `[server] port` (5080 por defecto).
 
 ```bash
 # En el servidor (Linux / Banana Pi)
@@ -476,7 +476,7 @@ De ahí salen dos direcciones: la de la LAN (`192.168.1.X`) y la del túnel (`10
 Con el móvil en la misma Wi-Fi (o con WireGuard conectado), abre en Safari:
 
 ```
-http://192.168.1.X:5050/api/categorias
+http://192.168.1.X:5080/api/categorias
 ```
 
 | Lo que ves | Qué significa |
@@ -1019,19 +1019,19 @@ El orden de registro importa:
 
 La aplicación habla HTTP y no termina TLS ella misma. Sin nada delante, el `POST /login` lleva la contraseña en el cuerpo y la respuesta devuelve la cookie de sesión, las dos cosas en texto plano: quien comparta la wifi, el switch o el punto de acceso puede leerlas y entrar. No es un riesgo teórico, es leer un paquete.
 
-**Se activa desde la propia aplicación: Ajustes › Seguridad › HTTPS.** No hay que reiniciar nada ni tocar ningún fichero, y **la dirección no cambia**: `http://192.168.1.50:5050` pasa a ser `https://192.168.1.50:5050`.
+**Se activa desde la propia aplicación: Ajustes › Seguridad › HTTPS.** No hay que reiniciar nada ni tocar ningún fichero. El HTTPS va en **su propio puerto** (5443 de fábrica): `https://192.168.1.50:5443`. El de siempre, `http://192.168.1.50:5080`, **sigue funcionando en claro**, así que un certificado que deja de valer no deja a nadie fuera.
 
 1. **Repasa la lista de nombres.** Llega rellena con la dirección por la que has entrado y con la IP del servidor en la red local: esa la calcula `docker-up.sh` en el host y se la pasa al contenedor, porque desde dentro solo se ve la red de Compose. Añade cualquier otra con la que entres —otro nombre DNS, la IP del túnel—, porque **el certificado solo vale para las que estén escritas**.
 2. **Pulsa *Emitir el certificado*.** Se emite, y **no cambia nada todavía**: sigues entrando por la misma dirección y en claro. Lo único que pasa es que a partir de ahí la CA existe y se puede descargar.
 3. **Instálalo en cada aparato desde el que entres**, con las instrucciones que trae el propio panel para iOS, Android, Windows, macOS y Firefox. Este paso va **antes** de encender el HTTPS a propósito, y es el orden lo que arregla la trampa: con el TLS ya puesto, un aparato sin la CA se encuentra el aviso del navegador justo delante de la página desde la que tendría que descargarla.
 4. **Compruébalo, con el HTTPS todavía apagado.** Son dos preguntas distintas y hay un botón para cada una:
    - ***Probar desde el servidor*** abre una conexión TLS por cada nombre declarado y valida el certificado contra esa misma CA: dice cuál no está cubierto y cuántos días le quedan al que caduca antes.
-   - ***Comprobar en este aparato*** lo hace el propio panel: le pide al navegador que tienes delante `https://<tu-servidor>:9443`, una página fija servida con **ese mismo certificado**. Si el navegador la valida, la CA está bien instalada aquí y el HTTPS va a funcionar; si no se fía, la petición falla y el panel lo dice, con el HTTPS todavía apagado. Repítelo desde cada aparato: abre el panel en el móvil y púlsalo allí.
-5. **Y entonces sí, *Activar HTTPS*.** El botón se habilita cuando la comprobación de este aparato ha salido bien —si no ha podido hacerse, hay una casilla para confirmarlo a mano—. El puerto pasa a hablar solo TLS y la página se recarga sola en `https://`.
+   - ***Comprobar en este aparato*** lo hace el propio panel: le pide al navegador que tienes delante `https://<tu-servidor>:5443`, el puerto del HTTPS, que antes de activarlo sirve solo una página fija con **ese mismo certificado**. Si el navegador la valida, la CA está bien instalada aquí y el HTTPS va a funcionar; si no se fía, la petición falla y el panel lo dice, con el HTTPS todavía apagado. Repítelo desde cada aparato: abre el panel en el móvil y púlsalo allí.
+5. **Y entonces sí, *Activar HTTPS*.** El botón se habilita cuando la comprobación de este aparato ha salido bien —si no ha podido hacerse, hay una casilla para confirmarlo a mano—. Se abre el HTTPS en su puerto y la página se recarga sola en `https://IP:5443`.
 
 El paso 4 existe porque **instalar un certificado parece que ha ido bien aunque no haya ido**. Windows dice «La importación se completó correctamente» aunque lo hayas dejado en el almacén *Personal*, que no sirve para confiar en nada; iOS lo instala pero no se fía hasta que activas el interruptor de Ajustes de confianza; y Firefox ni mira el almacén del sistema. Sin comprobarlo, todo eso se descubre al encender el HTTPS, o sea desde el otro lado del aviso.
 
-Emitir y encender eran la misma pulsación, y en ese orden no puede salir bien: cuando volvía la respuesta, el puerto ya solo hablaba TLS con un certificado que ningún aparato reconocía, así que el navegador cortaba y dejaba fuera **antes** de haber podido descargar lo que habría dejado entrar. Para no tocar el puerto por el que estás entrando, el certificado se emite en un puerto aparte (9443 por defecto, `CADDY_PREP_PORT`), que después se queda como puerto de comprobación.
+Emitir y encender eran la misma pulsación, y en ese orden no puede salir bien: cuando volvía la respuesta, el puerto ya solo hablaba TLS con un certificado que ningún aparato reconocía, así que el navegador cortaba y dejaba fuera **antes** de haber podido descargar lo que habría dejado entrar. Para no tocar el puerto por el que estás entrando, el certificado se emite en el puerto del HTTPS (5443 por defecto), que hasta activarlo solo sirve la página de comprobación.
 
 #### Cómo está montado, y por qué así
 
@@ -1046,32 +1046,32 @@ Activar el HTTPS es la aplicación mandándole a Caddy una configuración nueva 
                                        └─ emite el certificado en un puerto interno,
                                           y con él crea la CA que vas a instalar
 
-2. Activar ──POST :2019/load──> Caddy ─┬─ el puerto pasa a hablar solo TLS
-                                       └─ con el mismo certificado, ya instalado
+2. Activar ──POST :2019/load──> Caddy ─┬─ abre el HTTPS en su puerto (5443)
+                                       ├─ con el mismo certificado, ya instalado
+                                       └─ el puerto de siempre sigue en claro
 ```
 
-#### El puerto de comprobación
+#### La comprobación, en el mismo puerto del HTTPS
 
-El puerto de la primera pulsación (9443 por defecto, `CADDY_PREP_PORT`) no desaparece después: se queda como **puerto de comprobación**, y está publicado.
+No hay un puerto aparte para comprobar el certificado: se usa el del HTTPS (5443 por defecto).
 
-Sirve **una página fija** por HTTPS con el mismo certificado que el puerto principal, y **no hace `reverse_proxy` a nada**: no es una segunda entrada a la aplicación, no lleva sesión y lo único que contesta es que el certificado funciona.
+- **Antes de activar**, ese puerto sirve **una página fija** con el certificado ya emitido, y **no hace `reverse_proxy` a nada**: no es una entrada a la aplicación, no lleva sesión y lo único que contesta es que el certificado funciona.
+- **Con el HTTPS activado**, ese mismo puerto sirve la aplicación, y un aparato nuevo se comprueba contra ella. Como el puerto principal sigue en claro, comprobar no arriesga la entrada.
 
-Está publicado porque la pregunta que contesta solo la puede contestar el aparato que la hace —*¿se fía este móvil de la CA que acabo de instalar?*—, y eso el servidor no lo sabe. Sin publicarlo, lo único capaz de probar el certificado sería la propia máquina que lo emitió, que es justo la que no hace falta comprobar.
+El panel lo pide con `fetch` en modo `no-cors`: la respuesta llega opaca, pero solo llega si el navegador ha aceptado el certificado, que es lo único que se quiere saber. Está publicado porque esa pregunta —*¿se fía este móvil de la CA que acabo de instalar?*— solo la puede contestar el aparato que la hace.
 
-Con el HTTPS ya activado sigue en pie, y ahí gana el otro uso: un aparato nuevo instala la CA y se comprueba en `:9443` **sin** arriesgarse a que la puerta principal lo rechace y lo deje fuera.
+#### Dos puertos: HTTP siempre, HTTPS aparte
 
-#### El acceso por HTTP de rescate
+Con el HTTPS activo, el puerto principal (`PORT`, 5080 de fábrica) **sigue sirviendo en claro** y el HTTPS va en **su propio puerto** (`CADDY_HTTPS_PORT`, 5443 de fábrica). Si el certificado deja de valer —se pierde el volumen de Caddy y con él la CA, o un aparato deja de fiarse—, por `http://<ip>:5080` se sigue entrando como siempre para arreglarlo o desactivar el HTTPS.
 
-Con el HTTPS activo, la aplicación sigue respondiendo **sin cifrar en otro puerto** (5080 por defecto, `CADDY_HTTP_PORT` en `.env`). Si el certificado deja de valer —se pierde el volumen de Caddy y con él la CA, o un aparato deja de fiarse—, por `http://<ip>:5080` se sigue llegando a Ajustes para arreglarlo o desactivar el HTTPS. El puerto principal no cambia: sigue siendo solo `https://`.
+- **El puerto del HTTPS se elige** en Ajustes › HTTPS › «Puerto del HTTPS». Se guarda en `data/tls/estado.json`, y **lo publica `./docker-update.sh`** la próxima vez que se ejecute: Docker solo abre puertos al crear el contenedor, y recrearlo desde la aplicación exigiría el socket de Docker. Hasta entonces el panel dice que el cambio está pendiente y sigue valiendo el publicado. Lo elegido en el panel gana a `CADDY_HTTPS_PORT` del `.env`. No puede ser el principal ni el de comprobación.
+- **Probar el puerto** abre TLS contra Caddy por ese puerto desde el servidor, valida el certificado con la CA (presentándose como `localhost`, que va siempre en él) y pide `/api/health`: dice si escucha y lleva a la aplicación, si está cerrado (lo esperado con el HTTPS apagado) o si escucha otra cosa. Que Docker lo publique en el host solo se ve desde fuera: para eso está el enlace «Abrir en una pestaña».
+- **Por el puerto en claro la contraseña y la cookie viajan sin cifrar.** Para el día a día, entra por `https://`.
+- **Son dos sesiones.** Con el HTTPS activo, las cookies del puerto en claro llevan el sufijo `_http` y no van `Secure`; las del HTTPS sí van `Secure` y no viajan nunca en claro. Sin nombre propio no se podría iniciar sesión por HTTP en un navegador que hubiera entrado antes por HTTPS: Chromium no deja que un origen en claro pise una cookie `Secure`.
+- **Sin HSTS.** La cabecera vale para el host entero, sin mirar el puerto: entrando por nombre, el navegador convertiría el `http://` del puerto principal en `https://` y lo dejaría inservible. Solo se manda con `HTTPS_ENABLED` (proxy propio), donde no hay puerto en claro.
+- **El Atajo de iOS** apunta siempre al puerto del HTTPS cuando está activo, aunque lo descargues viendo el panel por el principal.
 
-- **Se enciende y apaga** en Ajustes › HTTPS › «Mantener también el acceso por HTTP». Viene encendido. El número de puerto no se elige ahí porque tiene que estar publicado en `docker-compose.yml`; se cambia en `.env`.
-- **Por ese puerto la contraseña y la cookie viajan en claro.** Úsalo de rescate, no como entrada habitual. Si no lo quieres, apágalo.
-- **Es una sesión aparte.** Sus cookies llevan el sufijo `_http` y no van `Secure`; las del HTTPS siguen siendo `Secure` y no viajan nunca por el puerto en claro. Sin nombre propio no se podría iniciar sesión por HTTP en un navegador que hubiera entrado antes por HTTPS: Chromium no deja que un origen en claro pise una cookie `Secure`.
-- **Sin HSTS mientras esté abierto.** La cabecera vale para el host entero, sin mirar el puerto: entrando por nombre, el navegador convertiría el `http://` de rescate en `https://`. Al cerrarlo, HSTS vuelve.
-- **Probar el puerto** (debajo del interruptor) pide `/api/health` a Caddy por ese puerto desde el servidor y dice si está abierto y lleva a la aplicación, si está cerrado (lo esperado con la opción o el HTTPS apagados) o si responde otra cosa. Que Docker lo publique en el host solo se ve desde fuera: para eso está el enlace «Abrir en una pestaña».
-- **No se cierra desde él mismo**: Caddy cortaría la conexión por la que llega la petición. Se cierra entrando por `https://`. Desactivar el HTTPS entero desde ahí sí se puede, y la página vuelve sola al puerto principal.
-
-Qué petición llega por cada puerto lo dice `X-Forwarded-Proto`, que fija Caddy en cada petición (necesita `PROXY_FIX_HOPS` ≥ 1, el valor de fábrica en Docker).
+Qué petición llega cifrada lo dice `X-Forwarded-Proto`, que fija Caddy en cada petición (necesita `PROXY_FIX_HOPS` ≥ 1, el valor de fábrica en Docker).
 
 La alternativa —arrancar Caddy bajo demanda desde la aplicación— exigiría montarle el socket de Docker, y eso convierte cualquier fallo de la aplicación en root sobre el host: un agujero bastante peor que el que veníamos a tapar. Reconfigurar un proxy que ya está en marcha no necesita ningún privilegio. Y meter el TLS dentro de gunicorn tampoco valía: lee el certificado al arrancar, así que activarlo desde la interfaz obligaría a reiniciar el contenedor en mitad de la petición que lo activa.
 
@@ -1128,12 +1128,13 @@ El certificado **solo vale para los nombres que declares**. Si entras por una IP
 | Caddy rechaza la configuración | No se guarda nada y sigues conectado como estabas. El estado solo se escribe **después** de que el proxy la acepte: al revés, un estado diciendo «HTTPS activo» sobre un proxy en claro haría que las cookies salieran con `Secure`, el navegador las descartaría y no se podría iniciar sesión. |
 | Se recrea el contenedor del proxy | Caddy arranca con `--resume` y recupera la última configuración cargada. Y por si acaso, la aplicación reaplica el estado guardado al arrancar, con reintentos mientras el proxy termina de levantar. |
 | Entras por una dirección que el certificado no cubre | No se llega a activar: el panel lo avisa mientras escribes y el servidor devuelve un 400 diciendo qué nombre falta. Es la única forma de quedarse fuera, así que no se acepta. |
-| «Este aparato no acepta el certificado» | Es el resultado que evita el disgusto: con el HTTPS apagado, el navegador ya ha dicho que no. O la CA no está instalada ahí —en Windows tiene que quedar en «Entidades de certificación raíz de confianza», no en «Personal»—, o no se llega al puerto 9443. El enlace que sale al lado abre la página a mano y el navegador dice cuál de las dos es. |
+| «Este aparato no acepta el certificado» | Es el resultado que evita el disgusto: con el HTTPS apagado, el navegador ya ha dicho que no. O la CA no está instalada ahí —en Windows tiene que quedar en «Entidades de certificación raíz de confianza», no en «Personal»—, o no se llega al puerto del HTTPS (5443). El enlace que sale al lado abre la página a mano y el navegador dice cuál de las dos es. |
 | Instalas el certificado y sigue sin funcionar | Casi siempre está instalado donde no vale. En Windows, el asistente propone el almacén de la pestaña desde la que lo abriste y dice «importación completada» igualmente: tiene que quedar en **Entidades de certificación raíz de confianza**, no en *Personal*; lo más fiable es instalarlo con `certutil -user -addstore Root "$env:USERPROFILE\Downloads\PorfolioManager-CA.crt"` desde PowerShell, sin administrador. En Vivaldi, Chrome, Edge y Brave, además, **hay que cerrar el navegador del todo y volver a abrirlo**: no ven una CA nueva hasta reiniciarse. En iOS falta el interruptor de Ajustes › General › Información › Ajustes de confianza. En Firefox, su propio almacén. *Probar en este aparato* lo distingue en un clic y con el HTTPS todavía apagado. |
 | Un aparato sigue avisando del certificado | *Probar ahora* lo distingue: si dice que ese nombre **no está cubierto**, hay que añadirlo a la lista y volver a activar; si dice que está bien, lo que falta es instalar la CA **en ese aparato**. |
 | Activas sin haber instalado la CA | El navegador avisa en ese aparato y, hasta que te saltes el aviso, no puedes ni llegar al panel a descargarla. Por eso emitir e instalar van antes: el botón de activar no se habilita hasta marcar que ya está instalada. Si aun así pasa, salta el aviso una vez, descarga el certificado desde Ajustes e instálalo. |
 | `data/tls/estado.json` ilegible | Se lee como «HTTPS desactivado», que es el estado que siempre funciona. |
-| El certificado deja de valer con el HTTPS puesto | Entra por `http://<ip>:5080` (el acceso de rescate, si no lo has apagado), inicia sesión y desactiva el HTTPS o vuelve a emitir. Si lo apagaste, entrando por IP el navegador deja saltarse el aviso («Avanzado › Continuar»). |
+| El certificado deja de valer con el HTTPS puesto | Entra por el puerto de siempre, `http://<ip>:5080`, que sigue en claro; inicia sesión y desactiva el HTTPS o vuelve a emitir. |
+| Cambias el puerto del HTTPS y no abre | Docker todavía publica el anterior: ejecuta `./docker-update.sh` en el servidor. Hasta entonces el panel lo marca como pendiente. |
 | Quieres volver a HTTP | *Desactivar* en el mismo panel. A mano: borra `data/tls/estado.json` y reinicia. |
 
 #### Si ya tienes tu propio proxy delante
