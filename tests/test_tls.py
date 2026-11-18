@@ -1327,3 +1327,46 @@ def testLaPruebaDelPuertoExigeSesionYContesta200(crearApp, clienteAutenticado, b
     assert res.status_code == 200
     assert res.get_json()["ok"] is True
     assert res.get_json()["escucha"] is False
+
+
+def testConElHttpsActivoNoSeCambiaElPuerto(crearApp, bpTls, caddy):
+    """Los aparatos y el Atajo ya apuntan a ese puerto: cambiarlo los dejaría
+    llamando a uno que desaparece en la siguiente actualización."""
+    tls.guardarEstado(True, ["localhost"])
+    client, cab = _clienteCon(crearApp, bpTls, "https://localhost")
+
+    res = client.post(
+        "/api/tls/puerto", headers=cab, json={"puertoHttps": 6443}, base_url="https://localhost"
+    )
+
+    assert res.status_code == 409
+    assert tls.leerEstado()["puertoHttps"] is None
+
+
+def testConElHttpsActivoNoSeCambianLosNombres(crearApp, bpTls, caddy):
+    """El certificado, los aparatos y el Atajo ya usan esos nombres."""
+    tls.guardarEstado(True, ["localhost"])
+    client, cab = _clienteCon(crearApp, bpTls, "https://localhost")
+
+    res = client.post(
+        "/api/tls", headers=cab, base_url="https://localhost",
+        json={"activado": True, "nombres": ["localhost", "portfolio.casa"]},
+    )
+
+    assert res.status_code == 409
+    assert tls.leerEstado()["nombres"] == ["localhost"]
+    assert _ultimoLoad(caddy) is None
+
+
+def testConElHttpsActivoSeDejaDesactivar(crearApp, bpTls, caddy):
+    """Bloquear los nombres no puede bloquear la salida."""
+    tls.guardarEstado(True, ["localhost"])
+    client, cab = _clienteCon(crearApp, bpTls, "https://localhost")
+
+    res = client.post(
+        "/api/tls", headers=cab, base_url="https://localhost",
+        json={"activado": False, "nombres": ["otra.cosa"]},
+    )
+
+    assert res.status_code == 200
+    assert tls.leerEstado()["activado"] is False

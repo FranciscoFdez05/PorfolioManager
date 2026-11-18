@@ -140,6 +140,29 @@ def _validarQueNoTeDejaFuera(nombres: list[str]) -> None:
     )
 
 
+def _validarQueNoCambianLosNombres(nombres: list[str]) -> None:
+    """Con el HTTPS ya activo, la lista de nombres no se cambia.
+
+    El certificado, los aparatos que lo tienen instalado y el Atajo ya usan
+    esos nombres: cambiarlos en caliente deja a alguno llamando a una dirección
+    que el certificado no cubre. Se cambia desactivando antes el HTTPS.
+
+    Args:
+        nombres: la lista pedida, ya normalizada.
+
+    Raises:
+        ApiError: 409 si el HTTPS está activo y la lista es distinta.
+    """
+    if not tls.httpsActivo():
+        return
+    if set(nombres) != set(tls.leerEstado()["nombres"]):
+        raise ApiError(
+            "Con el HTTPS activo no se cambian los nombres ni las direcciones. "
+            "Desactívalo antes, cambia la lista y vuelve a emitir el certificado.",
+            statusCode=409,
+        )
+
+
 def _validarPuertoHttps(valor) -> int:
     """El puerto pedido para el HTTPS, si se puede usar.
 
@@ -233,6 +256,7 @@ def setTls():
     if activar:
         _validarNombres(nombres)
         _validarQueNoTeDejaFuera(nombres)
+        _validarQueNoCambianLosNombres(nombres)
 
     try:
         tls.aplicar(activar, nombres)
@@ -324,6 +348,14 @@ def postPuertoHttps():
         raise ApiError(
             "El HTTPS está fijado por la configuración del servidor "
             "(HTTPS_ENABLED en .env). Cámbialo allí, no desde aquí.",
+            statusCode=409,
+        )
+    if tls.httpsActivo():
+        # Con el HTTPS puesto, los aparatos y el Atajo ya apuntan a este puerto:
+        # cambiarlo los dejaría llamando a uno que desaparece al actualizar.
+        raise ApiError(
+            "Con el HTTPS activo el puerto no se puede cambiar. Desactívalo antes "
+            "y elige otro.",
             statusCode=409,
         )
     datos = request.get_json(silent=True) or {}

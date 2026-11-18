@@ -22,6 +22,41 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.7.1] — 2026-11-18
+
+Remata el HTTPS de la 5.7.0 en iPhone y en el Atajo de iOS.
+
+**Esquema de base de datos:** no lo toca (sigue en el **41**).
+
+**Al actualizar:** nada que hacer en el servidor. En el iPhone, si el Atajo
+se hizo a mano o duplicando el de HTTP, revisa que **todas** sus acciones
+«Obtener contenido de» lleven la cabecera `X-Atajo-Token`; lo más seguro es
+volver a descargarlo desde Ajustes › API.
+
+### Añadido
+
+- **HTTPS: guía de instalación en iPhone e iPad paso a paso.** Descargar con
+  Safari, instalar el perfil, activar la confianza en Ajustes › General ›
+  Información › Ajustes de confianza de certificados y comprobarlo en Safari,
+  con qué mirar si el Atajo sigue diciendo que el certificado no es válido
+  (hora automática, perfil de otro servidor). En el panel, en la documentación
+  y en la guía del Atajo.
+- **Atajo de iOS: qué hacer si se salta la base de datos.** Si pasa directo a
+  «¿Gasto o ingreso?», la lista de bases de datos ha llegado vacía porque el
+  servidor contestó con un error: casi siempre falta `X-Atajo-Token` en un
+  Atajo duplicado o hecho a mano. La documentación explica cómo verlo con
+  «Vista rápida» y por qué el Atajo descargado no se salta nada (se para y
+  enseña el error).
+
+### Cambiado
+
+- **HTTPS: con el HTTPS activo el puerto y los nombres quedan fijos.** Los
+  campos se bloquean y el servidor responde 409 (`POST /api/tls/puerto`, o
+  `POST /api/tls` con otra lista): el certificado, los aparatos y el Atajo ya
+  usan esa dirección. Para cambiarlos, se desactiva antes el HTTPS.
+
+---
+
 ## [5.7.0] — 2026-11-18
 
 Se perfecciona el HTTPS: va en su propio puerto y el de siempre sigue en HTTP,

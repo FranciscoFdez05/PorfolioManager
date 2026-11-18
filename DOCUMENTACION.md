@@ -1064,7 +1064,7 @@ El panel lo pide con `fetch` en modo `no-cors`: la respuesta llega opaca, pero s
 
 Con el HTTPS activo, el puerto principal (`PORT`, 5080 de fábrica) **sigue sirviendo en claro** y el HTTPS va en **su propio puerto** (`CADDY_HTTPS_PORT`, 5443 de fábrica). Si el certificado deja de valer —se pierde el volumen de Caddy y con él la CA, o un aparato deja de fiarse—, por `http://<ip>:5080` se sigue entrando como siempre para arreglarlo o desactivar el HTTPS.
 
-- **El puerto del HTTPS se elige** en Ajustes › HTTPS › «Puerto del HTTPS». Se guarda en `data/tls/estado.json`, y **lo publica `./docker-update.sh`** la próxima vez que se ejecute: Docker solo abre puertos al crear el contenedor, y recrearlo desde la aplicación exigiría el socket de Docker. Hasta entonces el panel dice que el cambio está pendiente y sigue valiendo el publicado. Lo elegido en el panel gana a `CADDY_HTTPS_PORT` del `.env`. No puede ser el principal ni el de comprobación.
+- **El puerto del HTTPS se elige** en Ajustes › HTTPS › «Puerto del HTTPS». Se guarda en `data/tls/estado.json`, y **lo publica `./docker-update.sh`** la próxima vez que se ejecute: Docker solo abre puertos al crear el contenedor, y recrearlo desde la aplicación exigiría el socket de Docker. Hasta entonces el panel dice que el cambio está pendiente y sigue valiendo el publicado. Lo elegido en el panel gana a `CADDY_HTTPS_PORT` del `.env`. **Con el HTTPS activo no se puede cambiar**, ni tampoco la lista de nombres: el certificado, los aparatos y el Atajo ya apuntan a esa dirección; para cambiarlos, desactívalo antes. No puede ser el principal ni el de comprobación.
 - **Probar el puerto** abre TLS contra Caddy por ese puerto desde el servidor, valida el certificado con la CA (presentándose como `localhost`, que va siempre en él) y pide `/api/health`: dice si escucha y lleva a la aplicación, si está cerrado (lo esperado con el HTTPS apagado) o si escucha otra cosa. Que Docker lo publique en el host solo se ve desde fuera: para eso está el enlace «Abrir en una pestaña».
 - **Por el puerto en claro la contraseña y la cookie viajan sin cifrar.** Para el día a día, entra por `https://`.
 - **Son dos sesiones.** Con el HTTPS activo, las cookies del puerto en claro llevan el sufijo `_http` y no van `Secure`; las del HTTPS sí van `Secure` y no viajan nunca en claro. Sin nombre propio no se podría iniciar sesión por HTTP en un navegador que hubiera entrado antes por HTTPS: Chromium no deja que un origen en claro pise una cookie `Secure`.
@@ -1121,6 +1121,17 @@ El certificado **solo vale para los nombres que declares**. Si entras por una IP
 
 `localhost` y `127.0.0.1` se añaden siempre, los escribas o no: por ahí entran el healthcheck del propio proxy, el de la aplicación y la comprobación de `docker-update.sh`. Si el certificado no los cubriera, Caddy rechazaría esas conexiones: Docker daría el proxy por enfermo y una actualización se daría por fallida y volvería atrás sola.
 
+#### Instalar el certificado en iPhone o iPad
+
+Son dos partes: instalar el perfil y, aparte, decirle a iOS que se fíe de él. La segunda es la que se olvida.
+
+1. **Descárgalo con Safari** (no con Chrome): entra por `http://<ip>:5080`, Ajustes › Seguridad › HTTPS › **Descargar certificado**, y **Permitir** cuando pregunte por el perfil de configuración.
+2. **Instálalo**: en la app Ajustes sale arriba **Perfil descargado** › **Instalar** (pide el código del iPhone) › **Instalar**. Si no aparece, está en Ajustes › General › VPN y gestión de dispositivos.
+3. **Activa la confianza**: Ajustes › General › Información › baja del todo › **Ajustes de confianza de certificados**, activa **Caddy Local Authority** y confirma con «Continuar».
+4. **Compruébalo en Safari** abriendo `https://<ip>:5443`: tiene que cargar sin «Esta conexión no es privada». Después cierra la app Atajos del todo y vuelve a lanzar el Atajo.
+
+Si sigue fallando: la hora del iPhone tiene que ser automática (Caddy emite certificados de horas, y una hora mal puesta los da por caducados), y no puede quedar un perfil de otro servidor: todas las CA de Caddy se llaman igual («Caddy Local Authority – 2026 ECC Root»), pero cada servidor tiene la suya.
+
 #### Qué pasa si algo sale mal
 
 | Situación | Qué ocurre |
@@ -1133,6 +1144,9 @@ El certificado **solo vale para los nombres que declares**. Si entras por una IP
 | Un aparato sigue avisando del certificado | *Probar ahora* lo distingue: si dice que ese nombre **no está cubierto**, hay que añadirlo a la lista y volver a activar; si dice que está bien, lo que falta es instalar la CA **en ese aparato**. |
 | Activas sin haber instalado la CA | El navegador avisa en ese aparato y, hasta que te saltes el aviso, no puedes ni llegar al panel a descargarla. Por eso emitir e instalar van antes: el botón de activar no se habilita hasta marcar que ya está instalada. Si aun así pasa, salta el aviso una vez, descarga el certificado desde Ajustes e instálalo. |
 | `data/tls/estado.json` ilegible | Se lee como «HTTPS desactivado», que es el estado que siempre funciona. |
+| El Atajo dice «No se ha podido establecer conexión con el servidor» | La URL no apunta a un puerto que escuche: revisa que sea `https://` y el puerto del HTTPS (5443), sin erratas, en **todas** las acciones «Obtener contenido de». Lo más fácil es volver a descargar el Atajo desde Ajustes › API. |
+| El Atajo se salta la base de datos y pasa directo a «¿Gasto o ingreso?» | «Seleccionar en» recibió una lista vacía: el servidor contestó con un error en vez de la lista, y un Atajo hecho a mano no lo comprueba. Casi siempre falta la cabecera `X-Atajo-Token` (al duplicar un Atajo o cambiarle la URL se puede perder): tiene que ir en **todas** las acciones «Obtener contenido de». Para verlo, añade «Vista rápida» tras la primera llamada. El Atajo descargado de Ajustes › API no se salta nada: se para y enseña el error. Con una sola base de datos también se salta la pregunta, y eso es normal: iOS la elige sola. |
+| El Atajo dice «El certificado de este servidor no es válido» | Ya llega, pero el iPhone no se fía de la CA: falta el interruptor de Ajustes › General › Información › Ajustes de confianza de certificados, o el perfil es de otro servidor. Ver [Instalar el certificado en iPhone o iPad](#instalar-el-certificado-en-iphone-o-ipad). |
 | El certificado deja de valer con el HTTPS puesto | Entra por el puerto de siempre, `http://<ip>:5080`, que sigue en claro; inicia sesión y desactiva el HTTPS o vuelve a emitir. |
 | Cambias el puerto del HTTPS y no abre | Docker todavía publica el anterior: ejecuta `./docker-update.sh` en el servidor. Hasta entonces el panel lo marca como pendiente. |
 | Quieres volver a HTTP | *Desactivar* en el mismo panel. A mano: borra `data/tls/estado.json` y reinicia. |

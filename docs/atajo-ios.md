@@ -144,6 +144,23 @@ también por la VPN (al entrar por IP Caddy solo puede presentar el de una, la
 de la LAN). Con HTTPS, la URL empieza por `https://` y lleva el puerto del
 HTTPS (5443 de fábrica, el que diga Ajustes › HTTPS), no el principal.
 
+Con HTTPS, el iPhone tiene que fiarse del certificado: instala el perfil desde
+Safari (Ajustes › Seguridad › HTTPS › Descargar certificado), instálalo en
+Ajustes › Perfil descargado y **activa la confianza** en Ajustes › General ›
+Información › Ajustes de confianza de certificados › Caddy Local Authority.
+Sin ese interruptor el Atajo falla con «El certificado de este servidor no es
+válido». Pasos completos en `DOCUMENTACION.md` › HTTPS › Instalar el certificado
+en iPhone o iPad.
+
+**Si pasas un Atajo de HTTP a HTTPS duplicándolo**, cambiar `http` por `https` y
+el puerto no basta: revisa que la cabecera `X-Atajo-Token` siga en **todas** las
+acciones «Obtener contenido de». Sin ella el servidor contesta con un error, la
+lista de bases de datos llega vacía y el Atajo salta directo a «¿Gasto o
+ingreso?» sin avisar. Para comprobarlo, añade «Vista rápida» tras la primera
+llamada: si sale «Este Atajo no lleva el token de acceso», es eso. Lo más seguro
+es descargar el Atajo de nuevo desde Ajustes › API, que comprueba cada respuesta
+y se para con el error en vez de seguir.
+
 **Cada «Obtener contenido de la URL» lleva la cabecera `X-Atajo-Token`** con el
 token de Ajustes › API (despliega *Mostrar más* en la acción para ver las
 cabeceras). En los pasos de abajo no se repite.

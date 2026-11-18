@@ -1748,6 +1748,15 @@
     color: var(--text-subtle);
     font-weight: 600;
 }
+/* Pasos numerados de la guía (iPhone): con sangría y aire entre pasos, que
+   en un párrafo corrido el de la confianza se pasaba por alto. */
+.ajustesTlsPasos {
+    margin: 0 0 10px;
+    padding-left: 22px;
+}
+.ajustesTlsPasos li + li {
+    margin-top: 6px;
+}
 
 /* El comando de Windows va en su propio bloque: metido en la frase se partía
    entre líneas y era fácil copiarlo a medias o con el punto final pegado. */

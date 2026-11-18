@@ -1316,10 +1316,25 @@
                     <details class="ajustesTlsAyuda">
                         <summary>Cómo instalarlo</summary>
                         <div class="ajustesTlsAyudaCuerpo">
-                            <p><strong>iPhone / iPad.</strong> Abre esta página en Safari (no en Chrome) y descarga el certificado.
-                            Ajustes › Perfil descargado › Instalar. Y después, <strong>el paso que todo el mundo se salta</strong>:
-                            Ajustes › General › Información › Ajustes de confianza de certificados, y activa el interruptor.
-                            Sin eso queda instalado pero no es de confianza, y el aviso sigue igual.</p>
+                            <p><strong>iPhone / iPad.</strong> Son dos partes: instalar el perfil y, aparte, decirle a iOS que se fíe de él.</p>
+                            <ol class="ajustesTlsPasos">
+                                <li><strong>Descárgalo con Safari</strong> (no con Chrome ni otro navegador): abre esta página por
+                                    <code>http://</code>, pulsa «Descargar certificado» y, cuando pregunte si permites descargar un perfil
+                                    de configuración, <strong>Permitir</strong>.</li>
+                                <li><strong>Instálalo</strong>: abre la app Ajustes. Arriba sale <strong>Perfil descargado</strong>; tócalo,
+                                    pulsa <strong>Instalar</strong>, escribe el código del iPhone y vuelve a pulsar <strong>Instalar</strong>.
+                                    Si no aparece, está en Ajustes › General › VPN y gestión de dispositivos.</li>
+                                <li><strong>Activa la confianza</strong>, el paso que todo el mundo se salta: Ajustes › General ›
+                                    Información › baja del todo › <strong>Ajustes de confianza de certificados</strong>, activa el
+                                    interruptor de <strong>Caddy Local Authority</strong> y confirma con «Continuar». Sin esto queda
+                                    instalado pero iOS no se fía, y el Atajo dice «El certificado de este servidor no es válido».</li>
+                                <li><strong>Compruébalo en Safari</strong>: abre la dirección <code>https://</code> del puerto del HTTPS.
+                                    Si carga sin «Esta conexión no es privada», ya está. Luego cierra la app Atajos del todo y vuelve a
+                                    lanzar el Atajo.</li>
+                            </ol>
+                            <p>Si sigue fallando: comprueba que la hora del iPhone es automática (Ajustes › General › Fecha y hora),
+                            porque Caddy emite certificados de horas y una hora mal puesta los da por caducados. Y si tienes perfiles
+                            de otro servidor, bórralos: todas las CA de Caddy se llaman igual, pero cada servidor tiene la suya.</p>
                             <p><strong>Por la VPN del router (iPhone / iPad).</strong> Usa la <strong>misma IP de la LAN</strong>
                             que en casa (por ejemplo <code>https://192.168.1.50:5443</code>): con la VPN conectada el router
                             ya te lleva a ella por el túnel, y no hay que tocar la configuración de la VPN. El certificado solo

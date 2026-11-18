@@ -999,8 +999,13 @@ function _initAjustesAtajoHttps() {
         if (tlsPuertoEl && document.activeElement !== tlsPuertoEl) {
             tlsPuertoEl.value = data.puertoHttpsPedido || ""
         }
-        if (tlsPuertoEl) tlsPuertoEl.disabled = !editable
-        if (tlsPuertoBtn) tlsPuertoBtn.disabled = !editable
+        // Con el HTTPS activo el puerto queda fijo: cambiarlo dejaría a los
+        // aparatos y al Atajo apuntando a uno que deja de existir al actualizar.
+        // Se cambia desactivando antes el HTTPS.
+        const puertoEditable = editable && !data.activado
+        if (tlsPuertoEl) tlsPuertoEl.disabled = !puertoEditable
+        if (tlsPuertoBtn) tlsPuertoBtn.style.display = data.activado ? "none" : ""
+        if (tlsPuertoBtn) tlsPuertoBtn.disabled = !puertoEditable
         if (tlsPuertoProbarBtn) tlsPuertoProbarBtn.disabled = !data.proxyDisponible
         const url = `https://${location.hostname}:${data.puertoHttps}`
         if (tlsPuertoAbrirEl) tlsPuertoAbrirEl.href = url + "/"
@@ -1009,6 +1014,9 @@ function _initAjustesAtajoHttps() {
             `El HTTPS va en su propio puerto: <code>${escapeHtml(url)}</code>. ` +
             `El de siempre (<code>${escapeHtml(String(data.puertoPrincipal))}</code>) sigue en <code>http://</code>, ` +
             "así que si el certificado deja de valer no te quedas fuera."
+        if (data.activado) {
+            ayuda += " Con el HTTPS activo el puerto no se puede cambiar: para elegir otro, desactívalo antes."
+        }
         if (data.puertoHttpsPendiente) {
             ayuda +=
                 ` <strong>Has elegido el ${escapeHtml(String(data.puertoHttpsPedido))}, pero Docker publica el ${escapeHtml(String(data.puertoHttps))}</strong>: ` +
@@ -1139,7 +1147,10 @@ function _initAjustesAtajoHttps() {
         _tlsUltimo = data
         _pintarPuertoHttps(data, editable)
         if (tlsNombresEl) {
-            tlsNombresEl.disabled = !editable
+            // Con el HTTPS activo la lista queda fija: el certificado, los
+            // aparatos y el Atajo ya usan esos nombres. Se cambia desactivando.
+            tlsNombresEl.disabled = !editable || !!data.activado
+            tlsNombresEl.title = data.activado ? "Con el HTTPS activo no se cambia: desactívalo antes." : ""
             // Solo se rellena si el usuario no ha escrito nada: al recargar tras
             // guardar, machacar lo que tenga a medias sería perder su trabajo.
             if (!tlsNombresEl.value.trim()) {
