@@ -8,6 +8,7 @@ es lo que se puede probar sin levantar un proxy.
     POST /api/tls            activar o desactivar
     POST /api/tls/comprobacion  levantar el puerto donde se comprueba desde el aparato
     GET  /api/tls/prueba     comprobación real del cifrado, nombre por nombre
+    GET  /api/tls/http-alternativo/prueba  si el puerto HTTP de rescate responde
     GET  /api/tls/ca.crt     certificado raíz, para instalar en cada aparato
 
 **Por qué preparar y activar son dos peticiones.** Porque la respuesta a activar
@@ -27,7 +28,7 @@ import logging
 
 from flask import Blueprint, jsonify, make_response, request
 
-from core import tls
+from core import seguridad_app, settings, tls
 from core.errors import ApiError, ValidationError
 
 log = logging.getLogger(__name__)
@@ -76,6 +77,15 @@ def _estadoPublico() -> dict:
         # que ya enruta hacia la LAN. Ver `tls.nombrePorDefecto()`.
         "nombrePorDefecto": tls.nombrePorDefecto(estado["nombres"]),
         "ipLan": tls.ipLan(),
+        # La preferencia guardada y si de verdad está sirviendo ahora (solo con
+        # el HTTPS puesto). El puerto lo fija docker-compose, no la interfaz.
+        "httpAlternativo": estado["httpAlternativo"],
+        "httpAlternativoActivo": tls.httpAlternativoActivo(),
+        "puertoHttpAlternativo": tls.PUERTO_HTTP_ALTERNATIVO,
+        "porHttpAlternativo": seguridad_app.porHttpAlternativo(),
+        # Adónde volver al desactivar el HTTPS entrando por el puerto
+        # alternativo, que en ese momento se cierra.
+        "puertoPrincipal": settings.puerto(),
     }
 
 
@@ -128,6 +138,41 @@ def _validarQueNoTeDejaFuera(nombres: list[str]) -> None:
     )
 
 
+def _httpAlternativoPedido(datos: dict) -> bool:
+    """Lo que pide la interfaz para el puerto HTTP alternativo.
+
+    Args:
+        datos: cuerpo JSON de la petición.
+
+    Returns:
+        El valor enviado, o el guardado si la petición no lo trae (un cliente
+        anterior a esta opción no debe apagarla sin querer).
+    """
+    valor = datos.get("httpAlternativo")
+    return tls.leerEstado()["httpAlternativo"] if valor is None else bool(valor)
+
+
+def _validarQueNoCierrasTuPuerto(httpAlternativo: bool) -> None:
+    """No se cierra el puerto HTTP alternativo desde el propio puerto alternativo.
+
+    Caddy recarga y corta esa conexión: la respuesta no llegaría y la página
+    quedaría sin servidor detrás. Se apaga entrando por HTTPS.
+
+    Args:
+        httpAlternativo: el valor pedido.
+
+    Raises:
+        ValidationError: si se pide apagarlo entrando justo por él.
+    """
+    if httpAlternativo or not seguridad_app.porHttpAlternativo():
+        return
+    raise ValidationError(
+        "Estás entrando por el puerto HTTP alternativo: si lo cierras desde aquí "
+        "perderías esta conexión. Entra por https:// y desactívalo desde allí.",
+        field="httpAlternativo",
+    )
+
+
 @tlsBp.route("/api/tls", methods=["GET"])
 def getTls():
     return jsonify({"ok": True, **_estadoPublico()})
@@ -168,7 +213,7 @@ def postPreparar():
     # justo lo que se va a hacer, porque instalar la CA lleva a Ajustes del
     # móvil y de vuelta—, y el estado sigue diciendo la verdad: esto todavía va
     # en claro, y las cookies siguen saliendo sin `Secure`.
-    tls.guardarEstado(False, nombres)
+    tls.guardarEstado(False, nombres, _httpAlternativoPedido(datos))
 
     log.info(
         "[tls] certificado preparado para %s; el HTTPS sigue sin activar",
@@ -190,13 +235,15 @@ def setTls():
     datos = request.get_json(silent=True) or {}
     activar = bool(datos.get("activado"))
     nombres = tls.normalizarNombres(datos.get("nombres"))
+    httpAlternativo = _httpAlternativoPedido(datos)
 
     if activar:
         _validarNombres(nombres)
         _validarQueNoTeDejaFuera(nombres)
+        _validarQueNoCierrasTuPuerto(httpAlternativo)
 
     try:
-        tls.aplicar(activar, nombres)
+        tls.aplicar(activar, nombres, httpAlternativo=httpAlternativo)
     except tls.ErrorCaddy as e:
         # 502 y no 500: el fallo es del proxy, no de esta aplicación, y el
         # mensaje ya dice qué mirar.
@@ -205,14 +252,12 @@ def setTls():
     # Solo se guarda si Caddy ha aceptado la configuración. Al revés, un estado
     # que dijera «HTTPS activo» sobre un proxy sirviendo en claro haría que las
     # cookies salieran con `Secure` y nadie pudiera iniciar sesión.
-    estado = tls.guardarEstado(activar, nombres)
+    estado = tls.guardarEstado(activar, nombres, httpAlternativo)
 
     # Las banderas de la cookie se leen de app.config en cada respuesta, así que
     # actualizarlas aquí surte efecto inmediato: la propia respuesta a esta
     # petición ya sale con la política nueva, sin reiniciar nada.
     from flask import current_app
-
-    from core import seguridad_app
 
     seguridad_app.aplicarConfiguracionSesion(current_app)
 
@@ -273,6 +318,16 @@ def getPrueba():
     Solo el proxy caído o la CA ausente llenan `error`, y también con 200.
     """
     return jsonify({"ok": True, "puertoPrueba": tls.PUERTO_PREPARACION, **tls.probar()})
+
+
+@tlsBp.route("/api/tls/http-alternativo/prueba", methods=["GET"])
+def getPruebaHttpAlternativo():
+    """¿Está abierto el puerto HTTP alternativo y lleva a la aplicación?
+
+    Como `/api/tls/prueba`, siempre 200: que esté cerrado es un resultado (y
+    con la opción apagada, el esperado), no un fallo de la petición.
+    """
+    return jsonify({"ok": True, **tls.probarHttpAlternativo()})
 
 
 @tlsBp.route("/api/tls/ca.crt", methods=["GET"])

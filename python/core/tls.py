@@ -42,6 +42,7 @@ que activar el HTTPS no mueve la dirección: `http://IP:5000` pasa a ser
 `https://IP:5000`. Y ese puerto deja de aceptar texto plano, que era el objetivo.
 """
 
+import http.client
 import ipaddress
 import json
 import logging
@@ -89,12 +90,25 @@ try:
 except ValueError:
     PUERTO_PREPARACION = 9443
 
+# Puerto en claro que se mantiene abierto con el HTTPS ya activo. Existe para no
+# depender del certificado: si la CA se pierde (volumen de Caddy borrado) o un
+# aparato deja de fiarse, por aquí se sigue entrando a Ajustes para arreglarlo.
+# No puede ser el mismo que el principal —un puerto habla TLS o habla claro—, y
+# tiene que estar publicado en docker-compose, por eso se fija por entorno y no
+# desde la interfaz: un puerto elegido allí no lo vería nadie desde la LAN.
+try:
+    PUERTO_HTTP_ALTERNATIVO = int(os.environ.get("CADDY_HTTP_PORT") or 5080)
+except ValueError:
+    PUERTO_HTTP_ALTERNATIVO = 5080
+
 # Reintentos al arrancar, solo para la convergencia inicial. Suman 8 segundos en
 # el peor caso; el arranque de gunicorn tiene 120 s de margen.
 _REINTENTOS_ARRANQUE = 5
 _ESPERA_REINTENTO = 2
 
-_ESTADO_POR_DEFECTO = {"activado": False, "nombres": [], "actualizado": None}
+# `httpAlternativo` encendido de fábrica: quien activa el HTTPS no debería poder
+# quedarse sin acceso por un certificado que deja de valer.
+_ESTADO_POR_DEFECTO = {"activado": False, "nombres": [], "actualizado": None, "httpAlternativo": True}
 
 
 # ── Estado ────────────────────────────────────────────────────────────────────
@@ -122,14 +136,32 @@ def leerEstado() -> dict:
         "activado": bool(datos.get("activado")),
         "nombres": [str(n) for n in datos.get("nombres", []) if str(n).strip()],
         "actualizado": datos.get("actualizado"),
+        # Un estado.json anterior a esta opción no la trae: se lee como
+        # encendida, igual que en una instalación nueva.
+        "httpAlternativo": bool(datos.get("httpAlternativo", True)),
     }
 
 
-def guardarEstado(activado: bool, nombres: list[str]) -> dict:
+def guardarEstado(activado: bool, nombres: list[str], httpAlternativo: bool | None = None) -> dict:
+    """Guarda el estado del HTTPS de forma atómica.
+
+    Args:
+        activado: si el puerto principal sirve TLS.
+        nombres: direcciones que cubre el certificado.
+        httpAlternativo: si se mantiene el puerto en claro con el HTTPS
+            activo. `None` conserva lo que hubiera guardado, para que emitir o
+            desactivar no reinicien una preferencia que no han tocado.
+
+    Returns:
+        El estado tal y como ha quedado escrito.
+    """
+    if httpAlternativo is None:
+        httpAlternativo = leerEstado()["httpAlternativo"]
     estado = {
         "activado": bool(activado),
         "nombres": list(nombres),
         "actualizado": datetime.now(UTC).isoformat(timespec="seconds"),
+        "httpAlternativo": bool(httpAlternativo),
     }
     # Escritura atómica: un corte de corriente a medias dejaría un JSON truncado,
     # y este fichero decide si las cookies salen con Secure. Temporal único por
@@ -147,6 +179,23 @@ def httpsActivo() -> bool:
     Encrypt) y no pasa por esta interfaz.
     """
     return settings.httpsActivado() or leerEstado()["activado"]
+
+
+def httpAlternativoActivo() -> bool:
+    """¿Hay, además del HTTPS, un puerto en claro sirviendo la aplicación?
+
+    Solo con el HTTPS gestionado desde Ajustes: con `HTTPS_ENABLED` en .env el
+    proxy es ajeno y este módulo no le añade puertos. Y solo con nombres, que es
+    cuando `construirCaddyfile` monta de verdad el TLS.
+
+    Returns:
+        True si Caddy está sirviendo también `http://` en
+        `PUERTO_HTTP_ALTERNATIVO`.
+    """
+    if settings.httpsActivado():
+        return False
+    estado = leerEstado()
+    return estado["activado"] and bool(estado["nombres"]) and estado["httpAlternativo"]
 
 
 # ── Nombres ───────────────────────────────────────────────────────────────────
@@ -374,7 +423,18 @@ def _opcionesTlsGlobales(nombres: list[str]) -> str:
     return lineas
 
 
-def construirCaddyfile(activado: bool, nombres: list[str], preparando: bool = False) -> str:
+def _sitioHttpAlternativo(proxy: str) -> str:
+    """Sitio en claro que sigue llevando a la aplicación con el HTTPS puesto.
+
+    El `http://` explícito es lo que impide que Caddy le aplique HTTPS
+    automático: sin él, con nombres declarados, intentaría servirlo cifrado.
+    """
+    return f"http://:{PUERTO_HTTP_ALTERNATIVO} {{\n" + proxy + "}\n\n"
+
+
+def construirCaddyfile(
+    activado: bool, nombres: list[str], preparando: bool = False, httpAlternativo: bool = False
+) -> str:
     """Configuración completa de Caddy para el estado pedido.
 
     Se genera un Caddyfile y no el JSON nativo porque la API de admin sabe
@@ -386,6 +446,11 @@ def construirCaddyfile(activado: bool, nombres: list[str], preparando: bool = Fa
     claro —quien está mirando el panel no nota nada— y en paralelo se monta un
     sitio TLS en un puerto interno con esos mismos nombres, solo para obligar a
     Caddy a emitir el certificado y, con él, la CA que hay que instalar.
+
+    `httpAlternativo` solo cuenta con el HTTPS activo: añade un segundo puerto
+    en claro (`PUERTO_HTTP_ALTERNATIVO`) que lleva a la misma aplicación, para
+    no perder el acceso si el certificado deja de valer. Sin HTTPS, el puerto de
+    siempre ya va en claro y no hace falta otro.
     """
     puerto = settings.puerto()
     admin = """{
@@ -415,6 +480,7 @@ def construirCaddyfile(activado: bool, nombres: list[str], preparando: bool = Fa
             # **sin** tener que arriesgarse a entrar por la puerta principal y
             # descubrir que no, que es como se descubre ahora.
             + _sitioDePrueba(_conLocalhost(nombres))
+            + (_sitioHttpAlternativo(proxy) if httpAlternativo else "")
         )
 
     if preparando and nombres:
@@ -458,14 +524,20 @@ class ErrorCaddy(RuntimeError):
     """El proxy no ha aceptado la configuración, o no responde."""
 
 
-def aplicar(activado: bool, nombres: list[str], preparando: bool = False) -> None:
+def aplicar(
+    activado: bool, nombres: list[str], preparando: bool = False, httpAlternativo: bool = False
+) -> None:
     """Carga la configuración en Caddy. Lanza ErrorCaddy si no la acepta.
 
     Que Caddy valide antes de aplicar es lo que hace segura la activación desde
     la interfaz: si el Caddyfile generado no es válido, responde 400, no toca su
     configuración en marcha y el usuario sigue conectado como estaba.
+
+    `httpAlternativo` se pasa siempre de forma explícita y por defecto es False:
+    el sitio de comprobación y la preparación reaplican sin HTTPS, y ahí no debe
+    aparecer un puerto en claro extra.
     """
-    caddyfile = construirCaddyfile(activado, nombres, preparando)
+    caddyfile = construirCaddyfile(activado, nombres, preparando, httpAlternativo)
     try:
         _admin("/load", caddyfile.encode("utf-8"), "text/caddyfile")
     except urllib.error.HTTPError as e:
@@ -588,6 +660,49 @@ def _hostDelProxy() -> str:
     que puedan discrepar: quien cambia uno cambia el otro.
     """
     return urllib.parse.urlsplit(CADDY_ADMIN).hostname or "caddy"
+
+
+def probarHttpAlternativo() -> dict:
+    """Comprueba si el puerto HTTP alternativo está abierto y lleva a la aplicación.
+
+    Pide `/api/health` a Caddy por ese puerto, dentro de la red de Compose. Así
+    se distingue «no escucha nada» (lo normal con la opción o el HTTPS
+    apagados) de «responde, pero no es esta aplicación». Lo que no puede ver es
+    si Docker lo publica en el host: eso solo se sabe abriéndolo desde fuera.
+
+    Returns:
+        `puerto`, `esperado` (si según el estado debería estar abierto),
+        `escucha`, `llegaALaApp` y `error` con el motivo si no escucha.
+    """
+    salida = {
+        "puerto": PUERTO_HTTP_ALTERNATIVO,
+        "esperado": httpAlternativoActivo(),
+        "escucha": False,
+        "llegaALaApp": False,
+        "error": None,
+    }
+    conexion = http.client.HTTPConnection(_hostDelProxy(), PUERTO_HTTP_ALTERNATIVO, timeout=TIMEOUT_PRUEBA)
+    try:
+        conexion.request("GET", "/api/health")
+        respuesta = conexion.getresponse()
+        cuerpo = respuesta.read(4096)
+        salida["escucha"] = True
+        try:
+            datos = json.loads(cuerpo)
+        except ValueError:
+            datos = None
+        # `version` solo la manda /api/health de esta aplicación: un 200 de otra
+        # cosa escuchando en el mismo puerto no cuenta.
+        salida["llegaALaApp"] = isinstance(datos, dict) and "version" in datos
+    except OSError as e:
+        salida["error"] = str(e) or e.__class__.__name__
+    except http.client.HTTPException as e:
+        # Algo acepta la conexión pero no habla HTTP: escucha, pero no es Caddy.
+        salida["escucha"] = True
+        salida["error"] = f"Responde, pero no en HTTP: {e.__class__.__name__}"
+    finally:
+        conexion.close()
+    return salida
 
 
 def _resumenCertificado(cert: dict) -> dict:
@@ -823,7 +938,7 @@ def converger() -> None:
     ultimo = None
     for intento in range(_REINTENTOS_ARRANQUE):
         try:
-            aplicar(estado["activado"], estado["nombres"])
+            aplicar(estado["activado"], estado["nombres"], httpAlternativo=estado["httpAlternativo"])
             break
         except ErrorCaddy as e:
             ultimo = e
@@ -835,5 +950,7 @@ def converger() -> None:
 
     if estado["activado"]:
         log.info("[tls] HTTPS activo para %s", ", ".join(estado["nombres"]))
+        if httpAlternativoActivo():
+            log.info("[tls] HTTP sin cifrar también abierto en el puerto %d", PUERTO_HTTP_ALTERNATIVO)
     else:
         log.info("[tls] HTTPS desactivado: el proxy sirve en claro")

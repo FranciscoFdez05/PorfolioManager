@@ -1272,6 +1272,22 @@
                     </div>
                 </div>
 
+                <div class="ajustesSwitchRow" id="ajustesTlsHttpAltFila">
+                    <div class="ajustesSwitchLabel">
+                        <span>Mantener también el acceso por HTTP</span>
+                        <small id="ajustesTlsHttpAltAyuda">Con el HTTPS activo, la aplicación sigue respondiendo sin cifrar en otro puerto, para no perder el acceso si el certificado deja de valer.</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="ajustesTlsHttpAlt" checked>
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <div class="ajustesTlsHttpAltAcciones">
+                    <button id="ajustesTlsHttpAltProbarBtn" class="ajustesTlsAvisoBtn" type="button">Probar el puerto</button>
+                    <a id="ajustesTlsHttpAltAbrir" class="ajustesTlsHttpAltAbrir" href="#" target="_blank" rel="noopener">Abrir en una pestaña</a>
+                    <span id="ajustesTlsHttpAltMsg" class="ajustesStatusMsg"></span>
+                </div>
+
                 <div class="ajustesActions">
                     <button id="ajustesTlsPrepararBtn" class="ajustesAddBtn" type="button">Emitir el certificado</button>
                     <button id="ajustesTlsDesactivarBtn" class="ajustesSecondaryBtn" type="button" style="display:none">Desactivar</button>
@@ -1309,9 +1325,12 @@
                             <p><strong>Android.</strong> Ajustes › Seguridad › Cifrado y credenciales › Instalar un certificado ›
                             Certificado de CA. Avisará de que es una acción delicada; lo es, y por eso lo estás instalando tú.</p>
                             <p><strong>Windows (Vivaldi, Chrome, Edge, Brave).</strong> Lo más fiable es un comando: abre
-                            PowerShell (no hace falta como administrador) y pega
-                            <code>certutil -user -addstore Root "$env:USERPROFILE\Downloads\PorfolioManager-CA.crt"</code>.
-                            Windows pregunta si quieres instalar el certificado: <strong>Sí</strong>. Si lo descargaste a otra
+                            PowerShell (no hace falta como administrador) y pega:</p>
+                            <div class="ajustesTlsComando">
+                                <code id="ajustesTlsComandoWin">certutil -user -addstore Root "$env:USERPROFILE\Downloads\PorfolioManager-CA.crt"</code>
+                                <button id="ajustesTlsComandoCopiarBtn" class="ajustesTlsAvisoBtn" type="button">Copiar</button>
+                            </div>
+                            <p>Windows pregunta si quieres instalar el certificado: <strong>Sí</strong>. Si lo descargaste a otra
                             carpeta, o el navegador lo renombró a <code>PorfolioManager-CA (1).crt</code>, cambia la ruta.
                             Después <strong>cierra el navegador del todo y vuelve a abrirlo</strong>: Chromium no ve la CA
                             nueva hasta reiniciarse, y «Comprobar en este aparato» seguiría fallando con el certificado bien

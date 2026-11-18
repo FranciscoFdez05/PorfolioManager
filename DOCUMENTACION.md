@@ -1060,6 +1060,19 @@ Está publicado porque la pregunta que contesta solo la puede contestar el apara
 
 Con el HTTPS ya activado sigue en pie, y ahí gana el otro uso: un aparato nuevo instala la CA y se comprueba en `:9443` **sin** arriesgarse a que la puerta principal lo rechace y lo deje fuera.
 
+#### El acceso por HTTP de rescate
+
+Con el HTTPS activo, la aplicación sigue respondiendo **sin cifrar en otro puerto** (5080 por defecto, `CADDY_HTTP_PORT` en `.env`). Si el certificado deja de valer —se pierde el volumen de Caddy y con él la CA, o un aparato deja de fiarse—, por `http://<ip>:5080` se sigue llegando a Ajustes para arreglarlo o desactivar el HTTPS. El puerto principal no cambia: sigue siendo solo `https://`.
+
+- **Se enciende y apaga** en Ajustes › HTTPS › «Mantener también el acceso por HTTP». Viene encendido. El número de puerto no se elige ahí porque tiene que estar publicado en `docker-compose.yml`; se cambia en `.env`.
+- **Por ese puerto la contraseña y la cookie viajan en claro.** Úsalo de rescate, no como entrada habitual. Si no lo quieres, apágalo.
+- **Es una sesión aparte.** Sus cookies llevan el sufijo `_http` y no van `Secure`; las del HTTPS siguen siendo `Secure` y no viajan nunca por el puerto en claro. Sin nombre propio no se podría iniciar sesión por HTTP en un navegador que hubiera entrado antes por HTTPS: Chromium no deja que un origen en claro pise una cookie `Secure`.
+- **Sin HSTS mientras esté abierto.** La cabecera vale para el host entero, sin mirar el puerto: entrando por nombre, el navegador convertiría el `http://` de rescate en `https://`. Al cerrarlo, HSTS vuelve.
+- **Probar el puerto** (debajo del interruptor) pide `/api/health` a Caddy por ese puerto desde el servidor y dice si está abierto y lleva a la aplicación, si está cerrado (lo esperado con la opción o el HTTPS apagados) o si responde otra cosa. Que Docker lo publique en el host solo se ve desde fuera: para eso está el enlace «Abrir en una pestaña».
+- **No se cierra desde él mismo**: Caddy cortaría la conexión por la que llega la petición. Se cierra entrando por `https://`. Desactivar el HTTPS entero desde ahí sí se puede, y la página vuelve sola al puerto principal.
+
+Qué petición llega por cada puerto lo dice `X-Forwarded-Proto`, que fija Caddy en cada petición (necesita `PROXY_FIX_HOPS` ≥ 1, el valor de fábrica en Docker).
+
 La alternativa —arrancar Caddy bajo demanda desde la aplicación— exigiría montarle el socket de Docker, y eso convierte cualquier fallo de la aplicación en root sobre el host: un agujero bastante peor que el que veníamos a tapar. Reconfigurar un proxy que ya está en marcha no necesita ningún privilegio. Y meter el TLS dentro de gunicorn tampoco valía: lee el certificado al arrancar, así que activarlo desde la interfaz obligaría a reiniciar el contenedor en mitad de la petición que lo activa.
 
 #### Firma, o red de confianza
@@ -1120,6 +1133,7 @@ El certificado **solo vale para los nombres que declares**. Si entras por una IP
 | Un aparato sigue avisando del certificado | *Probar ahora* lo distingue: si dice que ese nombre **no está cubierto**, hay que añadirlo a la lista y volver a activar; si dice que está bien, lo que falta es instalar la CA **en ese aparato**. |
 | Activas sin haber instalado la CA | El navegador avisa en ese aparato y, hasta que te saltes el aviso, no puedes ni llegar al panel a descargarla. Por eso emitir e instalar van antes: el botón de activar no se habilita hasta marcar que ya está instalada. Si aun así pasa, salta el aviso una vez, descarga el certificado desde Ajustes e instálalo. |
 | `data/tls/estado.json` ilegible | Se lee como «HTTPS desactivado», que es el estado que siempre funciona. |
+| El certificado deja de valer con el HTTPS puesto | Entra por `http://<ip>:5080` (el acceso de rescate, si no lo has apagado), inicia sesión y desactiva el HTTPS o vuelve a emitir. Si lo apagaste, entrando por IP el navegador deja saltarse el aviso («Avanzado › Continuar»). |
 | Quieres volver a HTTP | *Desactivar* en el mismo panel. A mano: borra `data/tls/estado.json` y reinicia. |
 
 #### Si ya tienes tu propio proxy delante

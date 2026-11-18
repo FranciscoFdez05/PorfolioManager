@@ -40,6 +40,11 @@ services:
       # está entrando. NO se publica abajo a propósito: solo existe dentro de
       # esta red. Solo hay que tocarlo si choca con algo del despliegue.
       - CADDY_PREP_PORT=${CADDY_PREP_PORT:-9443}
+      # Puerto en claro que se mantiene abierto con el HTTPS activo, para no
+      # perder el acceso si el certificado deja de valer. Se enciende y apaga
+      # desde Ajustes; el número va aquí porque tiene que coincidir con el que
+      # se publica abajo en el servicio caddy.
+      - CADDY_HTTP_PORT=${CADDY_HTTP_PORT:-5080}
       # Dirección del servidor en la LAN, que calcula docker-up.sh en el host.
       # Dentro del contenedor solo se ve la red de Compose, así que sin esto el
       # panel de HTTPS no puede proponer la dirección por la que entran el móvil
@@ -212,6 +217,11 @@ services:
       # publicarlo, lo único que puede probarlo es el propio servidor, y eso ya
       # se sabía antes de mirar.
       - "${CADDY_PREP_PORT:-9443}:${CADDY_PREP_PORT:-9443}"
+      # El acceso por HTTP que convive con el HTTPS (Ajustes › HTTPS ›
+      # «Mantener también el acceso por HTTP»). Publicado siempre, pero Caddy
+      # solo escucha en él con el HTTPS activo y la opción encendida: el resto
+      # del tiempo la conexión se rechaza.
+      - "${CADDY_HTTP_PORT:-5080}:${CADDY_HTTP_PORT:-5080}"
     environment:
       - PORT=${PORT:-5050}
     volumes:

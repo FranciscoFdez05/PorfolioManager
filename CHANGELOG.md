@@ -83,6 +83,15 @@ decide cómo se deshace la actualización:
   de pantallas sigue en español. Ajuste global nuevo `idioma` (`es`/`en`) en
   `/api/settings`. Los textos están en `js/locales/` y el idioma de respaldo es
   el español.
+- **HTTPS: acceso por HTTP de rescate.** Con el HTTPS activo, la aplicación
+  sigue respondiendo sin cifrar en otro puerto (5080, `CADDY_HTTP_PORT`), para
+  no perder el acceso si el certificado deja de valer. Se enciende y apaga en
+  Ajustes › HTTPS y viene encendido. Por ese puerto las cookies llevan sufijo
+  `_http` y no van `Secure`; las del HTTPS no cambian. Mientras está abierto no
+  se manda HSTS. «Probar el puerto» comprueba desde el servidor si está abierto
+  y lleva a la aplicación (`GET /api/tls/http-alternativo/prueba`), y un enlace
+  lo abre desde el aparato. Hay que publicar el puerto nuevo: `./docker-update.sh` recrea
+  el contenedor de Caddy con él.
 
 ### Corregido
 
@@ -115,6 +124,11 @@ decide cómo se deshace la actualización:
   confianza», en vez del asistente, que lo dejaba en *Personal*. Y avisa de
   que hay que cerrar el navegador del todo tras instalarlo: Chromium no ve la
   CA nueva hasta reiniciarse y la comprobación seguía fallando.
+- **HTTPS: «Emitir el certificado» desaparecía con la CA ya creada.** Si la raíz
+  de Caddy existía de un intento anterior pero no había nombres guardados, el
+  panel escondía «Emitir» y ofrecía comprobar y activar; la comprobación pedía
+  pulsar un botón que no estaba y el puerto 9443 rechazaba la conexión. Ahora
+  «Emitir» sale mientras no haya un certificado emitido para algún nombre.
 
 ---
 

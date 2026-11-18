@@ -1644,6 +1644,25 @@
     color: var(--text-subtle);
     font-weight: 600;
 }
+/* Probar el puerto HTTP de rescate: desde el servidor (botón) y desde este
+   aparato (enlace), con el resultado al lado. */
+.ajustesTlsHttpAltAcciones {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 0 20px 6px;
+}
+.ajustesTlsHttpAltAbrir {
+    font-size: 12px;
+    color: var(--accent);
+}
+
+/* Sin aire el botón quedaba pegado a la última línea del párrafo y parecía
+   parte del texto. */
+.ajustesTlsCaTexto + .ajustesActions {
+    margin-top: 14px;
+}
 
 .ajustesTlsAyuda {
     margin-top: 18px;
@@ -1684,6 +1703,31 @@
 .ajustesTlsAyudaCuerpo strong {
     color: var(--text-subtle);
     font-weight: 600;
+}
+
+/* El comando de Windows va en su propio bloque: metido en la frase se partía
+   entre líneas y era fácil copiarlo a medias o con el punto final pegado. */
+.ajustesTlsComando {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: 7px;
+    background: var(--bg-elevated);
+}
+.ajustesTlsComando code {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+.ajustesTlsComando .ajustesTlsAvisoBtn {
+    flex: 0 0 auto;
 }
 
 /* El aviso de que la firma está desactivada. Rojo y no naranja: los demás

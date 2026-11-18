@@ -919,6 +919,23 @@ function _initAjustesAtajoHttps() {
             }
         })
     }
+    const tlsComandoWinEl = document.getElementById("ajustesTlsComandoWin")
+    const tlsComandoCopiarBtn = document.getElementById("ajustesTlsComandoCopiarBtn")
+    if (tlsComandoCopiarBtn) {
+        tlsComandoCopiarBtn.addEventListener("click", async () => {
+            try {
+                await navigator.clipboard.writeText(tlsComandoWinEl?.textContent || "")
+                tlsComandoCopiarBtn.textContent = "Copiado"
+            } catch {
+                // Sin HTTPS el portapapeles solo funciona en localhost, y esta
+                // guía se lee justo antes de tenerlo: se selecciona el texto
+                // para que baste con Ctrl+C.
+                if (tlsComandoWinEl) getSelection()?.selectAllChildren(tlsComandoWinEl)
+                tlsComandoCopiarBtn.textContent = "Pulsa Ctrl+C"
+            }
+            setTimeout(() => (tlsComandoCopiarBtn.textContent = "Copiar"), 2000)
+        })
+    }
     if (atajoExigirFirmaEl) {
         atajoExigirFirmaEl.addEventListener("change", () => {
             if (atajoAvisoFirmaEl) atajoAvisoFirmaEl.hidden = atajoExigirFirmaEl.checked
@@ -959,6 +976,116 @@ function _initAjustesAtajoHttps() {
     const tlsAparatoResEl = document.getElementById("ajustesTlsAparatoRes")
     const tlsConfianzaEl = document.getElementById("ajustesTlsConfianza")
     const tlsConfirmaFila = document.getElementById("ajustesTlsConfirmaFila")
+    const tlsHttpAltFila = document.getElementById("ajustesTlsHttpAltFila")
+    const tlsHttpAltEl = document.getElementById("ajustesTlsHttpAlt")
+    const tlsHttpAltAyuda = document.getElementById("ajustesTlsHttpAltAyuda")
+    const tlsHttpAltMsg = document.getElementById("ajustesTlsHttpAltMsg")
+    const tlsHttpAltProbarBtn = document.getElementById("ajustesTlsHttpAltProbarBtn")
+    const tlsHttpAltAbrirEl = document.getElementById("ajustesTlsHttpAltAbrir")
+    // Lo último que ha contado el servidor. El interruptor del HTTP alternativo
+    // lo necesita para reaplicar con los mismos nombres, y desactivar desde el
+    // puerto alternativo, para saber adónde volver.
+    let _tlsUltimo = null
+
+    // Ayuda del interruptor: el puerto real, la dirección a la que lleva y si
+    // se está entrando justo por él, que es lo que explica por qué no se deja
+    // apagar desde aquí.
+    function _pintarHttpAlternativo(data, editable) {
+        if (!tlsHttpAltFila) return
+        tlsHttpAltFila.style.display = data.gestionadoPorEntorno ? "none" : ""
+        if (tlsHttpAltEl) {
+            tlsHttpAltEl.checked = data.httpAlternativo !== false
+            tlsHttpAltEl.disabled = !editable || !!data.porHttpAlternativo
+        }
+        const url = `http://${location.hostname}:${data.puertoHttpAlternativo}`
+        if (tlsHttpAltAbrirEl) tlsHttpAltAbrirEl.href = url + "/"
+        if (tlsHttpAltProbarBtn) tlsHttpAltProbarBtn.disabled = !data.proxyDisponible
+        if (!tlsHttpAltAyuda) return
+        let ayuda =
+            `Con el HTTPS activo, la aplicación sigue respondiendo sin cifrar en <code>${escapeHtml(url)}</code>, ` +
+            "para no perder el acceso si el certificado deja de valer. Por ahí la contraseña viaja en claro: úsalo solo de rescate."
+        if (data.porHttpAlternativo) {
+            ayuda += " <strong>Estás entrando por este puerto</strong>: para cerrarlo, entra por <code>https://</code>."
+        } else if (data.activado && !data.httpAlternativoActivo) {
+            ayuda += " Ahora está cerrado."
+        }
+        tlsHttpAltAyuda.innerHTML = ayuda
+    }
+
+    // Desde el servidor solo se sabe si Caddy escucha y lleva a la aplicación;
+    // si Docker lo publica en el host lo dice el enlace de al lado, abierto
+    // desde el aparato.
+    function _textoPruebaHttpAlternativo(r) {
+        const puerto = r.puerto
+        if (r.escucha && r.llegaALaApp) {
+            return [
+                `Abierto: el puerto ${puerto} lleva a la aplicación. Ábrelo en una pestaña para comprobarlo desde este aparato.`,
+                "ok"
+            ]
+        }
+        if (r.escucha) {
+            return [
+                `Algo responde en el puerto ${puerto}, pero no es esta aplicación${r.error ? " (" + r.error + ")" : ""}.`,
+                "error"
+            ]
+        }
+        if (r.esperado) {
+            return [
+                `Debería estar abierto y no responde: ${r.error || "sin respuesta"}. Revisa los logs de Caddy.`,
+                "error"
+            ]
+        }
+        const motivo = _tlsUltimo?.activado ? "la opción está apagada" : "el HTTPS está desactivado"
+        return [`Cerrado: nada escucha en el puerto ${puerto}. Es lo esperado, porque ${motivo}.`, ""]
+    }
+
+    async function _probarHttpAlternativo() {
+        if (tlsHttpAltProbarBtn) tlsHttpAltProbarBtn.disabled = true
+        showMsg(tlsHttpAltMsg, "Probando…", "")
+        try {
+            const res = await fetch("/api/tls/http-alternativo/prueba")
+            const data = await res.json()
+            if (!data.ok) {
+                showMsg(tlsHttpAltMsg, data.error || "No se ha podido probar", "error")
+                return
+            }
+            const [texto, tipo] = _textoPruebaHttpAlternativo(data)
+            showMsg(tlsHttpAltMsg, texto, tipo)
+        } catch {
+            showMsg(tlsHttpAltMsg, "Error de red", "error")
+        } finally {
+            if (tlsHttpAltProbarBtn) tlsHttpAltProbarBtn.disabled = false
+        }
+    }
+
+    // Con el HTTPS apagado solo se guarda la preferencia al emitir o activar;
+    // con el HTTPS puesto se aplica en el momento, con los nombres de siempre.
+    async function _cambiarHttpAlternativo() {
+        if (!tlsHttpAltEl || !_tlsUltimo?.activado) return
+        const pedido = tlsHttpAltEl.checked
+        tlsHttpAltEl.disabled = true
+        showMsg(tlsHttpAltMsg, pedido ? "Abriendo el puerto HTTP…" : "Cerrando el puerto HTTP…", "")
+        try {
+            const res = await fetch("/api/tls", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ activado: true, nombres: _tlsUltimo.nombres, httpAlternativo: pedido })
+            })
+            const data = await res.json()
+            if (!data.ok) {
+                tlsHttpAltEl.checked = !pedido
+                showMsg(tlsHttpAltMsg, data.error || "No se ha podido aplicar", "error")
+                return
+            }
+            _pintarTls(data)
+            showMsg(tlsHttpAltMsg, pedido ? "Puerto HTTP abierto" : "Puerto HTTP cerrado", "ok")
+        } catch {
+            tlsHttpAltEl.checked = !pedido
+            showMsg(tlsHttpAltMsg, "Error de red", "error")
+        } finally {
+            tlsHttpAltEl.disabled = !!_tlsUltimo?.porHttpAlternativo
+        }
+    }
 
     function _pintarTls(data) {
         if (!tlsEstadoEl) return
@@ -993,6 +1120,8 @@ function _initAjustesAtajoHttps() {
         // Sin proxy o con el HTTPS impuesto por .env no hay nada que pulsar:
         // un botón que solo puede devolver un error es peor que ninguno.
         const editable = data.proxyDisponible && !data.gestionadoPorEntorno
+        _tlsUltimo = data
+        _pintarHttpAlternativo(data, editable)
         if (tlsNombresEl) {
             tlsNombresEl.disabled = !editable
             // Solo se rellena si el usuario no ha escrito nada: al recargar tras
@@ -1012,8 +1141,14 @@ function _initAjustesAtajoHttps() {
         // instalarla y encender. La hay tras preparar y también si el HTTPS
         // estuvo puesto alguna vez, porque la raíz vive en el volumen de Caddy.
         const conCa = !!data.caDisponible
+        // La raíz sobrevive en el volumen de Caddy aunque estado.json se quede
+        // sin nombres (un intento anterior, un desactivar sin lista). Con CA y
+        // sin nombres no hay nada emitido que comprobar ni activar: si «Emitir»
+        // se escondiera solo por haber CA, el panel pediría pulsar un botón que
+        // no enseña.
+        const preparado = conCa && (data.nombres || []).length > 0
         if (tlsPrepararBtn) {
-            tlsPrepararBtn.style.display = editable && !data.activado && !conCa ? "" : "none"
+            tlsPrepararBtn.style.display = editable && !data.activado && !preparado ? "" : "none"
             tlsPrepararBtn.disabled = !editable
         }
         if (tlsDesactivarBtn) {
@@ -1029,7 +1164,7 @@ function _initAjustesAtajoHttps() {
         // Y colgando de él, el segundo paso: encender. Solo mientras esté
         // apagado; con el HTTPS puesto, lo que se ofrece debajo es comprobarlo.
         if (tlsPaso2El) {
-            tlsPaso2El.style.display = editable && !data.activado && conCa ? "" : "none"
+            tlsPaso2El.style.display = editable && !data.activado && preparado ? "" : "none"
         }
         _tlsIpLan = data.ipLan || null
         _avisarSiTeDejasFuera()
@@ -1178,7 +1313,7 @@ function _initAjustesAtajoHttps() {
             const res = await fetch("/api/tls/preparar", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ nombres })
+                body: JSON.stringify({ nombres, httpAlternativo: tlsHttpAltEl ? tlsHttpAltEl.checked : undefined })
             })
             const data = await res.json()
             if (!data.ok) {
@@ -1222,6 +1357,13 @@ function _initAjustesAtajoHttps() {
         }, 6000)
     }
 
+    function _volverAlPuertoPrincipal(puerto) {
+        if (!puerto) return
+        const url = `http://${location.hostname}:${puerto}${location.pathname}`
+        showMsg(tlsMsg, `HTTPS desactivado. Volviendo a ${url}…`, "ok")
+        setTimeout(() => location.replace(url), 3000)
+    }
+
     // --- Paso 2: encender ---
     async function _guardarTls(activado) {
         const nombres = _nombresEscritos()
@@ -1240,16 +1382,24 @@ function _initAjustesAtajoHttps() {
             const res = await fetch("/api/tls", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ activado, nombres })
+                body: JSON.stringify({
+                    activado,
+                    nombres,
+                    httpAlternativo: tlsHttpAltEl ? tlsHttpAltEl.checked : undefined
+                })
             })
             const data = await res.json()
             if (!data.ok) {
                 showMsg(msg, data.error || "No se ha podido aplicar", "error")
                 return
             }
+            const veniaPorHttpAlternativo = !!_tlsUltimo?.porHttpAlternativo
             _pintarTls(data)
             showMsg(msg, activado ? "HTTPS activado" : "HTTPS desactivado", "ok")
             if (activado) _saltarAHttps(data.nombres)
+            // Sin HTTPS el puerto alternativo se cierra: el sitio vuelve a estar
+            // en el puerto de siempre, ya en claro.
+            else if (veniaPorHttpAlternativo) _volverAlPuertoPrincipal(data.puertoPrincipal)
         } catch {
             // Al activar, el proxy recarga su configuración mientras esta misma
             // petición está en vuelo: es posible que haya funcionado y que la
@@ -1506,6 +1656,8 @@ function _initAjustesAtajoHttps() {
     if (tlsPrepararBtn) tlsPrepararBtn.addEventListener("click", _prepararTls)
     if (tlsActivarBtn) tlsActivarBtn.addEventListener("click", () => _guardarTls(true))
     if (tlsDesactivarBtn) tlsDesactivarBtn.addEventListener("click", () => _guardarTls(false))
+    if (tlsHttpAltEl) tlsHttpAltEl.addEventListener("change", _cambiarHttpAlternativo)
+    if (tlsHttpAltProbarBtn) tlsHttpAltProbarBtn.addEventListener("click", _probarHttpAlternativo)
     // El botón de activar no se habilita hasta que se marca que el certificado
     // ya está instalado. Es la única pulsación de este panel que puede dejar a
     // alguien fuera, y basta una casilla para que no se dé por accidente.

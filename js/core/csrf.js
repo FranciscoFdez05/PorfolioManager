@@ -12,9 +12,20 @@
 
     const SAFE_METHODS = { GET: 1, HEAD: 1, OPTIONS: 1, TRACE: 1 }
 
-    function readCsrfToken() {
-        const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/)
+    function readCookie(name) {
+        const match = document.cookie.match(new RegExp("(?:^|;\\s*)" + name + "=([^;]*)"))
         return match ? decodeURIComponent(match[1]) : ""
+    }
+
+    // Por el puerto HTTP que convive con el HTTPS, el servidor emite la cookie
+    // como csrf_token_http (ver SUFIJO_COOKIE_HTTP en core/seguridad_app.py).
+    // Por https:// también se ve esa cookie, que no lleva Secure, así que solo
+    // se mira en claro.
+    function readCsrfToken() {
+        if (window.location.protocol === "http:") {
+            return readCookie("csrf_token_http") || readCookie("csrf_token")
+        }
+        return readCookie("csrf_token")
     }
 
     function isSameOrigin(url) {
