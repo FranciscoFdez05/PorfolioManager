@@ -502,9 +502,9 @@ Este endpoint es el que hace que el Atajo no tenga ninguna categoría escrita a 
 
 ### 5. Montar el Atajo
 
-**Lo más rápido es no montarlo: que lo genere el servidor.** En **Ajustes › API › Atajo de iOS** hay un botón que descarga el atajo ya hecho, con la dirección de este servidor dentro, además del estado de la configuración, un botón para generar la clave de firma y una prueba en seco que dice qué falta. El fichero va sin firmar por Apple, así que iOS pide tener activado *Ajustes › Atajos › Permitir atajos no fiables*.
+**Ajustes › API › Atajo de iOS** reúne todo lo necesario: el estado de la configuración, un botón para generar la clave de firma, una prueba en seco que dice qué falta, la receta para montarlo con las URL y el token de este servidor, y un botón que descarga el atajo ya hecho. **Pero el fichero va sin firmar por Apple, y desde iOS 15 no se puede importar así**: la opción *Permitir atajos no fiables* desapareció. Solo sirve si antes lo firmas en un Mac (`shortcuts sign --mode anyone --input atajo.shortcut --output firmado.shortcut`). Sin Mac, se monta a mano: la receta de Ajustes › API › «Montarlo a mano, paso a paso» trae las URL y el token (con botón para copiarlo), que va en la cabecera `X-Atajo-Token` de **todas** las llamadas.
 
-Si prefieres montarlo a mano —o si iOS lo rechaza—, los pasos concretos, con los nombres de cada acción de la app Atajos, están en **[docs/atajo-ios.md](docs/atajo-ios.md)**. El flujo es:
+Para montarlo a mano, los pasos concretos, con los nombres de cada acción de la app Atajos, están en **[docs/atajo-ios.md](docs/atajo-ios.md)**. El flujo es:
 
 ```
 Elegir del menú (Gasto / Ingreso)

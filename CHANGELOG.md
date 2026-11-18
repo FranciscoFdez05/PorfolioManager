@@ -50,6 +50,11 @@ volver a descargarlo desde Ajustes › API.
 
 ### Cambiado
 
+- **Ajustes › API: el Atajo se monta a mano.** Desde iOS 15 no se puede importar
+  un atajo sin firmar (ya no existe «Permitir atajos no fiables»), y el panel
+  seguía mandando a activarlo. Ahora el paso «Instalar en el iPhone» lo explica
+  y abre la receta manual, que lleva un botón para copiar el token;
+  «Descargar» queda para quien lo firme en un Mac (`shortcuts sign`).
 - **HTTPS: con el HTTPS activo el puerto y los nombres quedan fijos.** Los
   campos se bloquean y el servidor responde 409 (`POST /api/tls/puerto`, o
   `POST /api/tls` con otra lista): el certificado, los aparatos y el Atajo ya

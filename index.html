@@ -1990,9 +1990,14 @@
                         <div class="ajustesAtajoPasoCuerpo">
                             <div class="ajustesAtajoPasoTitulo">Instalar en el iPhone</div>
                             <div class="ajustesAtajoPasoDetalle">
-                                Abre esta misma página en el iPhone y pulsa <strong>Descargar</strong>; iOS ofrece
-                                «Añadir atajo». Si no lo acepta, activa antes
-                                <em>Ajustes › Atajos › Permitir atajos no fiables</em>.
+                                iOS ya no importa atajos sin firmar: la opción «Permitir atajos no fiables»
+                                desapareció en iOS 15, y este fichero no lleva la firma de Apple. Lo normal es
+                                <strong>montarlo a mano</strong> con la receta de abajo, que trae las URL y el
+                                token: el token va en la cabecera <code>X-Atajo-Token</code> de
+                                <strong>todas</strong> las llamadas.
+                                <button id="ajustesAtajoRecetaBtn" class="ajustesTlsAvisoBtn" type="button">Ver cómo montarlo</button>
+                                <br>«Descargar» solo sirve si antes lo firmas en un Mac con
+                                <code>shortcuts sign --mode anyone</code>.
                             </div>
                             <div class="ajustesAtajoUrlFila">
                                 <span class="ajustesAtajoUrlEtiqueta">Llamará a</span>
@@ -2089,7 +2094,7 @@
                     </div>
                 </details>
 
-                <details class="ajustesTlsAyuda ajustesAtajoReceta">
+                <details class="ajustesTlsAyuda ajustesAtajoReceta" id="ajustesAtajoRecetaDetalles">
                     <summary>Montarlo a mano, paso a paso</summary>
                     <div class="ajustesTlsAyudaCuerpo" id="ajustesAtajoReceta"></div>
                 </details>

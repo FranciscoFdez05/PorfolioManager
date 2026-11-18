@@ -797,9 +797,30 @@ function _initAjustesAtajoHttps() {
             "<p>El cuerpo del último paso va como <strong>Archivo</strong>, no como JSON: con JSON, Atajos vuelve a serializar el texto, cambian los bytes y la firma falla con un 401 que parece un problema de clave sin serlo.</p>" +
             "<p><strong>Token</strong> (trátalo como una contraseña; cambia al regenerar la clave): " +
             '<code id="ajustesAtajoTokenValor">oculto</code> ' +
-            '<button id="ajustesAtajoTokenBtn" class="ajustesTlsAvisoBtn" type="button">Mostrar</button></p>'
+            '<button id="ajustesAtajoTokenBtn" class="ajustesTlsAvisoBtn" type="button">Mostrar</button> ' +
+            '<button id="ajustesAtajoTokenCopiarBtn" class="ajustesTlsAvisoBtn" type="button">Copiar</button></p>'
 
         document.getElementById("ajustesAtajoTokenBtn")?.addEventListener("click", _mostrarTokenAtajo)
+        document.getElementById("ajustesAtajoTokenCopiarBtn")?.addEventListener("click", _copiarTokenAtajo)
+    }
+
+    // Montado a mano, el token se pega en cuatro acciones: copiarlo evita
+    // erratas en 64 caracteres. Por http:// el portapapeles no está disponible
+    // (solo en contextos seguros), y entonces se deja seleccionado para Copiar
+    // del propio sistema.
+    async function _copiarTokenAtajo() {
+        const destino = document.getElementById("ajustesAtajoTokenValor")
+        const boton = document.getElementById("ajustesAtajoTokenCopiarBtn")
+        if (!destino || !boton) return
+        if (destino.textContent === "oculto") await _mostrarTokenAtajo()
+        try {
+            await navigator.clipboard.writeText(destino.textContent || "")
+            boton.textContent = "Copiado"
+        } catch {
+            getSelection()?.selectAllChildren(destino)
+            boton.textContent = "Seleccionado: cópialo"
+        }
+        setTimeout(() => (boton.textContent = "Copiar"), 2500)
     }
 
     async function _mostrarTokenAtajo() {
@@ -942,6 +963,14 @@ function _initAjustesAtajoHttps() {
         })
     }
     if (atajoProbarBtn) atajoProbarBtn.addEventListener("click", _probarAtajo)
+    // La receta manual es ahora el camino normal: el botón del paso 3 la abre
+    // y la lleva a la vista, en vez de dejar que se busque al final del panel.
+    document.getElementById("ajustesAtajoRecetaBtn")?.addEventListener("click", () => {
+        const receta = document.getElementById("ajustesAtajoRecetaDetalles")
+        if (!receta) return
+        receta.open = true
+        receta.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
     loadAtajo()
 
     // Enciende y apaga el TLS del proxy que hay delante, en dos pulsaciones que

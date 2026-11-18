@@ -2367,8 +2367,8 @@
     overflow-wrap: anywhere;
 }
 
-/* El aviso de «atajos no fiables» va antes de la descarga y no después: leído
-   cuando el fichero ya no se abre, llega tarde. */
+/* El aviso de cómo instalar el atajo va antes de la descarga y no después:
+   leído cuando el fichero ya no se abre, llega tarde. */
 .ajustesAtajoAviso {
     margin: 0 20px;
     padding: 12px 14px;

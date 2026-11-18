@@ -16,10 +16,10 @@ secreto**: guárdalo como una contraseña. Rehacer la clave en Ajustes revoca el
 token, y hay que volver a descargar el Atajo.
 
 **El formato.** Un `.shortcut` es un plist con la lista de acciones. Se genera en
-XML y **sin firmar**, porque firmarlo exige las claves de Apple. Un atajo sin
-firmar solo se importa con «Atajos no fiables» activado (Ajustes > Atajos), que a
-su vez exige haber ejecutado algún atajo antes. Eso se le dice al usuario junto
-al botón de descarga: sin el aviso, el fichero se abre y no ocurre nada.
+XML y **sin firmar**, porque firmarlo exige las claves de Apple. Desde iOS 15 un
+atajo sin firmar no se importa (desapareció «Permitir atajos no fiables»): el
+fichero solo sirve firmado antes en un Mac con `shortcuts sign`. Por eso el
+panel ofrece como camino normal la receta manual, con el token para copiar.
 
 **Por qué hay un «Si» después de cada llamada al servidor.** Atajos no trata
 un 403 o un 404 como un error: «Obtener contenido de la URL» devuelve el JSON

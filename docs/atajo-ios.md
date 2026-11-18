@@ -22,12 +22,18 @@ se entere.
   primer paso que falla.
 - **Descarga el atajo ya montado**, con la dirección de tu servidor dentro.
 
-El fichero se genera sin firmar —firmarlo exige las claves de Apple—, así que
-iOS solo lo acepta con *Ajustes > Atajos > Permitir atajos no fiables*, un
-interruptor que además no aparece hasta que has ejecutado algún atajo alguna
-vez. Si tu iPhone lo rechaza, o si prefieres entender cada acción antes de
-usarla, el resto de este documento es la misma receta a mano: son exactamente
-las mismas acciones y en el mismo orden.
+El fichero se genera sin firmar —firmarlo exige las claves de Apple—, y **desde
+iOS 15 un atajo sin firmar no se puede importar**: la opción *Permitir atajos no
+fiables* ya no existe. Solo sirve si lo firmas antes en un Mac:
+
+```sh
+shortcuts sign --mode anyone --input "Gestor Portfolio.shortcut" --output firmado.shortcut
+```
+
+Sin Mac, se monta a mano con el resto de este documento, que es la misma
+receta: las mismas acciones y en el mismo orden. Las URL y el token están en
+Ajustes › API › «Montarlo a mano, paso a paso», con un botón para copiar el
+token.
 
 El atajo generado **no lleva la clave de firma**, pero sí un **token de acceso**
 (`X-Atajo-Token`) que manda en todas sus llamadas. Sin él, cualquier equipo de
