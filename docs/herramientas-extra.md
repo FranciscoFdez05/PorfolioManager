@@ -1,9 +1,59 @@
 # Añadir tus propias herramientas
 
+Hay dos formas. La primera no necesita código y basta para la mayoría de
+calculadoras; la segunda da libertad total a cambio de escribir HTML y JS.
+
+## Desde la aplicación, sin código
+
+En **Herramientas › Propias**, la última pestaña es **+ Nueva herramienta**.
+Abre un formulario con tres partes:
+
+- **Datos**: título y, si quieres, una descripción.
+- **Campos**: lo que se pide al usar la herramienta. Cada uno lleva una
+  etiqueta, un *nombre en la fórmula*, una unidad opcional (€, %, años) y un
+  valor por defecto. El nombre en la fórmula se rellena solo a partir de la
+  etiqueta («Gasto anual» → `gastoAnual`) hasta que lo cambies a mano; empieza
+  por letra y solo lleva letras sin acentos, números o guion bajo.
+- **Resultados**: cada uno con su etiqueta, su fórmula, el formato (número,
+  moneda o porcentaje), los decimales, un sufijo opcional («/ mes», «años») y
+  si va destacado.
+
+Las fórmulas usan los nombres de los campos:
+
+```text
+gastoAnual / (tasa / 100)
+capital * (1 + interes / 100) ^ anos
+max(0, objetivo - ahorrado) / meses
+```
+
+| Admite | |
+|---|---|
+| Operaciones | `+ - * / ^` y paréntesis. `^` es la potencia y `-2 ^ 2` da `-4` |
+| Funciones | `min`, `max`, `abs`, `round(x)` o `round(x, decimales)`, `sqrt`, `pow`, `ln`, `log` (base 10), `exp`, `floor`, `ceil` |
+| Números | Decimal con punto (`0.5`); los argumentos se separan con coma |
+
+Al guardar se comprueba que cada fórmula se entienda y use solo campos que
+existen; si no, el formulario dice qué resultado falla y por qué. Un resultado
+que no se puede calcular con los valores puestos (una división entre cero, por
+ejemplo) sale como «—» con el motivo al pasar el ratón.
+
+El formato **porcentaje** pinta el número tal cual: si quieres ver «4 %», la
+fórmula tiene que dar 4, no 0,04. **Moneda** usa la moneda base de Ajustes.
+
+Cada herramienta tiene **Editar** y **Borrar** en su cabecera. Son comunes a
+todos los portfolios y se guardan en `data/JSON/ajustes.json` (clave
+`herramientasPropias`), así que entran en las copias de seguridad, las
+exportaciones y las importaciones. Las fórmulas las calcula el navegador con
+un analizador propio (`js/analisis/herramientas-formula.js`), nunca con
+`eval`: una fórmula no puede ejecutar código. La API es
+`GET/POST /api/herramientas-propias` y `PUT/DELETE /api/herramientas-propias/<id>`.
+
+## Con un fichero HTML y JS
+
 La página **Herramientas** lee la carpeta `html/analisis/herramientas-extra/`.
 Cada fichero `.html` que dejes ahí es una calculadora más: aparece en la
-categoría **Propias** de la barra, con el mismo aspecto que las de serie. Esa
-categoría sale sola en cuanto hay una herramienta tuya. No hay nada que
+categoría **Propias** de la barra, con el mismo aspecto que las de serie y
+delante de las creadas desde la aplicación. No hay nada que
 registrar ni ningún fichero de la aplicación que tocar, así que tus herramientas
 sobreviven a las actualizaciones.
 
@@ -91,7 +141,7 @@ Dos límites que conviene saber:
 
 ## Si algo no sale
 
-- La categoría «Propias» no aparece → mira el nombre del fichero y el log del servidor.
+- Tu herramienta no aparece en «Propias» → mira el nombre del fichero y el log del servidor.
 - Aparece pero está vacía o no calcula → consola del navegador (F12). Un error
   dentro de tu herramienta se registra ahí y no tumba el resto de la página.
 - Cambias el fichero y no ves el cambio → recarga con Ctrl+F5.

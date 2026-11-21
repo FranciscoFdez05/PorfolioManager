@@ -33,10 +33,12 @@ from urllib.error import HTTPError, URLError
 from flask import Blueprint, jsonify, request
 
 from core import fifo
+from core.errors import registrarFalloEscritura
 from core.paths import BASE_DIR
+from core.validation import jsonBody
 from providers import tradingview_client
 from providers.http import motivoConexion
-from stores import herramientas_fiscal, ventas_fifo
+from stores import ajustes_store, equivalencias, herramientas_fiscal, herramientas_propias, ventas_fifo
 
 log = logging.getLogger(__name__)
 
@@ -138,6 +140,72 @@ def getHerramientasExtra():
     return jsonify({"ok": True, "herramientas": listar()})
 
 
+# ── Herramientas creadas desde la aplicación ─────────────────────────────────
+# Las de fichero de arriba piden editar una carpeta del servidor; estas se crean
+# con un formulario. Viven en ajustes.json (ver stores/herramientas_propias.py)
+# y aquí solo se leen, se aplica el cambio y se escriben. Se lee siempre lo
+# último del disco antes de escribir para no pisar otros ajustes guardados
+# entretanto desde otra pestaña.
+
+
+def _leerPropias() -> list[dict]:
+    return ajustes_store._readAjustes()[herramientas_propias.CLAVE]
+
+
+def _guardarPropias(lista: list[dict]):
+    """Escribe la lista; devuelve una respuesta de error si el disco falla, o None."""
+    ajustes = ajustes_store._readAjustes()
+    ajustes[herramientas_propias.CLAVE] = lista
+    try:
+        ajustes_store._writeAjustes(ajustes)
+    except OSError as error:
+        mensaje = registrarFalloEscritura(log, "No se pudo guardar la herramienta", error)
+        return jsonify({"ok": False, "error": mensaje}), 500
+    return None
+
+
+def _errorPropia(error):
+    if isinstance(error, herramientas_propias.HerramientaNoEncontrada):
+        return jsonify({"ok": False, "error": "Esa herramienta ya no existe"}), 404
+    return jsonify({"ok": False, "error": str(error)}), 400
+
+
+@herramientasBp.route("/api/herramientas-propias", methods=["GET"])
+def getHerramientasPropias():
+    """Las herramientas creadas desde la aplicación, en el orden en que se crearon."""
+    return jsonify({"ok": True, "herramientas": _leerPropias()})
+
+
+@herramientasBp.route("/api/herramientas-propias", methods=["POST"])
+def postHerramientaPropia():
+    """Crea una herramienta. El id lo pone el servidor."""
+    try:
+        lista, herramienta = herramientas_propias.crear(_leerPropias(), jsonBody())
+    except herramientas_propias.HerramientaInvalida as error:
+        return _errorPropia(error)
+    return _guardarPropias(lista) or jsonify({"ok": True, "herramienta": herramienta})
+
+
+@herramientasBp.route("/api/herramientas-propias/<identificador>", methods=["PUT"])
+def putHerramientaPropia(identificador):
+    """Sustituye la herramienta entera; conserva su id y su posición."""
+    try:
+        lista, herramienta = herramientas_propias.actualizar(_leerPropias(), identificador, jsonBody())
+    except (herramientas_propias.HerramientaInvalida, herramientas_propias.HerramientaNoEncontrada) as error:
+        return _errorPropia(error)
+    return _guardarPropias(lista) or jsonify({"ok": True, "herramienta": herramienta})
+
+
+@herramientasBp.route("/api/herramientas-propias/<identificador>", methods=["DELETE"])
+def deleteHerramientaPropia(identificador):
+    """Borra la herramienta. No hay papelera: el navegador pide confirmación antes."""
+    try:
+        lista = herramientas_propias.borrar(_leerPropias(), identificador)
+    except herramientas_propias.HerramientaNoEncontrada as error:
+        return _errorPropia(error)
+    return _guardarPropias(lista) or jsonify({"ok": True})
+
+
 # ── Simulador de venta ───────────────────────────────────────────────────────
 # GET y no POST porque no cambia nada: es una consulta con parámetros. De paso
 # se ahorra el token CSRF, que aquí solo sería ceremonia.
@@ -227,3 +295,24 @@ def getCapitalizacion():
         return jsonify({"ok": False, "error": "TradingView no devuelve cotización para ese ticker"}), 404
 
     return jsonify({"ok": True, "ticker": ticker, **dato})
+
+
+# ── Equivalencias entre divisas y activos ────────────────────────────────────
+# Series de cada elemento de la lista en la moneda de referencia. Un elemento
+# sin cotización no tumba la respuesta: llega con su `error` y los demás siguen.
+
+
+@herramientasBp.route("/api/herramientas/equivalencias", methods=["GET"])
+def getEquivalencias():
+    """`?divisas=USD,GBP&tickers=BITSTAMP:BTCUSD&referencia=EUR&rango=1M`."""
+    try:
+        datos = equivalencias.equivalencias(
+            equivalencias.leerLista(request.args.get("divisas")),
+            equivalencias.leerLista(request.args.get("tickers")),
+            request.args.get("referencia", "EUR"),
+            request.args.get("rango", "1M"),
+        )
+    except equivalencias.EquivalenciasInvalidas as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
+
+    return jsonify({"ok": True, **datos})

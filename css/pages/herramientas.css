@@ -419,6 +419,16 @@
 .hResultBig .hResultValue {
     font-size: 1.7rem;
 }
+/* Referencia bajo la cifra (el «antes» de una simulación). */
+.hResultSub {
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+}
+.hResultSub:empty {
+    display: none;
+}
 .hResultPositive {
     color: var(--color-pos);
 }
@@ -1553,6 +1563,650 @@
     color: var(--text-muted);
 }
 
+/* ── Simular compra ─────────────────────────────────────────────────────── */
+/* El aviso y la tabla de reparto iban pegados uno al otro. */
+#toolSimularCompra .hRatioInterpretacion + .hCard {
+    margin-top: 16px;
+}
+/* Una cartera con muchos activos alargaba la columna de resultados sin fin:
+   la tabla se desplaza dentro de su caja y la cabecera se queda a la vista. */
+#hScRepartoCard .hTableWrap {
+    max-height: 340px;
+    overflow-y: auto;
+}
+#hScRepartoCard .hPrecioMedioTable {
+    margin-bottom: 0;
+}
+/* Título a la izquierda y selector Cartera / Activo a la derecha. */
+.hScRepartoHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    margin-bottom: 12px;
+}
+.hScRepartoHead .hCardTitle,
+.hScRepartoHead .hFxRangos {
+    margin-bottom: 0;
+}
+#hScRepartoMsg:not(:empty) {
+    display: block;
+    margin-bottom: 10px;
+}
+/* La vista del activo tiene una columna más que la de cartera. */
+#hScRepartoCard .hPrecioMedioTable th:nth-child(5),
+#hScRepartoCard .hPrecioMedioTable td:nth-child(5) {
+    text-align: right;
+}
+#hScRepartoCard .hPrecioMedioTable th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding-top: 2px;
+    background: var(--bg-panel);
+}
+
+/* ── Equivalencias ──────────────────────────────────────────────────────── */
+/* La tabla necesita más ancho que los formularios de las demás herramientas;
+   lo que no quepa se desplaza en horizontal dentro de su caja, sin estirar el
+   panel. */
+#toolEquivalencias .herramientaBody {
+    grid-template-columns: minmax(320px, 480px) minmax(0, 1fr);
+}
+@media (max-width: 900px) {
+    #toolEquivalencias .herramientaBody {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+.hEqLado {
+    min-width: 0;
+}
+.hEqTablaWrap {
+    overflow-x: auto;
+    max-width: 100%;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    -webkit-overflow-scrolling: touch;
+    /* Con `scrollbar-width` a secas el navegador vuelve a pintar su barra
+       nativa (blanca, con flechas), saltándose el `display: none` global de
+       base.css. Con color propio queda una barra fina del tema, como la de la
+       fila de métricas; el relleno inferior le hace sitio para que no tape la
+       última fila. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+    padding-bottom: 4px;
+}
+.hEqTablaWrap::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+}
+.hEqTablaWrap::-webkit-scrollbar-track {
+    background: transparent;
+}
+.hEqTablaWrap::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+.hEqTablaWrap::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+/* La mano solo cuando sobra tabla que arrastrar (las clases las pone
+   hEqActualizarSombras); `dragging` la pone activarArrastreHorizontal. */
+.hEqTablaWrap.hEqMasDerecha,
+.hEqTablaWrap.hEqMasIzquierda,
+.hEqTablaWrap.hEqMasDerecha tbody tr,
+.hEqTablaWrap.hEqMasIzquierda tbody tr {
+    cursor: grab;
+}
+.hEqTablaWrap.dragging,
+.hEqTablaWrap.dragging tbody tr {
+    cursor: grabbing;
+    /* Sin esto, arrastrar sobre una cifra la selecciona en vez de mover la tabla. */
+    user-select: none;
+}
+.hEqTablaWrap .hEqCantidad {
+    cursor: text;
+}
+.hEqTabla {
+    min-width: 640px;
+    margin-bottom: 0;
+}
+.hEqTabla th,
+.hEqTabla td {
+    white-space: nowrap;
+}
+#toolEquivalencias .hEqTabla th {
+    padding: 10px 10px 8px;
+}
+#toolEquivalencias .hEqTabla td {
+    padding: 7px 10px;
+}
+.hEqTabla .hEqNum {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+/* Al desplazar la tabla, el nombre se queda a la vista: sin él, las cifras de
+   la derecha no dicen de qué activo son. */
+.hEqTabla th:first-child,
+.hEqTabla td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--bg-surface);
+}
+/* Quitar también queda siempre a mano, en el borde derecho. */
+.hEqTabla th:last-child,
+.hEqTabla td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    width: 34px;
+    padding-left: 4px;
+    padding-right: 6px;
+    background: var(--bg-surface);
+}
+/* La sombra aparece solo en el lado por el que queda tabla oculta (la clase la
+   pone hEqActualizarSombras al desplazar): así se ve que hay más columnas. */
+.hEqMasIzquierda .hEqTabla th:first-child,
+.hEqMasIzquierda .hEqTabla td:first-child {
+    box-shadow: 6px 0 8px -6px rgba(0, 0, 0, 0.45);
+}
+.hEqMasDerecha .hEqTabla th:last-child,
+.hEqMasDerecha .hEqTabla td:last-child {
+    box-shadow: -6px 0 8px -6px rgba(0, 0, 0, 0.45);
+}
+/* Toda la cabecera con el fondo de la tarjeta: con el de las tablas del tema
+   claro, la celda fija de «Activo» destacaba sobre las demás. El id gana a
+   `html[data-theme] th` de los temas. */
+#toolEquivalencias .hEqTabla thead th {
+    background: var(--bg-surface);
+}
+.hEqTabla tbody tr {
+    cursor: pointer;
+}
+.hEqTabla tbody tr:hover td {
+    background: color-mix(in srgb, var(--text-bright) 6%, var(--bg-surface));
+}
+/* Opaco y no translúcido: la primera columna es sticky y, si dejara ver lo
+   que pasa por debajo al desplazar, las cifras se montarían sobre el nombre. */
+.hEqTabla tbody tr.active td {
+    background: color-mix(in srgb, var(--accent) 16%, var(--bg-surface));
+}
+.hEqTabla tbody tr.active td:first-child {
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+.hEqMasIzquierda .hEqTabla tbody tr.active td:first-child {
+    box-shadow:
+        inset 3px 0 0 var(--accent),
+        6px 0 8px -6px rgba(0, 0, 0, 0.45);
+}
+#toolEquivalencias .hEqTabla tbody tr:last-child td {
+    border-bottom: none;
+}
+.hEqActivo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    /* Estrecha a propósito: con el nombre, la cantidad y el precio a la vista
+       en la columna de 480 px, las variaciones quedan a un desplazamiento. */
+    max-width: 150px;
+}
+.hEqMuestra {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+.hEqActivoTexto {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.hEqActivoTexto strong,
+.hEqActivoTexto small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.hEqActivoTexto strong {
+    color: var(--text-bright);
+    font-weight: 600;
+}
+.hEqActivoTexto small {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+}
+/* Campo discreto que se marca al pasar o al escribir: la tabla se lee como
+   una lista de cifras, no como un formulario. */
+#toolEquivalencias .hEqCantidad {
+    width: 112px;
+    padding: 5px 8px;
+    border-color: var(--border-soft);
+    background: transparent;
+    font-weight: 600;
+}
+#toolEquivalencias .hEqCantidad:hover {
+    border-color: var(--btn-border-hover);
+}
+#toolEquivalencias .hEqCantidad:focus {
+    border-color: var(--accent);
+    background: var(--bg-inset);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.hEqSinCotizacion {
+    color: var(--text-dim);
+}
+.hEqQuitar {
+    width: 26px;
+    height: 26px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.hEqQuitar:hover {
+    border-color: var(--btn-border-hover);
+    color: #f87171;
+}
+.hEqVacia,
+.hEqNota {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+}
+.hEqChartWrap {
+    height: 320px;
+}
+/* Siete periodos en una fila aunque la columna del gráfico sea estrecha. */
+#toolEquivalencias .hFxRango {
+    padding: 6px 10px;
+}
+#toolEquivalencias .hFxRangos {
+    gap: 4px;
+}
+.hEqSeleccionTitulo {
+    margin-top: 14px;
+}
+.hEqSeleccionTitulo:empty {
+    display: none;
+}
+
+/* Añadir: un control segmentado y, debajo, solo la fila de la opción elegida. */
+.hEqPestanas {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-inset);
+}
+.hEqPestana {
+    padding: 7px 8px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s;
+}
+.hEqPestana:hover {
+    color: var(--text-bright);
+}
+.hEqPestana.active {
+    border-color: var(--btn-active-border);
+    background: var(--btn-active-bg);
+    color: var(--btn-active-text);
+}
+.hEqOrigen {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.hEqOrigen .hCapBuscar > select,
+.hEqOrigen .hCapBuscar > .csWrapper {
+    flex: 1;
+    min-width: 0;
+}
+.hEqEnlace {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.hEqEnlace:hover {
+    text-decoration: underline;
+}
+
+/* Los resultados flotan sobre la tabla en vez de empujarla hacia abajo. */
+.hEqBuscarCaja {
+    position: relative;
+}
+#toolEquivalencias .hEqResultados {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    max-height: 300px;
+    margin-top: 6px;
+    border: 1px solid var(--border-mid);
+    border-radius: 10px;
+    background: var(--bg-surface);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+#toolEquivalencias .hEqResultados .hCapResultado {
+    padding: 9px 12px;
+}
+#toolEquivalencias .hEqResultados .hCapResultado:hover,
+#toolEquivalencias .hEqResultados .hCapResultado:focus-visible {
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg-surface));
+    outline: none;
+}
+
+.hEqListaCabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 4px;
+}
+.hEqListaCabecera .hCardTitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+.hEqContador {
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--bg-inset);
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    letter-spacing: 0;
+}
+.hEqContador:empty {
+    display: none;
+}
+
+.hEqTotal {
+    padding: 12px 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-inset);
+    color: var(--text-bright);
+    font-size: 1rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.hEqTotal:empty {
+    display: none;
+}
+
+/* ── Equivalencias: varias listas ── */
+/* Un desplegable con la lista activa; renombrar y borrar, a su lado. Con
+   pestañas, muchas listas acababan en una tira cortada por los bordes. */
+.hEqListasFila {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.hEqListaSelector {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.hEqListaActual {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 11px;
+    border: 1px solid var(--border-mid);
+    border-radius: 8px;
+    background: var(--bg-inset);
+    color: var(--text-bright);
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
+}
+.hEqListaActual:hover {
+    border-color: var(--btn-border-hover);
+}
+.hEqListaActual[aria-expanded="true"] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.hEqListaActual .hEqListaNombre {
+    flex: 1 1 auto;
+}
+.hEqListaFlecha {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin: 0 2px 3px 0;
+    border-right: 2px solid var(--text-muted);
+    border-bottom: 2px solid var(--text-muted);
+    transform: rotate(45deg);
+    transition: transform 0.15s;
+}
+.hEqListaActual[aria-expanded="true"] .hEqListaFlecha {
+    margin-bottom: -3px;
+    transform: rotate(-135deg);
+}
+.hEqListaNombre {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.hEqListaCuenta {
+    flex: none;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 16%, transparent);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+/* El menú flota sobre lo de abajo en vez de empujarlo. */
+.hEqListasMenu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+    border: 1px solid var(--border-mid);
+    border-radius: 10px;
+    background: var(--bg-surface);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+.hEqListasMenu.hidden {
+    display: none;
+}
+.hEqListas {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 280px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+}
+.hEqListaOpcion {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+.hEqListaOpcion .hEqListaNombre {
+    flex: 1 1 auto;
+}
+.hEqListaOpcion:hover,
+.hEqListaOpcion:focus-visible {
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg-surface));
+    outline: none;
+}
+.hEqListaOpcion.active {
+    background: var(--btn-active-bg);
+    color: var(--btn-active-text);
+}
+.hEqListaNueva {
+    padding: 8px 10px;
+    border: 1px dashed var(--btn-border);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+.hEqListaNueva:hover:not(:disabled) {
+    border-color: var(--accent);
+}
+.hEqListaNueva:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.hEqListaAccion {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+.hEqListaAccion:hover:not(:disabled) {
+    border-color: var(--btn-border-hover);
+    color: var(--text-bright);
+}
+.hEqListaBorrar:hover:not(:disabled) {
+    color: #f87171;
+}
+.hEqListaAccion:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.hEqListaNombreInput {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 8px 11px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    background: var(--bg-inset);
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    font-weight: 600;
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* ── Equivalencias: ver en grande ── */
+.hEqListaAcciones {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.hEqAmpliarBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.hEqGraficoCabecera {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+.hEqGraficoCabecera .hEqAmpliarBtn {
+    flex: none;
+    margin-top: 7px;
+}
+
+/* La misma tarjeta, a casi toda la ventana, como el gráfico ampliado de la
+   ficha de un activo (grafico-activo.css). Fondo de tarjeta y no de panel:
+   las celdas fijas de la tabla lo llevan y se notarían como parches. */
+#toolEquivalencias .hEqVentana {
+    position: fixed;
+    inset: calc(var(--vh, 1vh) * 4) calc(var(--vw, 1vw) * 4);
+    z-index: 5000;
+    overflow: auto;
+    margin: 0;
+    border: 1px solid var(--btn-border);
+    border-radius: 12px;
+    background: var(--bg-surface);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    box-sizing: border-box;
+}
+.hEqFondo {
+    position: fixed;
+    inset: 0;
+    z-index: 4999;
+    background: rgba(4, 12, 24, 0.68);
+}
+.hEqFondo.hidden {
+    display: none;
+}
+/* El gráfico se come todo el alto que dejan los periodos y las estadísticas. */
+#hEqGraficoCard.hEqVentana {
+    display: flex;
+    flex-direction: column;
+}
+#hEqGraficoCard.hEqVentana .hEqChartWrap {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 340px;
+}
+/* Con sitio de sobra, los nombres largos se leen enteros. */
+#hEqTablaCard.hEqVentana .hEqActivo {
+    max-width: 340px;
+}
+#hEqTablaCard.hEqVentana .hEqTabla {
+    width: 100%;
+}
+@media (max-width: 700px) {
+    #toolEquivalencias .hEqVentana {
+        inset: calc(var(--vh, 1vh) * 2) 8px;
+    }
+}
+
 /* Capitalización objetivo: los datos del activo y las referencias van en dos
    tarjetas una junto a la otra, y los resultados ocupan el resto. En una sola
    columna la tarjeta era tan alta que «Calcular» quedaba fuera de la ventana. */
@@ -1637,4 +2291,260 @@
 .herramientaField > .herramientaSecBtn {
     align-self: flex-start;
     margin-top: 2px;
+}
+
+/* ── Herramientas propias (creadas desde la página) ─────────────────────── */
+/* El botón de crear cierra la fila de «Propias»: discontinuo para que se lea
+   como acción y no como una herramienta más. */
+.herramientaBtnNueva {
+    border: 1px dashed var(--border-mid);
+}
+
+.hPropiaEditor {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+/* La separación la da el gap: los márgenes propios de los títulos y del <p>
+   de ayuda se sumaban y dejaban huecos de casi el doble. */
+.hPropiaEditor > .hCardTitle {
+    margin-bottom: 0;
+}
+.hPropiaEditor > .hCardTitle:not(:first-child) {
+    margin-top: 10px;
+}
+.hPropiaEditor > p {
+    margin: 0;
+}
+.hPropiaEditor > .herramientaSecBtn {
+    align-self: flex-start;
+}
+.hPropiaDato {
+    max-width: 520px;
+}
+
+/* La tabla reutiliza la de precio medio, que alinea a la derecha sus
+   columnas 2-4 porque son importes; aquí son textos. */
+.hPropiaTabla th,
+.hPropiaTabla td,
+.hPropiaTabla td:nth-child(n) {
+    text-align: left;
+}
+.hPropiaTabla td:last-child {
+    width: 40px;
+}
+.hPropiaTexto,
+.hPropiaSelect {
+    background: var(--bg-inset);
+    border: 1px solid var(--border-mid);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    padding: 6px 9px;
+    border-radius: 7px;
+    outline: none;
+    width: 100%;
+    min-width: 120px;
+    box-sizing: border-box;
+}
+.hPropiaTexto:focus,
+.hPropiaSelect:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.hPropiaClave,
+.hPropiaFormula {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.hPropiaFormula {
+    min-width: 220px;
+}
+.hPropiaTabla .hPropiaCorto {
+    width: 80px;
+    min-width: 0;
+}
+
+.hPropiaError {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--color-neg);
+}
+.hPropiaError:empty {
+    display: none;
+}
+
+/* ── Comparar activos ───────────────────────────────────────────────────── */
+/* Listas en dos filas: arriba «+ Nueva lista» a la izquierda y renombrar/borrar
+   a la derecha; debajo, el desplegable a todo el ancho. En una sola fila no
+   cabía y cortaba el nombre de la lista («Mi com…»). Al renombrar, el campo
+   ocupa el sitio del desplegable. */
+.hCmpListasFila {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: 8px 6px;
+    margin-bottom: 6px;
+}
+.hCmpListaNueva {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+}
+#hCmpListaRenombrarBtn {
+    grid-column: 3;
+    grid-row: 1;
+}
+#hCmpListaBorrarBtn {
+    grid-column: 4;
+    grid-row: 1;
+}
+.hCmpListasFila > select,
+.hCmpListasFila > .csWrapper,
+.hCmpListaNombre {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-width: 0;
+    width: 100%;
+}
+.hCmpListaNombre {
+    display: none;
+    box-sizing: border-box;
+    padding: 7px 11px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    outline: none;
+    background: var(--bg-inset);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+    color: var(--text-primary);
+    font-size: 0.92rem;
+}
+.hCmpListasFila.renombrando > select,
+.hCmpListasFila.renombrando > .csWrapper {
+    display: none;
+}
+.hCmpListasFila.renombrando .hCmpListaNombre {
+    display: block;
+}
+.hCmpListaAccion {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-muted);
+    cursor: pointer;
+}
+.hCmpListaAccion:hover:not(:disabled) {
+    border-color: var(--btn-border-hover);
+    color: var(--text-primary);
+}
+.hCmpListaBorrar:hover:not(:disabled) {
+    color: var(--color-neg);
+}
+.hCmpListaAccion:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+/* Los mismos proveedores que el modal de activo, pero en fila: en esta columna
+   la rejilla del modal ponía cada botón en una línea entera. */
+.hCmpApisTitulo {
+    margin-top: 8px;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+}
+.hCmpApis {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+.hCmpApis .herramientaSecBtn {
+    flex: 1 1 auto;
+}
+.hCmpChips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.hCmpChips:empty {
+    display: none;
+}
+.hCmpChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    padding: 3px 4px 3px 9px;
+    border: 1px solid var(--border-mid);
+    border-radius: 999px;
+    background: var(--bg-inset);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+}
+/* Sin histórico: tachado y en rojo, para que se vea por qué no sale su línea. */
+.hCmpChipError {
+    border-color: var(--color-neg);
+}
+.hCmpChipError .hCmpChipTexto {
+    color: var(--color-neg);
+    text-decoration: line-through;
+}
+.hCmpChipTexto {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.hCmpChipColor {
+    display: inline-block;
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    vertical-align: middle;
+}
+.hCmpChipQuitar {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.hCmpChipQuitar:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+.hCmpTabla td,
+.hCmpTabla th {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.hCmpTabla th:not(:first-child),
+.hCmpTabla td:not(:first-child) {
+    text-align: right;
+}
+.hCmpPos {
+    color: var(--color-pos);
+}
+.hCmpNeg {
+    color: var(--color-neg);
+}
+/* El alfa lo pone el JS según |r|: el fondo se lee antes que la cifra. */
+.hCmpCorrPos {
+    background: color-mix(in srgb, var(--color-pos) calc(var(--hCmpCorrAlfa, 0) * 100%), transparent);
+}
+.hCmpCorrNeg {
+    background: color-mix(in srgb, var(--color-neg) calc(var(--hCmpCorrAlfa, 0) * 100%), transparent);
 }

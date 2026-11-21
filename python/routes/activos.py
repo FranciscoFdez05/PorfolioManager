@@ -138,6 +138,16 @@ def getRendimientoBatch():
         )
         result[assetId] = totales.paraJson()
         totalParticipaciones = totales.participaciones
+        # Sin redondear a céntimos, como el resto de cifras: en cripto la posición
+        # va en fracciones de unidad. La usa «Simular compra» para el precio medio.
+        result[assetId]["participaciones"] = float(dinero.redondear(totalParticipaciones, 8))
+        # El medio sale del invertido sin redondear: con 0,01 BTC, el céntimo del
+        # invertido redondeado movía el precio medio casi un euro.
+        result[assetId]["precioMedio"] = (
+            float(dinero.redondear(totales.invertidoNeto / totalParticipaciones, 8))
+            if totalParticipaciones > 0
+            else 0.0
+        )
 
         # Desglose activo/divisa. Las cifras de arriba están en la moneda del
         # activo y se mantienen tal cual —cambiarlas rompería la tabla que ya

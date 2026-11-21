@@ -131,6 +131,7 @@ const _MODULE_PAGES = {
         "patrimonio",
         "gastos",
         "ingresos",
+        "movimientosCuentas",
         "mensualidades",
         "ingresosRecurrentes",
         "pagosFraccionados",
@@ -140,7 +141,6 @@ const _MODULE_PAGES = {
     misFinanzas: [
         "ahorro",
         "cuentas",
-        "movimientosCuentas",
         "hipotecas",
         "financiadas",
         "microcreditos",

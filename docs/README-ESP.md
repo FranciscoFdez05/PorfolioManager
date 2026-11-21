@@ -7,7 +7,7 @@
 <h1 align="center">PorfolioManager</h1>
 
 <p align="center">
-  <a href="../CHANGELOG.md"><img src="https://img.shields.io/badge/versi%C3%B3n-5.7.1-blue" alt="Versión"></a>
+  <a href="../CHANGELOG.md"><img src="https://img.shields.io/badge/versi%C3%B3n-5.8.0-blue" alt="Versión"></a>
   <a href="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml"><img src="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB" alt="Python">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED" alt="Docker">
@@ -112,8 +112,9 @@ Los secretos van en `.env` (copia `.env.example`; `./docker-setup` lo hace por t
 | **Dividendos › Reinvertir** | Un dividendo se puede marcar como reinvertido: añade a la ficha del activo una compra «Reinvertido» que cuenta en la posición y en el FIFO |
 | **Ajustes › Exportar a CSV** | Descarga gastos, ingresos, dividendos, operaciones y cuentas en CSV listo para Excel |
 | **Herramientas › Proyección** | Interés compuesto, independencia financiera (cuánto necesitas y cuándo llegas), cuánto dura un capital retirando cada año, Monte Carlo con la volatilidad de tu cartera y rentabilidad real tras impuestos e inflación |
-| **Herramientas › Cartera / Mercado** | Tamaño de posición por riesgo, cuánto hay que subir para recuperar una caída, DCA frente a invertir todo de golpe con precios históricos reales, y el ratio entre dos activos cualesquiera frente a su historia |
+| **Herramientas › Cartera / Mercado** | Simular una compra (unidades que salen por lo invertido, precio medio nuevo, posición y peso en la cartera, en automático desde tus posiciones o todo a mano), tamaño de posición por riesgo, cuánto hay que subir para recuperar una caída, DCA frente a invertir todo de golpe con precios históricos reales, el ratio entre dos activos cualesquiera frente a su historia, un comparador que solapa en un gráfico de dos a ocho activos (de tu cartera o buscados por ticker con cualquiera de las APIs) con su rentabilidad, volatilidad, caída máxima y correlación, y una tabla de equivalencias: escribes una cantidad de cualquier divisa, acción, ETF, cripto o metal y ves cuánto vale en todos los demás, con el rendimiento de cada uno en un gráfico |
 | **Herramientas › Fiscal** | Simular una venta, ver qué posiciones en pérdidas vender para rebajar el IRPF del año (y cuándo recomprar), prever la cuota del ahorro con ventas, dividendos e intereses, y calcular la doble imposición de un dividendo extranjero |
+| **Herramientas › Propias** | Crear tus propias calculadoras desde la página, sin código: campos de entrada y resultados calculados con fórmulas como `gastoAnual / (tasa / 100)`. Comunes a todos los portfolios y dentro de las copias de seguridad |
 | **Mi dinero › Microcréditos** | Préstamos pequeños y de corta duración, con pago único (importe más comisión) o en cuotas mensuales: coste, TAE equivalente, vencimientos con aviso de los vencidos y calendario en los de cuotas |
 | **Cripto › Transacciones › ··· › Wallets enlazadas** | Importar los movimientos de tus wallets desde la blockchain (nunca pegues claves privadas ni frases semilla) |
 | **Cripto › Seguimiento** | Agrupar wallets propias o ajenas, ver su historial, UTXOs y tokens, y recibir avisos por Telegram |

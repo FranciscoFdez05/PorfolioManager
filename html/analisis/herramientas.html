@@ -29,6 +29,7 @@
             <button class="herramientaBtn hidden" data-cat="rendimiento" data-tool="rentDividendo">Rent. Dividendo</button>
 
             <button class="herramientaBtn hidden" data-cat="cartera" data-tool="precioMedio">Precio Medio</button>
+            <button class="herramientaBtn hidden" data-cat="cartera" data-tool="simularCompra">Simular compra</button>
             <button class="herramientaBtn hidden" data-cat="cartera" data-tool="rebalanceo">Rebalanceo</button>
             <button class="herramientaBtn hidden" data-cat="cartera" data-tool="tamanoPosicion">Tamaño de posición</button>
             <button class="herramientaBtn hidden" data-cat="cartera" data-tool="recuperacion">Recuperar una caída</button>
@@ -43,8 +44,10 @@
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="metales">Oro y plata</button>
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="ratioOroBtc">Oro / Bitcoin</button>
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="divisas">Divisas</button>
+            <button class="herramientaBtn hidden" data-cat="mercado" data-tool="equivalencias">Equivalencias</button>
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="capitalizacion">Capitalización objetivo</button>
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="ratioAB">Ratio entre dos activos</button>
+            <button class="herramientaBtn hidden" data-cat="mercado" data-tool="comparador">Comparar activos</button>
         </div>
     </div>
 
@@ -265,6 +268,182 @@
                 </div>
                 <div class="hPlaceholder hPlaceholderSlim">
                     <p>Rellena las compras y pulsa <strong>Calcular</strong>.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Simular compra ─────────────────────────────────────────── -->
+        <div class="herramientaPanel hidden" id="toolSimularCompra">
+            <div class="hPanelHead">
+                <div class="hPanelHeadText">
+                    <h3 class="herramientaPanelTitle">Simular compra</h3>
+                    <p class="hPanelDesc">Cómo quedarían tu precio medio, tu posición y su peso en la cartera si compras. No guarda nada.</p>
+                </div>
+            </div>
+            <div class="herramientaBody">
+                <div class="hCard herramientaInputs">
+                    <div class="hFxRangos" id="hScModos" role="tablist" aria-label="Modo">
+                        <button type="button" class="hFxRango active" data-modo="auto" role="tab" aria-selected="true">Automático</button>
+                        <button type="button" class="hFxRango" data-modo="manual" role="tab" aria-selected="false">Manual</button>
+                    </div>
+
+                    <!-- Automático: posición, precio y cartera salen de lo guardado. -->
+                    <div id="hScAuto">
+                        <div class="herramientaField">
+                            <label for="hScActivo">Activo</label>
+                            <select id="hScActivo">
+                                <option value="">Elige un activo…</option>
+                            </select>
+                            <span class="hPrecargaMsg" id="hScPosicion"></span>
+                        </div>
+                        <div class="herramientaField">
+                            <label for="hScImporte">Lo que inviertes</label>
+                            <div class="hInputWrap">
+                                <input type="number" id="hScImporte" value="" min="0" step="10" placeholder="0">
+                                <span class="hInputUnit hScMoneda">€</span>
+                            </div>
+                            <span class="hPrecargaMsg" id="hScEquivale"></span>
+                        </div>
+                        <div class="herramientaField">
+                            <label for="hScPrecio">Precio de compra</label>
+                            <div class="hInputWrap">
+                                <input type="number" id="hScPrecio" value="" min="0" step="any" placeholder="Precio actual">
+                                <span class="hInputUnit hScMoneda">€</span>
+                            </div>
+                            <span class="hPrecargaMsg">Sale el de mercado; cámbialo para simular otro precio.</span>
+                        </div>
+                    </div>
+
+                    <!-- Manual: todo a mano, en euros. -->
+                    <div id="hScManual" class="hidden">
+                        <div class="herramientaField">
+                            <label for="hScMUnidades">Unidades que ya tienes</label>
+                            <div class="hInputWrap">
+                                <input type="number" id="hScMUnidades" value="0" min="0" step="any">
+                                <span class="hInputUnit">uds</span>
+                            </div>
+                        </div>
+                        <div class="herramientaField">
+                            <label for="hScMMedio">Tu precio medio actual</label>
+                            <div class="hInputWrap">
+                                <input type="number" id="hScMMedio" value="" min="0" step="any" placeholder="0,00">
+                                <span class="hInputUnit">€</span>
+                            </div>
+                        </div>
+                        <div class="herramientaField">
+                            <label for="hScMMercado">Precio actual de mercado (opcional)</label>
+                            <div class="hInputWrap">
+                                <input type="number" id="hScMMercado" value="" min="0" step="any" placeholder="El de compra">
+                                <span class="hInputUnit">€</span>
+                            </div>
+                        </div>
+                        <div class="herramientaField">
+                            <label for="hScMPrecio">Precio de compra</label>
+                            <div class="hInputWrap">
+                                <input type="number" id="hScMPrecio" value="" min="0" step="any" placeholder="0,00">
+                                <span class="hInputUnit">€</span>
+                            </div>
+                        </div>
+                        <div class="herramientaField">
+                            <label for="hScMImporte">Lo que inviertes</label>
+                            <div class="hInputWrap">
+                                <input type="number" id="hScMImporte" value="" min="0" step="10" placeholder="0">
+                                <span class="hInputUnit">€</span>
+                            </div>
+                        </div>
+                        <div class="herramientaField">
+                            <label for="hScMCantidad">Cantidad que compras</label>
+                            <div class="hInputWrap">
+                                <input type="number" id="hScMCantidad" value="" min="0" step="any" placeholder="0">
+                                <span class="hInputUnit">uds</span>
+                            </div>
+                            <span class="hPrecargaMsg">Sale de lo que inviertes y el precio; si la escribes, se recalcula el importe.</span>
+                        </div>
+                        <div class="herramientaField">
+                            <label for="hScMTotal">Valor de tu cartera, con esta posición</label>
+                            <div class="hInputWrap">
+                                <input type="number" id="hScMTotal" value="" min="0" step="100" placeholder="0">
+                                <span class="hInputUnit">€</span>
+                            </div>
+                            <button class="herramientaSecBtn" id="hScMCargarBtn" type="button">Usar el de mi cartera</button>
+                            <span class="hPrecargaMsg" id="hScMTotalMsg"></span>
+                        </div>
+                    </div>
+
+                    <span class="hPrecargaMsg" id="hScMsg"></span>
+                    <div class="hBtnRow">
+                        <button class="herramientaCalcBtn" id="hScCalcBtn">Calcular</button>
+                        <button class="herramientaResetBtn" data-panel="toolSimularCompra">Reiniciar</button>
+                    </div>
+                </div>
+                <div class="hResultsCol">
+                    <div class="herramientaResults hidden" id="hScResults">
+                        <div class="herramientaResultGrid">
+                            <div class="herramientaResultCard hResultCardAccent">
+                                <div class="hResultLabel">Unidades que compras</div>
+                                <div class="hResultValue" id="hScUnidadesRes">---</div>
+                                <div class="hResultSub" id="hScUnidadesSub"></div>
+                            </div>
+                            <div class="herramientaResultCard">
+                                <div class="hResultLabel">Precio medio si compras</div>
+                                <div class="hResultValue" id="hScMedioRes">---</div>
+                                <div class="hResultSub" id="hScMedioSub"></div>
+                            </div>
+                            <div class="herramientaResultCard">
+                                <div class="hResultLabel">Peso de la compra en la posición</div>
+                                <div class="hResultValue" id="hScPesoCompraRes">---</div>
+                                <div class="hResultSub" id="hScPesoCompraSub"></div>
+                            </div>
+                            <div class="herramientaResultCard">
+                                <div class="hResultLabel">Peso en la cartera</div>
+                                <div class="hResultValue" id="hScPesoRes">---</div>
+                                <div class="hResultSub" id="hScPesoSub"></div>
+                            </div>
+                            <div class="herramientaResultCard">
+                                <div class="hResultLabel">Posición total</div>
+                                <div class="hResultValue" id="hScPosRes">---</div>
+                                <div class="hResultSub" id="hScPosSub"></div>
+                            </div>
+                            <div class="herramientaResultCard">
+                                <div class="hResultLabel">Invertido en la posición</div>
+                                <div class="hResultValue" id="hScInvRes">---</div>
+                                <div class="hResultSub" id="hScInvSub"></div>
+                            </div>
+                            <div class="herramientaResultCard">
+                                <div class="hResultLabel">Rentabilidad latente</div>
+                                <div class="hResultValue" id="hScRentRes">---</div>
+                                <div class="hResultSub" id="hScRentSub"></div>
+                            </div>
+                            <div class="herramientaResultCard">
+                                <div class="hResultLabel">Valor de la cartera</div>
+                                <div class="hResultValue" id="hScTotalRes">---</div>
+                                <div class="hResultSub" id="hScTotalSub"></div>
+                            </div>
+                        </div>
+                        <div class="hRatioInterpretacion hidden" id="hScNota"></div>
+                        <div class="hCard hidden" id="hScRepartoCard">
+                            <div class="hScRepartoHead">
+                                <div class="hCardTitle" id="hScRepartoTitulo">Reparto de la cartera</div>
+                                <div class="hFxRangos" id="hScVistas" role="tablist" aria-label="Reparto">
+                                    <button type="button" class="hFxRango active" data-vista="cartera" role="tab" aria-selected="true">Cartera</button>
+                                    <button type="button" class="hFxRango" data-vista="activo" role="tab" aria-selected="false">Activo</button>
+                                </div>
+                            </div>
+                            <span class="hPrecargaMsg" id="hScRepartoMsg"></span>
+                            <div class="hTableWrap">
+                                <table class="hPrecioMedioTable">
+                                    <thead>
+                                        <tr id="hScRepartoCab"></tr>
+                                    </thead>
+                                    <tbody id="hScReparto"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hPlaceholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 8H6.2"/><circle cx="9" cy="20" r="1"/><circle cx="17" cy="20" r="1"/></svg>
+                        <p>Elige un activo, pon lo que inviertes y pulsa <strong>Calcular</strong>.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -769,6 +948,120 @@
                     <div class="hPlaceholder">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19L19 5"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/></svg>
                         <p>Elige dos activos o escribe sus tickers y pulsa <strong>Comparar</strong>.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Comparar activos ────────────────────────────────────────── -->
+        <!-- Varias líneas solapadas. El histórico sale del feed de TradingView;
+             los tickers de otras APIs se traducen con buildTVSymbol. -->
+        <div class="herramientaPanel hidden" id="toolComparador">
+            <div class="hPanelHead">
+                <div class="hPanelHeadText">
+                    <h3 class="herramientaPanelTitle">Comparar activos</h3>
+                    <p class="hPanelDesc">Solapa en un mismo gráfico de dos a ocho activos, de tu cartera o buscados por ticker, y compara su evolución, volatilidad, caídas y correlación.</p>
+                </div>
+            </div>
+            <div class="herramientaBody">
+                <div class="hCard herramientaInputs">
+                    <!-- Listas guardadas en un desplegable, con «+ Nueva lista» el
+                         primero a la izquierda. Las opciones las pone hCmpPintarListas. -->
+                    <div class="hCardTitle">Listas</div>
+                    <div class="hCmpListasFila" id="hCmpListasFila">
+                        <button type="button" class="herramientaSecBtn hCmpListaNueva" id="hCmpListaNuevaBtn">+ Nueva lista</button>
+                        <select id="hCmpListaSelect" aria-label="Lista que se compara"></select>
+                        <input type="text" class="hCmpListaNombre" id="hCmpListaNombre" aria-label="Nombre de la lista" autocomplete="off" spellcheck="false">
+                        <button type="button" class="hCmpListaAccion" id="hCmpListaRenombrarBtn" title="Renombrar la lista" aria-label="Renombrar la lista"><span class="icono iconoEditar" aria-hidden="true"></span></button>
+                        <button type="button" class="hCmpListaAccion hCmpListaBorrar" id="hCmpListaBorrarBtn" title="Borrar la lista" aria-label="Borrar la lista"><span class="icono iconoBorrar" aria-hidden="true"></span></button>
+                    </div>
+
+                    <div class="hCardTitle">De tu cartera</div>
+                    <div class="herramientaField">
+                        <div class="hCapBuscar">
+                            <select id="hCmpActivo" aria-label="Activo de tu cartera">
+                                <option value="">Elige un activo…</option>
+                            </select>
+                            <button class="herramientaSecBtn" id="hCmpActivoBtn" type="button">Añadir</button>
+                        </div>
+                    </div>
+
+                    <div class="hCardTitle">Por ticker</div>
+                    <div class="herramientaField">
+                        <div class="hCapBuscar">
+                            <input type="text" id="hCmpTicker" placeholder="Nombre o ticker, p. ej. NVIDIA o NASDAQ:NVDA" autocomplete="off" spellcheck="false" aria-label="Nombre o ticker del activo">
+                            <button class="herramientaSecBtn" id="hCmpTickerBtn" type="button">Añadir</button>
+                        </div>
+                        <span class="hCmpApisTitulo">Buscar con</span>
+                        <div class="hCmpApis" id="hCmpBuscarAcciones">
+                            <button class="herramientaSecBtn" type="button" data-provider="tradingview">TradingView</button>
+                            <button class="herramientaSecBtn" type="button" data-provider="finnhub">Finnhub</button>
+                            <button class="herramientaSecBtn" type="button" data-provider="eodhd">EODHD</button>
+                            <button class="herramientaSecBtn" type="button" data-provider="yahoo">Yahoo Finance</button>
+                            <button class="herramientaSecBtn" type="button" data-provider="alphavantage">Alpha Vantage</button>
+                        </div>
+                        <div id="hCmpBuscarMsg" class="assetSearchFeedback hidden"></div>
+                        <div id="hCmpResultados" class="assetSearchResults hidden"></div>
+                    </div>
+
+                    <div class="hEqListaCabecera">
+                        <div class="hCardTitle">Comparando <span class="hEqContador" id="hCmpContador"></span></div>
+                    </div>
+                    <ul class="hCmpChips" id="hCmpLista"></ul>
+
+                    <div class="herramientaField">
+                        <label for="hCmpModo">Mostrar</label>
+                        <select id="hCmpModo">
+                            <option value="variacion">% desde el inicio</option>
+                            <option value="precio">Precio (escala logarítmica)</option>
+                        </select>
+                    </div>
+                    <div class="herramientaField">
+                        <label for="hCmpPeriodo">Periodo</label>
+                        <select id="hCmpPeriodo"></select>
+                    </div>
+                    <span class="hPrecargaMsg" id="hCmpMsg"></span>
+                    <div class="hBtnRow">
+                        <button class="herramientaCalcBtn" id="hCmpCalcBtn">Comparar</button>
+                        <button class="herramientaResetBtn" data-panel="toolComparador">Reiniciar</button>
+                    </div>
+                </div>
+                <div class="hResultsCol">
+                    <div class="herramientaResults hidden" id="hCmpResults">
+                        <div class="hCard hChartCard">
+                            <div class="hCardTitle">Evolución</div>
+                            <div class="herramientaChartWrap">
+                                <canvas id="hCmpChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="hCard">
+                            <div class="hCardTitle">Diferencias en el periodo</div>
+                            <div class="hTableWrap">
+                                <table class="hPrecioMedioTable hCmpTabla">
+                                    <thead>
+                                        <tr>
+                                            <th>Activo</th>
+                                            <th>Último</th>
+                                            <th>Rentabilidad</th>
+                                            <th>CAGR</th>
+                                            <th>Volatilidad anual</th>
+                                            <th>Caída máxima</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="hCmpTabla"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="hCard">
+                            <div class="hCardTitle">Correlación de los rendimientos diarios</div>
+                            <div class="hTableWrap">
+                                <table class="hPrecioMedioTable hCmpTabla hCmpCorr" id="hCmpCorr"></table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hPlaceholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-6 4 3 6-8 3 3"/><path d="M3 20l6-4 4 2 8-7"/></svg>
+                        <p>Añade dos o más activos y pulsa <strong>Comparar</strong>.</p>
                     </div>
                 </div>
             </div>
@@ -1835,6 +2128,133 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- ── Equivalencias entre divisas y activos ───────────────────── -->
+        <div class="herramientaPanel hidden" id="toolEquivalencias">
+            <div class="hPanelHead">
+                <div class="hPanelHeadText">
+                    <h3 class="herramientaPanelTitle">Equivalencias</h3>
+                    <p class="hPanelDesc">Escribe la cantidad de cualquier divisa o activo de la lista y verás cuánto equivale de todos los demás, con su rendimiento en <span class="hEqReferencia">EUR</span>.</p>
+                </div>
+            </div>
+            <div class="herramientaBody hEqBody">
+                <div class="hCard herramientaInputs hEqLado" id="hEqTablaCard">
+                    <div class="hCardTitle">Listas</div>
+                    <div class="hEqListasFila">
+                        <div class="hEqListaSelector">
+                            <button type="button" class="hEqListaActual" id="hEqListaActualBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Lista comparativa">
+                                <span class="hEqListaNombre" id="hEqListaActualNombre"></span>
+                                <span class="hEqListaCuenta" id="hEqListaActualCuenta"></span>
+                                <span class="hEqListaFlecha" aria-hidden="true"></span>
+                            </button>
+                            <div class="hEqListasMenu hidden" id="hEqListasMenu">
+                                <button type="button" class="hEqListaNueva" id="hEqListaNuevaBtn">+ Nueva lista</button>
+                                <div class="hEqListas" id="hEqListas" role="listbox" aria-label="Listas comparativas"></div>
+                            </div>
+                        </div>
+                        <button type="button" class="hEqListaAccion" id="hEqListaRenombrarBtn" title="Renombrar esta lista" aria-label="Renombrar esta lista">
+                            <span class="icono iconoEditar" aria-hidden="true"></span>
+                        </button>
+                        <button type="button" class="hEqListaAccion hEqListaBorrar" id="hEqListaBorrarBtn" title="Borrar esta lista" aria-label="Borrar esta lista">
+                            <span class="icono iconoBorrar" aria-hidden="true"></span>
+                        </button>
+                    </div>
+
+                    <div class="hCardTitle">Añadir</div>
+                    <div class="hEqPestanas" id="hEqPestanas" role="tablist" aria-label="Qué añadir">
+                        <button type="button" class="hEqPestana active" role="tab" data-origen="cartera" aria-selected="true">Mi cartera</button>
+                        <button type="button" class="hEqPestana" role="tab" data-origen="buscar" aria-selected="false">Buscar</button>
+                        <button type="button" class="hEqPestana" role="tab" data-origen="divisa" aria-selected="false">Divisa</button>
+                    </div>
+
+                    <div class="herramientaField hEqOrigen" data-origen="cartera">
+                        <div class="hCapBuscar">
+                            <select id="hEqCartera" aria-label="Activo de tu cartera"></select>
+                            <button class="herramientaSecBtn" id="hEqCarteraBtn" type="button">Añadir</button>
+                        </div>
+                        <button type="button" class="hEqEnlace" id="hEqCarteraTodoBtn">Añadir toda la cartera</button>
+                    </div>
+                    <div class="herramientaField hEqOrigen hidden" data-origen="buscar">
+                        <div class="hEqBuscarCaja">
+                            <div class="hCapBuscar">
+                                <input type="text" id="hEqBuscarInput" placeholder="Acción, ETF, cripto, metal… (BTC, AAPL, VWCE)" autocomplete="off" aria-label="Buscar un activo">
+                                <button class="herramientaSecBtn" id="hEqBuscarBtn" type="button">Buscar</button>
+                            </div>
+                            <div class="hCapResultados hEqResultados hidden" id="hEqResultados"></div>
+                        </div>
+                    </div>
+                    <div class="herramientaField hEqOrigen hidden" data-origen="divisa">
+                        <div class="hCapBuscar">
+                            <select id="hEqDivisa" aria-label="Divisa que se añade"></select>
+                            <button class="herramientaSecBtn" id="hEqDivisaBtn" type="button">Añadir</button>
+                        </div>
+                    </div>
+                    <div class="hRatioFuenteMsg" id="hEqMsg"></div>
+
+                    <div class="hEqListaCabecera">
+                        <div class="hCardTitle">Lista <span class="hEqContador" id="hEqContador"></span></div>
+                        <div class="hEqListaAcciones">
+                            <button type="button" class="hEqEnlace hEqAmpliarBtn" id="hEqAmpliarTablaBtn" aria-pressed="false" title="Ver en grande">
+                                <span class="icono iconoAmpliar" aria-hidden="true"></span>
+                                <span class="hEqAmpliarTexto">Ampliar</span>
+                            </button>
+                            <button type="button" class="hEqEnlace" id="hEqVaciarBtn">Vaciar</button>
+                        </div>
+                    </div>
+                    <div class="hEqTablaWrap" id="hEqTablaWrap">
+                        <table class="hPrecioMedioTable hEqTabla">
+                            <thead>
+                                <tr>
+                                    <th>Activo</th>
+                                    <th>Cantidad</th>
+                                    <th class="hEqNum">Precio</th>
+                                    <th class="hEqNum" id="hEqColRango">1 mes</th>
+                                    <th class="hEqNum">1 día</th>
+                                    <th class="hEqNum">1 año</th>
+                                    <th aria-label="Quitar"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="hEqCuerpo"></tbody>
+                        </table>
+                    </div>
+                    <p class="hEqVacia hidden" id="hEqVacia">La lista está vacía: añade activos de tu cartera, busca cualquier otro o añade una divisa.</p>
+                    <div class="hEqTotal" id="hEqTotal"></div>
+                    <p class="hEqNota">Precios y rendimientos en <span class="hEqReferencia">EUR</span>, la moneda base de Ajustes: incluyen el tipo de cambio. Pulsa una fila para ver su detalle.</p>
+                </div>
+
+                <div class="hFxMain">
+                    <div class="hCard hChartCard" id="hEqGraficoCard">
+                        <div class="hEqGraficoCabecera">
+                            <div class="hFxRangos" id="hEqRangos" role="tablist" aria-label="Periodo">
+                                <button type="button" class="hFxRango" data-rango="1D">1 día</button>
+                                <button type="button" class="hFxRango" data-rango="1S">1 semana</button>
+                                <button type="button" class="hFxRango active" data-rango="1M">1 mes</button>
+                                <button type="button" class="hFxRango" data-rango="3M">3 meses</button>
+                                <button type="button" class="hFxRango" data-rango="6M">6 meses</button>
+                                <button type="button" class="hFxRango" data-rango="1A">1 año</button>
+                                <button type="button" class="hFxRango" data-rango="5A">5 años</button>
+                            </div>
+                            <button type="button" class="hEqEnlace hEqAmpliarBtn" id="hEqAmpliarGraficoBtn" aria-pressed="false" title="Ver en grande">
+                                <span class="icono iconoAmpliar" aria-hidden="true"></span>
+                                <span class="hEqAmpliarTexto">Ampliar</span>
+                            </button>
+                        </div>
+                        <div class="herramientaChartWrap hEqChartWrap">
+                            <canvas id="hEqChart"></canvas>
+                            <div class="hFxEstado" id="hEqEstado"></div>
+                        </div>
+                        <div class="hCardTitle hEqSeleccionTitulo" id="hEqSeleccionTitulo"></div>
+                        <div class="hFxStats" id="hEqStats"></div>
+                    </div>
+
+                    <div class="hCard">
+                        <div class="hCardTitle">Variación por periodo</div>
+                        <div class="hFxVariaciones" id="hEqVariaciones"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="hEqFondo hidden" id="hEqFondo"></div>
         </div>
 
         <!-- ── Capitalización objetivo ──────────────────────────────── -->

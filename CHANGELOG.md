@@ -22,6 +22,80 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.8.0] — 2026-11-21
+
+Herramientas nuevas: simular una compra, comparar activos, equivalencias entre
+divisas y activos, y calculadoras propias creadas desde la página.
+
+**Esquema de base de datos:** no lo toca (sigue en el **41**).
+
+**Al actualizar:** nada que hacer.
+
+### Añadido
+
+- **Herramientas › Cartera › Simular compra.** Cómo quedaría una posición si
+  compras más o la abres: unidades que entran por lo invertido, precio medio
+  nuevo, peso en la cartera (con aviso a partir del 20 %) y rentabilidad
+  latente. En automático, la posición, el precio y el valor de la cartera salen
+  de lo guardado y basta con poner el importe; en manual se escribe todo, para
+  un activo que no tienes o para probar otras cifras. No guarda nada. Para
+  ello, `GET /api/activos/rendimiento-batch` devuelve también `participaciones`
+  y `precioMedio` de cada activo, sin redondear a céntimos.
+
+- **Herramientas › Mercado › Equivalencias.** Lista de divisas y activos
+  (acciones, ETF, cripto, metales...) en la que escribes la cantidad de
+  cualquiera y ves cuánto equivale de todos los demás, como en una app de
+  cambio de divisas. Los activos de tu cartera se añaden de uno en uno o todos
+  de golpe con «Añadir toda la cartera»; cualquier otro, con el buscador de
+  tickers, y las divisas, desde su desplegable. A la izquierda, la tabla (con
+  desplazamiento horizontal, que también se arrastra con el ratón, y el nombre
+  fijo):
+  cantidad, precio y variación del periodo, del día y del año. A la derecha, el
+  rendimiento en % de todos en el mismo gráfico, de 1 día a 5 años, y las
+  estadísticas y la variación por periodo del que pulses. La tabla y el
+  gráfico tienen un botón «Ampliar» que los abre a casi toda la ventana
+  (se cierran con «Reducir», Escape o pulsando fuera). Todo en la moneda
+  base de Ajustes, con el tipo de cambio incluido. Puedes tener varias listas
+  comparativas (hasta 20, por ejemplo «Cripto» y «Divisas»), cada una con su
+  nombre, sus elementos y sus cantidades: se eligen y se crean desde un menú
+  desplegable, y la activa se renombra o se borra con los botones de al lado. Las listas se guardan en el navegador.
+- **Herramientas › Mercado › Comparar activos.** Solapa en un mismo gráfico de
+  dos a ocho activos (por ejemplo, NVIDIA y AMD): de tu cartera o por ticker,
+  escrito a mano o buscado con TradingView, Finnhub, EODHD, Yahoo Finance o
+  Alpha Vantage, los mismos buscadores del alta de activo. Se ven en % desde el
+  primer día común o en precio con escala logarítmica, de 6 meses a todo el
+  histórico, con una tabla de rentabilidad, CAGR, volatilidad anual y caída
+  máxima de cada uno y la correlación entre sus rendimientos diarios. El
+  histórico sale del feed de TradingView; los tickers de otras APIs se traducen
+  como en el gráfico de la ficha, y el que no tenga velas se marca tachado en la
+  lista. Se pueden tener hasta 20 listas con nombre (por ejemplo,
+  «Semiconductores» y «Cripto»), que se eligen en un desplegable con el número
+  de activos de cada una. «+ Nueva lista» va el primero, a la izquierda del
+  desplegable, y la lista elegida se renombra con el lápiz y se borra con la
+  papelera. Al cambiar de lista se compara sola. Las listas se guardan en el
+  navegador.
+- **Herramientas › Propias › Nueva herramienta.** Crea tus calculadoras desde
+  la propia página, sin escribir código: título, los campos que se piden
+  (etiqueta, unidad y valor por defecto) y los resultados, cada uno con una
+  fórmula como `gastoAnual / (tasa / 100)` y su formato (número, moneda o
+  porcentaje). Se editan y se borran desde su cabecera. Las fórmulas admiten
+  `+ - * / ^`, paréntesis y `min`, `max`, `abs`, `round`, `sqrt`, `pow`, `ln`,
+  `log`, `exp`, `floor` y `ceil`; se comprueban al guardar y se calculan con un
+  analizador propio, nunca con `eval`. Son comunes a todos los portfolios y se
+  guardan en `ajustes.json`, así que entran en las copias de seguridad y en
+  las exportaciones. La categoría **Propias** se ve siempre, aunque no haya
+  ninguna herramienta, y las de fichero de `herramientas-extra/` siguen igual.
+  API: `GET/POST /api/herramientas-propias` y `PUT/DELETE /api/herramientas-propias/<id>`.
+
+### Cambiado
+
+- **Movimientos pasa a Mi dinero.** En el menú va junto a Gastos e Ingresos en
+  vez de en Banco, y se enciende y apaga con el módulo de Gastos.
+- **Activos › Paneles:** los botones de la barra usan el tamaño de letra del
+  resto de la interfaz (`0.82rem` en vez de 17 px fijos).
+
+---
+
 ## [5.7.1] — 2026-11-18
 
 Remata el HTTPS de la 5.7.0 en iPhone y en el Atajo de iOS.

@@ -7,7 +7,7 @@
 <h1 align="center">PorfolioManager</h1>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-5.7.1-blue" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-5.8.0-blue" alt="Version"></a>
   <a href="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml"><img src="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB" alt="Python">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED" alt="Docker">
@@ -112,8 +112,9 @@ Secrets live in `.env` (copy `.env.example`; `./docker-setup` does it for you). 
 | **Dividendos › Reinvertir** | A dividend can be marked as reinvested: it adds a "Reinvertido" purchase to the asset sheet that counts in the position and in FIFO |
 | **Ajustes › Exportar a CSV** | Download expenses, income, dividends, operations and accounts as Excel-ready CSV |
 | **Herramientas › Proyección** | Compound interest, financial independence (how much you need and when you get there), how long savings last with yearly withdrawals, Monte Carlo with your portfolio's volatility, and real return after tax and inflation |
-| **Herramientas › Cartera / Mercado** | Position sizing by risk, how much a holding must rise to recover a drop, dollar-cost averaging versus lump sum with real historical prices, and the ratio between any two assets against its own history |
+| **Herramientas › Cartera / Mercado** | Simulate a purchase (units you get for the amount invested, new average price, position and weight in the portfolio, automatic from your holdings or fully manual), position sizing by risk, how much a holding must rise to recover a drop, dollar-cost averaging versus lump sum with real historical prices, the ratio between any two assets against its own history, a comparison tool that overlays two to eight assets on one chart (from your portfolio or found by ticker with any of the data providers) with their return, volatility, maximum drawdown and correlation, and an equivalence table: type an amount of any currency, stock, ETF, crypto or metal and see what it is worth in all the others, with each one's performance on one chart |
 | **Herramientas › Fiscal** | Simulate a sale, see which losing positions to sell to lower this year's Spanish income tax (and when you may buy back), forecast the savings-base tax with sales, dividends and interest, and work out double taxation on a foreign dividend |
+| **Herramientas › Propias** | Build your own calculators from the page, no code: input fields plus results computed with formulas such as `annualSpend / (rate / 100)`. Shared by all portfolios and included in backups |
 | **Mi dinero › Microcréditos** | Small short-term loans, either one single repayment (amount plus fee) or monthly instalments: cost, equivalent APR, due dates with overdue warnings, and a schedule for the instalment ones |
 | **Cripto › Transacciones › ··· › Wallets enlazadas** | Import your wallets' movements from the blockchain (never paste private keys or seed phrases) |
 | **Cripto › Seguimiento** | Group your own or third-party wallets, view their history, UTXOs and tokens, and get Telegram alerts |

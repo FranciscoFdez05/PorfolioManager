@@ -170,7 +170,9 @@ function hResetPanel(panelId) {
     }
     hProyReiniciar(panelId)
     hCarReiniciar(panelId)
+    hScReiniciar(panelId)
     hAbReiniciar(panelId)
+    hCmpReiniciar(panelId)
     if (panelId === "toolMetales") hMetReiniciar()
     if (panelId === "toolInteres" && _herramientasChart) {
         _herramientasChart.destroy()

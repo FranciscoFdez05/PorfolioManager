@@ -393,6 +393,39 @@ def testLasCifrasDeSiempreNoCambianAlAnadirElDesglose(cliente):
     assert datos["rendimiento"] == 300.0
 
 
+def testElLoteDevuelveLasParticipacionesVivas(cliente):
+    """«Simular compra» necesita la posición para el precio medio y el peso."""
+    client, _cabeceras = cliente
+    conn = _sembrarActivo(currency="EUR")
+    conn.execute("UPDATE activos SET price = '120' WHERE id = 'apple'")
+    conn.commit()
+
+    datos = client.get("/api/activos/rendimiento-batch").get_json()["apple"]
+
+    assert datos["participaciones"] == 15.0
+    assert datos["invertidoNeto"] / datos["participaciones"] == 100.0
+    assert datos["precioMedio"] == 100.0
+
+
+def testElPrecioMedioDelLoteNoArrastraElRedondeoDelInvertido(cliente):
+    """Con fracciones de unidad, un céntimo de redondeo movía el medio."""
+    from core.db import getDb
+
+    client, _cabeceras = cliente
+    conn = getDb()
+    conn.execute("INSERT INTO activos (id, name, type, currency, price) VALUES ('btc','Bitcoin','cripto','EUR','50000')")
+    conn.execute(
+        "INSERT INTO activo_rows (asset_id, fecha_operacion, tipo_operacion, currency, participaciones, "
+        "capital_invertido_bruto) VALUES ('btc','12-06-2026','Compra','EUR','0.003','100.004')"
+    )
+    conn.commit()
+
+    datos = client.get("/api/activos/rendimiento-batch").get_json()["btc"]
+
+    assert datos["participaciones"] == 0.003
+    assert abs(datos["precioMedio"] - 100.004 / 0.003) < 1e-6
+
+
 def testConsultarYRellenarPendientesPorHttp(cliente):
     client, cabeceras = cliente
     _sembrarActivo(currency="EUR")

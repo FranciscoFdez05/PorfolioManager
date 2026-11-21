@@ -101,6 +101,9 @@ async function initHerramientasLogic() {
     // ── Comparador de divisas ──────────────────────────────────────
     hFxIniciar()
 
+    // ── Equivalencias entre divisas y activos ──────────────────────
+    hEqIniciar()
+
     // ── Compensar pérdidas, IRPF del ahorro y doble imposición ─────
     hFiscalIniciar()
 
@@ -110,12 +113,21 @@ async function initHerramientasLogic() {
     // ── Tamaño de posición, recuperación y DCA ─────────────────────
     hCarIniciar()
 
+    // ── Simular compra ─────────────────────────────────────────────
+    hScIniciar()
+
     // ── Ratio entre dos activos ────────────────────────────────────
     hAbIniciar()
+
+    // ── Comparar varios activos ────────────────────────────────────
+    hCmpIniciar()
 
     // ── Herramientas añadidas por el usuario ───────────────────────
     // Lo último: si falla, las de serie ya están montadas y funcionando.
     await hCargarHerramientasExtra()
+    // Las creadas desde la página van detrás, con el botón de crear al final
+    // de la categoría «Propias».
+    await hCargarHerramientasPropias()
 }
 
 // ── Navegación, reinicio y Enter ───────────────────────────────────────────
@@ -193,6 +205,8 @@ function hAbrirHerramienta(btn) {
 
     if (btn.dataset.tool === "divisas") hFxAlAbrir()
 
+    if (btn.dataset.tool === "equivalencias") hEqAlAbrir()
+
     if (btn.dataset.tool === "metales") hMetAlAbrir()
 
     if (btn.dataset.tool === "ratioOroBtc") {
@@ -234,7 +248,7 @@ async function hCargarSelectoresDeActivos() {
 
     const visibles = activos.filter((a) => !a.hidden).sort((a, b) => (a.name || "").localeCompare(b.name || "", "es"))
 
-    document.querySelectorAll("#hPrecioActivo, #hSvActivo").forEach((select) => {
+    document.querySelectorAll("#hPrecioActivo, #hSvActivo, #hScActivo").forEach((select) => {
         // La primera opción es el texto de «sin elegir» y se queda.
         while (select.options.length > 1) select.remove(1)
         visibles.forEach((activo) => {

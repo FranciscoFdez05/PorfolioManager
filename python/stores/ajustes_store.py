@@ -17,7 +17,7 @@ from core import dinero, proveedor_bnb, telegram_notifier
 from core.db import getActiveDbPath
 from core.escritura import escribirJsonAtomico
 from core.paths import AJUSTES_JSON as _AJUSTES_JSON, JSON_DIR
-from stores import seguimiento_prefs
+from stores import herramientas_propias, seguimiento_prefs
 
 # Claves globales (compartidas entre todos los portfolios)
 _FIAT_DEFAULTS = [
@@ -74,6 +74,9 @@ _GLOBAL_DEFAULTS = {
     # Cada cuántos minutos se revisan las wallets de Cripto > Seguimiento (0 =
     # nunca). Lo valida y lo lee core.wallets_vigilancia.
     "walletsVigilanciaMinutos": 15,
+    # Herramientas creadas desde la página Herramientas (ver
+    # stores.herramientas_propias). Van aquí para que entren en las copias.
+    herramientas_propias.CLAVE: [],
 }
 
 # Claves por portfolio (cada DB tiene su propio archivo prefs_{id}.json)
@@ -156,6 +159,8 @@ def _sanear(guardado, defaults: dict) -> dict:
             valor = seguimiento_prefs.normalizarLista(valor)
         elif clave == seguimiento_prefs.CLAVE_LISTAS:
             valor = seguimiento_prefs.normalizarListas(valor)
+        elif clave == herramientas_propias.CLAVE:
+            valor = herramientas_propias.normalizarLista(valor)
         elif isinstance(valor, list):
             # Todas las demás listas de ajustes son de cadenas (ids, tipos,
             # categorías); un número o un objeto ahí rompía un `in {…}`.
