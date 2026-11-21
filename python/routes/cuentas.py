@@ -13,7 +13,7 @@ from core.validation import jsonBody
 from routes.cuenta_ahorro import pasarVinculosAntiguos
 from stores.ajustes_store import _activePortfolioId, _readPrefs, _writePrefs
 from stores.cuenta_ahorro_store import claveDeCuenta, renombrarEnConfig
-from stores.cuentas_historico import gastosPorCategoria, historicoSaldos
+from stores.cuentas_historico import gastosPorCategoria, historicoSaldos, movimientosDetallados
 from stores.cuentas_store import (
     ETIQUETAS_TIPO,
     MONTH_KEYS,
@@ -30,8 +30,8 @@ from stores.cuentas_store import (
     listarTransferencias,
     modificarCuenta,
     modificarTransferencia,
-    movimientosDeCuenta,
     obtenerCuenta,
+    reiniciarCuentas,
     reordenarCuentas,
     saldos,
     saldosDelMes,
@@ -153,10 +153,10 @@ def getGastosCategorias():
 
 @cuentasBp.route("/api/cuentas/<cuentaId>/movimientos", methods=["GET"])
 def getMovimientosCuenta(cuentaId):
-    """Transferencias, gastos e ingresos de una cuenta (detalle de la cuenta)."""
+    """Todo lo que mueve una cuenta, con el saldo tras cada movimiento (detalle de la cuenta)."""
     if obtenerCuenta(cuentaId) is None:
         return _error("La cuenta no existe", 404)
-    return jsonify({"movimientos": movimientosDeCuenta(cuentaId)})
+    return jsonify({"movimientos": movimientosDetallados(cuentaId)})
 
 
 @cuentasBp.route("/api/cuentas/saldos-mes", methods=["GET"])
@@ -187,10 +187,26 @@ def addCuenta():
             bool(datos.get("dividendos", False)),
             None if datos.get("ahorro") is None else bool(datos.get("ahorro")),
             datos.get("etiquetas"),
+            datos.get("inicio", ""),
         )
     except CuentaInvalida as error:
         return _error(error)
     return jsonify({"ok": True, "cuenta": cuenta}), 201
+
+
+@cuentasBp.route("/api/cuentas/reiniciar", methods=["POST"])
+def postReiniciarCuentas():
+    """Empieza a llevar las cuentas indicadas desde una fecha con su saldo real.
+
+    Cuerpo: `{"fecha": "dd-mm-aaaa", "saldos": {"<id>": "1.234,56"}}`. Lo
+    anterior a esa fecha deja de contar en esas cuentas; no se borra nada.
+    """
+    datos = jsonBody(required=False)
+    try:
+        cuentas = reiniciarCuentas(datos.get("fecha"), datos.get("saldos"))
+    except CuentaInvalida as error:
+        return _error(error)
+    return jsonify({"ok": True, "cuentas": cuentas})
 
 
 @cuentasBp.route("/api/cuentas/orden", methods=["PUT"])
@@ -214,6 +230,7 @@ def editCuenta(cuentaId):
             None if datos.get("ahorro") is None else bool(datos.get("ahorro")),
             datos.get("tipo"),
             datos.get("etiquetas"),
+            datos.get("inicio"),
         )
     except CuentaInvalida as error:
         return _error(error)

@@ -22,6 +22,71 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.9.0] — 2026-11-21
+
+Las cuentas cuadran con el banco: cada movimiento cuenta desde su día, se
+pueden reiniciar a un saldo real y su ventana enseña todos los movimientos con
+el saldo tras cada uno.
+
+**Esquema de base de datos:** sube al **42** (antes el 41; columna `cuentas.inicio`).
+Volver atrás es levantar la imagen anterior y restaurar
+`data/backups/auto/<portfolio>_pre-esquema-41-a-42_*.db`; la imagen anterior
+también funciona sin restaurar, ignorando la columna (vuelve a contar toda la
+historia de cada cuenta).
+
+**Al actualizar:** nada que hacer. El saldo de las cuentas puede cambiar en el
+mes en curso: lo que aún no ha llegado su día deja de restarse o sumarse.
+
+### Corregido
+
+- **Saldo de las cuentas contado antes de tiempo.** Las mensualidades, los
+  ingresos recurrentes, las transferencias, los gastos e ingresos, los
+  intereses y los dividendos del mes en curso contaban desde el día 1 aunque su
+  fecha o día de cobro fuera posterior a hoy (una mensualidad del 28 ya estaba
+  restada el 21). Ahora cada uno cuenta desde su día, con el día de cobro de la
+  mensualidad o del recurrente (y su excepción de ese mes) cuando no tiene
+  fecha propia. Afecta igual al saldo, al histórico y a los gastos por
+  categoría de la ventana Cuentas.
+- **Cuenta de ahorro: saldo distinto del de Cuentas.** La ventana recalculaba
+  el saldo por su cuenta: no sumaba las mensualidades ni los ingresos
+  recurrentes cobrados en la cuenta de ahorro, y sí lo que aún no había
+  llegado su día (transferencias, gastos, intereses y dividendos posteriores a
+  hoy). Ahora sigue la misma regla que Cuentas, y la tabla de gastos e
+  ingresos enseña también mensualidades y recurrentes.
+- **Cuenta de ahorro: bloque de la cuenta bancaria.** Sumaba todas las
+  mensualidades e ingresos recurrentes, aunque un mes se cobraran con otra
+  cuenta. Ahora solo cuenta los que ese mes pasan por la bancaria.
+
+### Añadido
+
+- **Reiniciar cuentas.** Las cuentas llegaron después que Gastos e Ingresos, así
+  que su saldo calculado desde el principio no casaba con el real. Desde
+  **Cuentas › ··· › Reiniciar cuentas…** se elige un día y se escribe lo que
+  tenía de verdad cada cuenta al terminarlo (cada casilla trae el saldo
+  calculado a esa fecha); desde entonces solo cuenta lo posterior, en el saldo,
+  la gráfica, el desglose y la ventana Cuenta de ahorro. No se borra nada: lo
+  anterior sigue en Gastos, Ingresos y Transferencias, y en la ventana de cada
+  cuenta sale como «Antes del inicio», sin saldo y fuera de los totales. Cada
+  cuenta también tiene su «Contar desde» en Editar cuenta; vaciarlo vuelve a
+  contar toda la historia. Ruta: `POST /api/cuentas/reiniciar`.
+
+- **Ventana de una cuenta con más detalle.** Pestaña nueva **Movimientos** con
+  todo lo que mueve la cuenta; **Ingresos y gastos** incluye ahora
+  mensualidades, ingresos recurrentes, intereses y dividendos; las tablas
+  llevan una columna **Saldo** con el saldo tras cada movimiento (calculado en
+  el servidor sobre todos ellos, así que cuadra con la tarjeta aunque la tabla
+  esté filtrada) y marcan como **Pendiente** lo que aún no ha llegado. El
+  selector de año tiene la opción **Todos** para ver toda la historia, y
+  pulsar una fila abre su detalle (fecha y día en que cuenta, concepto,
+  categoría o cuenta de origen y destino, importe, comisión, tu parte y la de
+  otros en un fraccionado, saldo antes y después, estado y nota), con el botón
+  para editar la transferencia o ir a la página donde está apuntado. El
+  **Resumen** separa entradas y salidas por vía y añade el desglose del saldo
+  del periodo. `GET /api/cuentas/<id>/movimientos` devuelve esa lista completa
+  con `saldo`, `dia`, `pendiente` y `orden`.
+
+---
+
 ## [5.8.0] — 2026-11-21
 
 Herramientas nuevas: simular una compra, comparar activos, equivalencias entre

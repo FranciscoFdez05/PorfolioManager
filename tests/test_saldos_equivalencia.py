@@ -94,27 +94,30 @@ def _plano(resultado):
     return {c: {k: str(v) for k, v in d.items()} for c, d in resultado.items()}
 
 
+# Desde que cada movimiento cuenta a partir de su día (no de su mes), la
+# transferencia del 21-03 (999 + 9 de comisión) y el dividendo del 25-03 (100)
+# ya no forman parte del saldo del 20-03. El resto de cifras no cambia.
 GOLDEN_SALDOS = {'banco': {'inicial': '1500.25',
            'entradas': '4010.00',
-           'salidas': '1512.60',
-           'comisiones': '10.25',
+           'salidas': '513.60',
+           'comisiones': '1.25',
            'intereses': '0',
            'dividendos': '0',
-           'saldo': '3987.40'},
+           'saldo': '4995.40'},
  'ahorro': {'inicial': '0',
-            'entradas': '2456.00',
+            'entradas': '1457.00',
             'salidas': '40',
             'comisiones': '0',
             'intereses': '34.80',
             'dividendos': '0',
-            'saldo': '2450.80'},
+            'saldo': '1451.80'},
  'broker': {'inicial': '200',
             'entradas': '100.50',
             'salidas': '55.00',
             'comisiones': '2',
             'intereses': '0',
-            'dividendos': '175.25',
-            'saldo': '418.75'},
+            'dividendos': '75.25',
+            'saldo': '318.75'},
  'tarjeta': {'inicial': '-50.5',
              'entradas': '115.5',
              'salidas': '90.00',

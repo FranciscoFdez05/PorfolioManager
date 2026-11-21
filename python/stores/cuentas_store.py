@@ -30,10 +30,13 @@ primera por orden es la de los dividendos sin cuenta apuntada). Lo que rinden
 euros— es dinero de esa cuenta y forma parte de su saldo
 (`rendimientos`).
 
-Solo cuenta lo que ya ha ocurrido (hasta el mes actual incluido): un recurrente
-de diciembre no es dinero que ya esté en la cuenta en octubre.
+Solo cuenta lo que ya ha ocurrido, hasta hoy incluido: un recurrente de
+diciembre no es dinero que ya esté en la cuenta en octubre, ni una mensualidad
+que se cobra el 28 lo es el 21. Cada movimiento cae en su fecha; sin ella, en
+su día de cobro, y sin ninguno de los dos, el día 1 de su mes.
 """
 
+import calendar
 import datetime
 import functools
 import json
@@ -132,6 +135,58 @@ def _saldoInicial(valor):
         raise CuentaInvalida("El saldo inicial no es un número válido") from None
 
 
+def _normalizarInicio(valor, hoy=None):
+    """Fecha de inicio de una cuenta como aaaa-mm-dd, o '' para toda la historia.
+
+    Acepta dd-mm-aaaa (la de los formularios) o aaaa-mm-dd.
+
+    Raises:
+        CuentaInvalida: si no es una fecha o es posterior a hoy (el saldo de
+            partida es uno que ya se conoce).
+    """
+    texto = str(valor or "").strip()
+    if not texto:
+        return ""
+    dia = _diaDeFecha(texto)
+    if dia is None:
+        raise CuentaInvalida("La fecha de inicio debe tener el formato dd-mm-aaaa")
+    if dia > (hoy or datetime.date.today()):
+        raise CuentaInvalida("La fecha de inicio no puede ser posterior a hoy")
+    return dia.isoformat()
+
+
+def _iniciosDe(cuentas):
+    """`{id: date}` de las cuentas que tienen fecha de inicio."""
+    inicios = {}
+    for cuenta in cuentas:
+        try:
+            inicios[cuenta["id"]] = datetime.date.fromisoformat(cuenta["inicio"]) if cuenta.get("inicio") else None
+        except ValueError:
+            # Un valor ilegible (editado a mano) no debe romper el saldo: se
+            # trata como si no hubiera fecha de inicio.
+            inicios[cuenta["id"]] = None
+    return {cuentaId: dia for cuentaId, dia in inicios.items() if dia}
+
+
+def esAnteriorAlInicio(inicios, cuentaId, dia):
+    """¿Queda fuera de la cuenta un movimiento de ese día?
+
+    Con fecha de inicio, el saldo inicial es el del final de ese día: solo
+    cuenta lo posterior. Lo que no tiene día tampoco cuenta, porque no se sabe
+    si es anterior.
+
+    Args:
+        inicios: `{id: date}` de `_iniciosDe`.
+        cuentaId: Cuenta del movimiento.
+        dia: Día del movimiento, o None si no tiene.
+
+    Returns:
+        True si el movimiento no mueve el saldo de esa cuenta.
+    """
+    inicio = inicios.get(cuentaId)
+    return inicio is not None and (dia is None or dia <= inicio)
+
+
 @functools.lru_cache(maxsize=8192)
 def _decimal(texto):
     # Cacheado: los importes se repiten mucho y Decimal es inmutable, así que
@@ -148,6 +203,7 @@ def _decimal(texto):
 
 _SELECT_CUENTAS = (
     "SELECT c.id, c.nombre, c.tipo, c.etiquetas, c.saldo_inicial, c.saldo_inicial_cent, c.dividendos, c.ahorro, "
+    "c.inicio, "
     "v.remunerada_id, "
     "r.nombre AS remunerada_nombre "
     "FROM cuentas c "
@@ -190,6 +246,7 @@ def _filaACuenta(fila):
         "tipo": fila["tipo"],
         "etiquetas": _etiquetasGuardadas(fila["etiquetas"], fila["tipo"]),
         "saldo_inicial": leerImporteCanonico(fila["saldo_inicial_cent"], fila["saldo_inicial"]),
+        "inicio": fila["inicio"] or "",
         "protegida": fila["id"] in (ID_BANCO, ID_AHORRO),
         "remunerada": fila["remunerada_id"] or "",
         "remunerada_nombre": fila["remunerada_nombre"] or "",
@@ -364,13 +421,18 @@ def importarVinculos(pares):
 
 
 @transactional
-def crearCuenta(nombre, tipo, saldoInicial="", remunerada="", dividendos=False, ahorro=None, etiquetas=None):
+def crearCuenta(
+    nombre, tipo, saldoInicial="", remunerada="", dividendos=False, ahorro=None, etiquetas=None, inicio=""
+):
     """Crea una cuenta. `ahorro=None` la saca en la ventana de ahorro si es de tipo ahorro.
-    `etiquetas` son las extra además del tipo (lista de ids de tipo)."""
+    `etiquetas` son las extra además del tipo (lista de ids de tipo). `inicio`
+    (dd-mm-aaaa) es el día al final del cual tenía `saldoInicial`; vacío, toda
+    la historia."""
     nombre = normalizarNombre(nombre)
     if not nombre:
         raise CuentaInvalida("Escribe un nombre para la cuenta")
     tipo = _normalizarTipo(tipo)
+    inicio = _normalizarInicio(inicio)
     conn = getDb()
     _nombreLibre(nombre, conn)
     if len(listarCuentas(conn)) >= _MAX_CUENTAS:
@@ -381,9 +443,9 @@ def crearCuenta(nombre, tipo, saldoInicial="", remunerada="", dividendos=False, 
     esAhorro = tipo == "ahorro" if ahorro is None else bool(ahorro)
     extra = _normalizarEtiquetas(etiquetas, tipo)
     conn.execute(
-        "INSERT INTO cuentas (id, nombre, tipo, etiquetas, saldo_inicial, saldo_inicial_cent, sort_order, ahorro) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (cuentaId, nombre, tipo, extra, inicialLegado, inicialCent, orden, 1 if esAhorro else 0),
+        "INSERT INTO cuentas (id, nombre, tipo, etiquetas, saldo_inicial, saldo_inicial_cent, sort_order, ahorro, "
+        "inicio) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (cuentaId, nombre, tipo, extra, inicialLegado, inicialCent, orden, 1 if esAhorro else 0, inicio),
     )
     _vincular(cuentaId, remunerada, conn)
     _marcarDividendos(cuentaId, bool(dividendos), conn)
@@ -393,7 +455,8 @@ def crearCuenta(nombre, tipo, saldoInicial="", remunerada="", dividendos=False, 
 
 @transactional
 def modificarCuenta(
-    cuentaId, nombre=None, saldoInicial=None, remunerada=None, dividendos=None, ahorro=None, tipo=None, etiquetas=None
+    cuentaId, nombre=None, saldoInicial=None, remunerada=None, dividendos=None, ahorro=None, tipo=None, etiquetas=None,
+    inicio=None,
 ):
     """Cambia el nombre, el saldo inicial, la cuenta remunerada vinculada, si
     cobra los dividendos, si es de ahorro, el tipo (etiqueta principal) y/o las
@@ -420,6 +483,9 @@ def modificarCuenta(
             (inicialLegado, inicialCent, cuentaId),
         )
 
+    if inicio is not None:
+        conn.execute("UPDATE cuentas SET inicio = ? WHERE id = ?", (_normalizarInicio(inicio), cuentaId))
+
     if tipo is not None or etiquetas is not None:
         nuevoTipo = _normalizarTipo(tipo) if tipo is not None else cuenta["tipo"]
         # Sin etiquetas nuevas se conservan las extra que ya tenía; la principal
@@ -440,6 +506,46 @@ def modificarCuenta(
         conn.execute("UPDATE cuentas SET ahorro = ? WHERE id = ?", (1 if ahorro else 0, cuentaId))
     conn.commit()
     return obtenerCuenta(cuentaId, conn)
+
+
+@transactional
+def reiniciarCuentas(fecha, saldosNuevos):
+    """Empieza a llevar varias cuentas desde `fecha` con el saldo que tenían ese día.
+
+    Para cuando las cuentas llegaron después que Gastos e Ingresos: lo anterior
+    deja de contar en ellas, pero no se borra nada.
+
+    Args:
+        fecha: Día (dd-mm-aaaa o aaaa-mm-dd) al final del cual tenían esos saldos.
+        saldosNuevos: `{id de cuenta: saldo}`. Solo se tocan las que vienen.
+
+    Returns:
+        Las cuentas reiniciadas, ya actualizadas.
+
+    Raises:
+        CuentaInvalida: si la fecha o algún saldo no valen, o una cuenta no
+            existe. No se guarda ninguna: o todas o ninguna.
+    """
+    if not isinstance(saldosNuevos, dict) or not saldosNuevos:
+        raise CuentaInvalida("Indica el saldo de al menos una cuenta")
+    inicio = _normalizarInicio(fecha)
+    if not inicio:
+        raise CuentaInvalida("Indica la fecha de inicio")
+    conn = getDb()
+    existentes = {c["id"] for c in listarCuentas(conn)}
+    # Validar todo antes de escribir nada.
+    preparados = []
+    for cuentaId, saldo in saldosNuevos.items():
+        if cuentaId not in existentes:
+            raise CuentaInvalida("Alguna de las cuentas no existe")
+        preparados.append((cuentaId, escribirImporte(_saldoInicial(saldo))))
+    for cuentaId, (inicialCent, inicialLegado) in preparados:
+        conn.execute(
+            "UPDATE cuentas SET saldo_inicial = ?, saldo_inicial_cent = ?, inicio = ? WHERE id = ?",
+            (inicialLegado, inicialCent, inicio, cuentaId),
+        )
+    conn.commit()
+    return [obtenerCuenta(cuentaId, conn) for cuentaId, _ in preparados]
 
 
 @transactional
@@ -621,12 +727,66 @@ def _excepcionesDeCuenta(texto):
     return {m: str(c) for m, c in datos.items() if m in MONTH_KEYS} if isinstance(datos, dict) else {}
 
 
-def _yaOcurrido(year, month, hoy):
-    """¿El mes de esa fila ya ha empezado? Las filas futuras no mueven el saldo."""
+def _diaDeFecha(texto):
+    """`date` de un texto dd-mm-aaaa o aaaa-mm-dd, o None si no lo es o no existe."""
+    limpio = str(texto or "").strip()
+    coincide = _FECHA.match(limpio)
     try:
-        return (int(year), MONTH_KEYS.index(month)) <= (hoy.year, hoy.month - 1)
+        if coincide:
+            dia, mes, anio = (int(g) for g in coincide.groups())
+            return datetime.date(anio, mes, dia)
+        return datetime.date.fromisoformat(limpio)
+    except ValueError:
+        return None
+
+
+def _diaEfectivo(year, month, fecha="", diaCobro=""):
+    """Día en que un movimiento de año y mes mueve el saldo.
+
+    Manda la fecha propia si cae en ese mes; si no, el día de cobro (recortado
+    al último día del mes: un 31 en febrero es el 28); si tampoco, el día 1.
+
+    Args:
+        year: Año de la fila («2026»).
+        month: Clave del mes («marzo»).
+        fecha: Fecha dd-mm-aaaa o aaaa-mm-dd de la fila, si la tiene.
+        diaCobro: Día del mes en que se cobra una mensualidad o un recurrente.
+
+    Returns:
+        La fecha, o None si el año o el mes no se entienden: entonces el
+        movimiento no tiene día y cuenta siempre, como hasta ahora.
+    """
+    try:
+        primero = datetime.date(int(year), MONTH_KEYS.index(month) + 1, 1)
     except (ValueError, TypeError):
-        return True
+        return None
+    dia = _diaDeFecha(fecha) if fecha else None
+    if dia is not None and (dia.year, dia.month) == (primero.year, primero.month):
+        return dia
+    cobro = str(diaCobro or "").strip()
+    if cobro.isdigit() and int(cobro) >= 1:
+        ultimo = calendar.monthrange(primero.year, primero.month)[1]
+        return primero.replace(day=min(int(cobro), ultimo))
+    return primero
+
+
+def _haOcurrido(dia, hoy):
+    """¿Ya ha llegado el día del movimiento? Sin día conocido, cuenta siempre."""
+    return dia is None or dia <= hoy
+
+
+def _diaCobroDelMes(fila, mes):
+    """Día de cobro de una mensualidad o recurrente en `mes`: la excepción del
+    mes (`dias_cobro`, solo en mensualidades) o el día habitual."""
+    claves = fila.keys()
+    if "dias_cobro" in claves and fila["dias_cobro"]:
+        try:
+            excepciones = json.loads(fila["dias_cobro"])
+        except ValueError:
+            excepciones = {}
+        if isinstance(excepciones, dict) and excepciones.get(mes):
+            return excepciones[mes]
+    return fila["dia_cobro"] if "dia_cobro" in claves else ""
 
 
 def _anioMes(texto):
@@ -685,6 +845,8 @@ def _rendimientosEn(conn, fechas, aEuros=None):
     a `fechas`.
     """
     resultados = [{} for _ in fechas]
+    # Lo anterior a la fecha de inicio de una cuenta no es de su saldo.
+    inicios = _iniciosDe(listarCuentas(conn))
 
     for fila in conn.execute(
         f"SELECT v.cuenta_id, i.fecha, {importeSql('i.acumulado')} AS acumulado, "
@@ -694,9 +856,12 @@ def _rendimientosEn(conn, fechas, aEuros=None):
         year, month = _anioMes(fila["fecha"])
         if not year:
             continue
+        dia = _diaEfectivo(year, month, fila["fecha"])
+        if esAnteriorAlInicio(inicios, fila["cuenta_id"], dia):
+            continue
         neto = None
         for hoy, resultado in zip(fechas, resultados, strict=True):
-            if not _yaOcurrido(year, month, hoy):
+            if not _haOcurrido(dia, hoy):
                 continue
             if neto is None:
                 neto = _decimal(fila["acumulado"]) - _decimal(fila["impuestos"])
@@ -718,9 +883,12 @@ def _rendimientosEn(conn, fechas, aEuros=None):
         year, month = _anioMes(fila["fecha"])
         if not year:
             continue
+        dia = _diaEfectivo(year, month, fila["fecha"])
+        if esAnteriorAlInicio(inicios, destino, dia):
+            continue
         enEuros = None
         for hoy, resultado in zip(fechas, resultados, strict=True):
-            if not _yaOcurrido(year, month, hoy):
+            if not _haOcurrido(dia, hoy):
                 continue
             if enEuros is None:
                 aEuros = aEuros or _cambioAEuros()
@@ -739,6 +907,16 @@ def saldos(conn=None, hoy=None, aEuros=None):
     return _saldosEn(conn, [hoy], aEuros)[0]
 
 
+def _columnasRecurrentes(tabla):
+    """Columnas que hacen falta de una tabla de importes por mes. Solo las
+    mensualidades tienen días de cobro distintos por mes (`dias_cobro`)."""
+    extra = ["dias_cobro"] if tabla == "mensualidades" else []
+    return ", ".join([
+        "id", "year", "nombre", "categoria", "nota", "cuenta", "cuentas_cobro", "dia_cobro", *extra,
+        *(f"{importeSql(mes)} AS {mes}" for mes in MONTH_KEYS),
+    ])
+
+
 def _saldosEn(conn, fechas, aEuros=None):
     """`saldos` para varias fechas de corte en un solo recorrido de las tablas.
 
@@ -753,41 +931,47 @@ def _saldosEn(conn, fechas, aEuros=None):
     ]
     rendidos = _rendimientosEn(conn, fechas, aEuros)
     existentes = acumulados[0]
+    inicios = _iniciosDe(cuentas)
+
+    def laCuenta(cuentaId, dia):
+        # La cuenta existe y el movimiento es posterior a su fecha de inicio.
+        return cuentaId in existentes and not esAnteriorAlInicio(inicios, cuentaId, dia)
 
     for fila in conn.execute(
         f"SELECT fecha, origen, destino, {importeSql('cantidad')} AS cantidad, {importeSql('comision')} AS comision "
         "FROM transferencias"
     ).fetchall():
         year, month = _yearMonth(fila["fecha"])
+        dia = _diaEfectivo(year, month, fila["fecha"]) if year else None
         importe = _decimal(fila["cantidad"])
         comision = _decimal(fila["comision"])
         for hoy, acumulado in zip(fechas, acumulados, strict=True):
-            if year and not _yaOcurrido(year, month, hoy):
+            if not _haOcurrido(dia, hoy):
                 continue
-            if fila["destino"] in existentes:
+            if laCuenta(fila["destino"], dia):
                 acumulado[fila["destino"]]["entradas"] += importe
-            if fila["origen"] in existentes:
+            if laCuenta(fila["origen"], dia):
                 acumulado[fila["origen"]]["salidas"] += importe
                 # La comisión se cuenta aparte: no es dinero que llegue a otra cuenta.
                 acumulado[fila["origen"]]["comisiones"] += comision
 
     for tabla, campo in (("ingresos_rows", "entradas"), ("gastos_rows", "salidas")):
         for fila in conn.execute(
-            f"SELECT year, month, {importeSql('cantidad')} AS cantidad, cuenta FROM {tabla}"
+            f"SELECT year, month, fecha, {importeSql('cantidad')} AS cantidad, cuenta FROM {tabla}"
         ).fetchall():
             cuentaId = _cuentaDeFila(fila["cuenta"])
-            if cuentaId not in existentes:
+            dia = _diaEfectivo(fila["year"], fila["month"], fila["fecha"])
+            if not laCuenta(cuentaId, dia):
                 continue
             importe = _decimal(fila["cantidad"])
             for hoy, acumulado in zip(fechas, acumulados, strict=True):
-                if _yaOcurrido(fila["year"], fila["month"], hoy):
+                if _haOcurrido(dia, hoy):
                     acumulado[cuentaId][campo] += importe
 
     # Mensualidades e ingresos recurrentes: importes por mes, de la cuenta con la
     # que se pagan o en la que se cobran (vacía, o una que ya no existe, = bancaria).
     for tabla, campo in (("ingresos_recurrentes", "entradas"), ("mensualidades", "salidas")):
-        columnas = ", ".join(["year", "cuenta", "cuentas_cobro", *(f"{importeSql(mes)} AS {mes}" for mes in MONTH_KEYS)])
-        for fila in conn.execute(f"SELECT {columnas} FROM {tabla}").fetchall():
+        for fila in conn.execute(f"SELECT {_columnasRecurrentes(tabla)} FROM {tabla}").fetchall():
             habitual = _cuentaDeFila(fila["cuenta"])
             # Un mes puede cobrarse con otra cuenta que la habitual de la fila.
             excepciones = _excepcionesDeCuenta(fila["cuentas_cobro"])
@@ -799,9 +983,12 @@ def _saldosEn(conn, fechas, aEuros=None):
                 destino = _cuentaDeFila(excepciones.get(mes)) if mes in excepciones else habitual
                 if destino not in existentes:
                     destino = ID_BANCO
+                dia = _diaEfectivo(fila["year"], mes, "", _diaCobroDelMes(fila, mes))
+                if not laCuenta(destino, dia):
+                    continue
                 importe = None
                 for hoy, acumulado in zip(fechas, acumulados, strict=True):
-                    if _yaOcurrido(fila["year"], mes, hoy):
+                    if _haOcurrido(dia, hoy):
                         if importe is None:
                             importe = _decimal(fila[mes])
                         acumulado[destino][campo] += importe

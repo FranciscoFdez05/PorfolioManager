@@ -97,19 +97,27 @@ Las métricas de gastos e ingresos sin las del resto de la cartera: KPIs, gráfi
 Una tarjeta por cuenta con su tipo, su saldo y una miniatura del saldo en lo que va de año; a la derecha, el reparto del dinero por cuenta y por tipo.
 
 - **Icono de ampliar:** gráfica del saldo con rangos **1 mes**, **3 meses**, **6 meses**, **1 año**, **YTD** y **Todo**.
-- **Pulsar la tarjeta:** detalle con lo que entró y salió en el periodo elegido y tres accesos:
-  - **Ingresos/Gastos**: lo apuntado en Gastos e Ingresos con esa cuenta, con buscador y filtros por tipo, año y mes.
-  - **Movimientos**: sus transferencias, que se crean, editan y borran desde ahí.
+- **Pulsar la tarjeta:** ventana de la cuenta con estas pestañas:
+  - **Resumen**: lo que entró y salió en el periodo elegido, separado por vía (ingresos, transferencias, intereses y dividendos / gastos, transferencias, comisiones), la gráfica del saldo y el desglose del saldo: saldo al empezar el periodo, cada vía y saldo al final.
+  - **Movimientos**: todo lo que mueve la cuenta mezclado (ingresos, gastos, mensualidades, recurrentes, transferencias, comisiones, intereses y dividendos), con buscador, filtros por entrada/salida, año (o **Todos**, para ver toda la historia) y mes, y la columna **Saldo** con el saldo de la cuenta justo después de cada movimiento.
+  - **Ingresos y gastos**: lo mismo sin transferencias ni comisiones.
+
+  En las tres tablas (también en Transferencias), pulsar una fila abre su detalle: fecha y día en que cuenta, concepto, categoría o cuenta de origen y destino, importe, comisión (en un fraccionado, tu parte y la de otros), saldo de la cuenta antes y después, estado y nota, con un botón para editar la transferencia o ir a la página donde está apuntado.
+
+  - **Transferencias**: las de la cuenta, con su saldo tras cada una; se crean, editan y borran desde ahí.
   - **Gráficos**: el saldo y las entradas y salidas de cada mes.
 
-El histórico se calcula día a día (`GET /api/cuentas/historico`):
+  Lo que todavía no ha llegado su día sale como **Pendiente**: no cuenta en el saldo actual ni en los totales, y su columna Saldo es el saldo previsto. Los datos van en `GET /api/cuentas/<id>/movimientos`.
+
+**Reiniciar cuentas** (menú ··· de Cuentas): si empezaste a usar las cuentas después que Gastos e Ingresos, elige un día y escribe lo que tenía de verdad cada cuenta al terminarlo (cada casilla trae el saldo calculado a esa fecha; las cuentas sin marcar no se tocan). Desde entonces solo cuenta lo posterior. No se borra nada: lo anterior sigue en Gastos, Ingresos y Transferencias, y en la ventana de la cuenta sale como **Antes del inicio**, sin saldo y fuera de los totales. Cada cuenta tiene también su **Contar desde** en Editar cuenta; vaciarlo vuelve a contar toda su historia. Ruta: `POST /api/cuentas/reiniciar` con `{"fecha": "dd-mm-aaaa", "saldos": {"<id>": "1.234,56"}}`.
+
+El saldo y el histórico (`GET /api/cuentas/historico`) cuentan cada apunte desde su día, nunca antes:
 
 | Apunte | Día en que cuenta |
 | --- | --- |
-| Gastos, ingresos y transferencias | El de su fecha |
-| Mensualidades e ingresos recurrentes | El día 1 de su mes |
+| Gastos, ingresos y transferencias | El de su fecha (si no cae en el mes de la fila, el día 1 de ese mes) |
+| Mensualidades e ingresos recurrentes | Su día de cobro (el de ese mes si tiene excepción; un 31 en un mes más corto es el último día), o el día 1 si no tienen |
 | Intereses y dividendos | El de su fecha, o el día 1 si solo tienen mes |
-| Apuntes del mes en curso con fecha posterior a hoy | Hoy (igual que en el saldo) |
 
 ### Movimientos
 

@@ -517,11 +517,15 @@ function cntAbrirModalCuenta(cuenta = null, { titulo = "", alGuardar = null } = 
                     <div class="cntEtiquetasElegir" id="cntCuentaEtiquetas">${cntEtiquetasOpciones(cuenta)}</div>
                     <p class="cuentasHint">Marca todas las que encajen, como un banco que también es broker. Son solo para identificar la cuenta.</p>
                 </div>
-                <div class="gastosCreateModalField mensFormFieldWide">
+                <div class="gastosCreateModalField">
                     <label class="assetModalLabel" for="cntCuentaSaldo">Saldo inicial <span class="assetModalLabelHint">opcional</span></label>
                     <input id="cntCuentaSaldo" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(cuenta ? cntSaldoInicialTexto(cuenta) : "")}" placeholder="0,00">
                 </div>
-                <p class="cuentasHint mensFormFieldWide">Lo que ya había en la cuenta antes de empezar a apuntar movimientos. Las cuentas de ahorro aparecen también en la ventana Cuenta de ahorro.</p>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cntCuentaInicio">Contar desde <span class="assetModalLabelHint">opcional</span></label>
+                    <input id="cntCuentaInicio" class="assetModalInput" type="text" value="${escapeGastosHtml(cntFechaInicioTexto(cuenta?.inicio))}" placeholder="dd-mm-aaaa">
+                </div>
+                <p class="cuentasHint mensFormFieldWide">Sin fecha, el saldo inicial es lo que había antes de empezar a apuntar movimientos. Con fecha, es el saldo que tenía la cuenta al terminar ese día y solo cuenta lo posterior: lo anterior sigue en Gastos e Ingresos, pero no en esta cuenta. Las cuentas de ahorro aparecen también en la ventana Cuenta de ahorro.</p>
                 <div class="gastosCreateModalField">
                     <label class="assetModalLabel">Cuenta remunerada</label>
                     <label class="cuentaAhorroCheck">
@@ -553,6 +557,7 @@ function cntAbrirModalCuenta(cuenta = null, { titulo = "", alGuardar = null } = 
             const cuerpo = {
                 nombre: getValue("cntCuentaNombre").trim(),
                 saldoInicial: getValue("cntCuentaSaldo").trim(),
+                inicio: getValue("cntCuentaInicio").trim(),
                 dividendos: Boolean(modal.querySelector("#cntCuentaDividendos")?.checked),
                 ...etiquetas
             }
@@ -586,6 +591,118 @@ async function cntCrearRemunerada(nombre) {
     const id = "cuenta-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
     await Api.post("/api/intereses", { cuentas: [...cuentas, { id, nombre, cuenta: "", rows: [] }] })
     return id
+}
+
+/**
+ * Fecha de inicio de una cuenta (aaaa-mm-dd) como la escribe el usuario.
+ * @param {string} [iso]
+ * @returns {string} dd-mm-aaaa, o "" si no hay.
+ */
+function cntFechaInicioTexto(iso) {
+    const [anio, mes, dia] = String(iso || "").split("-")
+    return anio && mes && dia ? `${dia}-${mes}-${anio}` : ""
+}
+
+/**
+ * Saldo de una cuenta al terminar un día, según el histórico ya cargado.
+ * @param {string} cuentaId
+ * @param {number} t Medianoche local del día.
+ * @returns {number|null} null sin histórico.
+ */
+function cntSaldoAlFinalDe(cuentaId, t) {
+    if (!cntHistorico) return null
+    const serie = cntSerieDe(cuentaId)
+    let saldo = null
+    serie.forEach((p) => {
+        if (p.t <= t) saldo = p.saldo
+    })
+    // Antes del primer punto la cuenta tenía su saldo de partida.
+    return saldo ?? (serie.length ? serie[0].saldo : null)
+}
+
+// Fecha dd-mm-aaaa a medianoche local, o null si no es una fecha.
+function cntInstanteDeTexto(texto) {
+    const coincide = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(String(texto || "").trim())
+    if (!coincide) return null
+    const [, dia, mes, anio] = coincide.map(Number)
+    const fecha = new Date(anio, mes - 1, dia)
+    return fecha.getMonth() === mes - 1 ? fecha.getTime() : null
+}
+
+function cntImporteTexto(valor) {
+    return valor === null ? "" : valor.toFixed(2).replace(".", ",")
+}
+
+// Empieza a llevar las cuentas marcadas desde una fecha con su saldo real. Cada
+// casilla se rellena con el saldo calculado a esa fecha; al cambiar la fecha se
+// recalculan las que no se han tocado.
+function cntAbrirModalReiniciar() {
+    const filas = cntCuentas
+        .map(
+            (c) => `
+                <div class="cntReinicioFila" data-cuenta="${escapeGastosHtml(c.id)}">
+                    <label class="cntReinicioNombre">
+                        <input type="checkbox" data-cnt-reinicio-marca checked>
+                        <span>${escapeGastosHtml(c.nombre)}</span>
+                    </label>
+                    <input class="assetModalInput" type="text" inputmode="decimal" data-cnt-reinicio-saldo placeholder="0,00" aria-label="Saldo real de ${escapeGastosHtml(c.nombre)}">
+                </div>`
+        )
+        .join("")
+    openGastosCreateModal({
+        title: "Reiniciar cuentas",
+        modalClass: "gastosCreateModalWide mensFormModal",
+        bodyHtml: `
+            <p class="cuentasHint">Para cuando empezaste a usar las cuentas después que Gastos e Ingresos: escribe lo que tenía de verdad cada cuenta al terminar el día elegido. Desde entonces solo cuenta lo posterior. No se borra nada: lo anterior sigue en Gastos, Ingresos y Transferencias, y en la ventana de cada cuenta sale como «Antes del inicio».</p>
+            <div class="gastosCreateModalField">
+                <label class="assetModalLabel" for="cntReinicioFecha">Saldos al terminar el día</label>
+                <input id="cntReinicioFecha" class="assetModalInput" type="text" value="${escapeGastosHtml(todayDateString())}" placeholder="dd-mm-aaaa">
+            </div>
+            <div class="cntReinicioLista">${filas}</div>
+            <p class="cuentasHint">Cada casilla trae el saldo calculado a esa fecha: cámbialo por el real. Las cuentas sin marcar no se tocan. Para volver a contar toda la historia de una cuenta, borra su «Contar desde» en Editar cuenta.</p>
+        `,
+        submitLabel: "Reiniciar",
+        onReady: cntBindModalReiniciar,
+        onSubmit: async ({ modal, getValue, setFeedback }) => {
+            const saldos = {}
+            modal.querySelectorAll(".cntReinicioFila").forEach((fila) => {
+                if (fila.querySelector("[data-cnt-reinicio-marca]")?.checked)
+                    saldos[fila.dataset.cuenta] = fila.querySelector("[data-cnt-reinicio-saldo]").value.trim() || "0"
+            })
+            if (!Object.keys(saldos).length) {
+                setFeedback("Marca al menos una cuenta.", true)
+                return false
+            }
+            try {
+                await Api.post("/api/cuentas/reiniciar", { fecha: getValue("cntReinicioFecha").trim(), saldos })
+                await cntRecargarYPintar()
+                return true
+            } catch (error) {
+                setFeedback(error?.message || "No se pudieron reiniciar las cuentas.", true)
+                return false
+            }
+        }
+    })
+}
+
+function cntBindModalReiniciar(modal) {
+    const fecha = modal.querySelector("#cntReinicioFecha")
+    const rellenar = () => {
+        const t = cntInstanteDeTexto(fecha?.value)
+        modal.querySelectorAll(".cntReinicioFila").forEach((fila) => {
+            const casilla = fila.querySelector("[data-cnt-reinicio-saldo]")
+            if (casilla.dataset.editado) return
+            const cuenta = cntCuentas.find((c) => c.id === fila.dataset.cuenta)
+            casilla.value = cntImporteTexto(
+                t === null ? null : (cntSaldoAlFinalDe(fila.dataset.cuenta, t) ?? parseEuroNumber(cuenta?.saldo))
+            )
+        })
+    }
+    fecha?.addEventListener("input", rellenar)
+    modal.addEventListener("input", (event) => {
+        if (event.target.matches("[data-cnt-reinicio-saldo]")) event.target.dataset.editado = "1"
+    })
+    rellenar()
 }
 
 function cntSaldoInicialTexto(cuenta) {
@@ -770,6 +887,7 @@ function cntBind() {
 
     const on = (id, handler) => document.getElementById(id)?.addEventListener("click", handler)
     on("cuentasNuevaCuentaBtn", () => cntAbrirModalCuenta())
+    on("cuentasReiniciarBtn", cntAbrirModalReiniciar)
     on("cuentasCsvBtn", cntDescargarCsv)
     on("cuentasGrafoBtn", cntAbrirGrafo)
     // Sin año elegido el informe es del año en curso.

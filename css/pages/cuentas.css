@@ -1036,6 +1036,127 @@
     text-align: center;
 }
 
+/* Ventana «Reiniciar cuentas»: una fila por cuenta con su casilla de saldo. */
+.cntReinicioLista {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 12px 0;
+    max-height: calc(40 * var(--vh));
+    overflow-y: auto;
+}
+
+.cntReinicioFila {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 160px;
+    align-items: center;
+    gap: 12px;
+}
+
+.cntReinicioNombre {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    color: var(--text-bright);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.cntReinicioNombre span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cntReinicioFila .assetModalInput {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Saldo tras cada movimiento: dato de referencia, sin el color de entrada o
+   salida salvo cuando la cuenta queda en negativo. */
+.cntPanelTabla td.cntCeldaSaldo {
+    color: var(--text-muted);
+}
+
+.cntPanelTabla td.cntCeldaSaldo.cuentasNeg {
+    color: inherit;
+}
+
+/* Pulsar una fila abre su detalle. */
+.cntPanelTabla tbody tr {
+    cursor: pointer;
+}
+
+.cntPanelTabla tbody tr:hover td {
+    background: var(--bg-elevated);
+}
+
+/* Lo que todavía no ha llegado su día: se ve, pero no cuenta en el saldo de hoy. */
+.cntFilaPendiente td {
+    opacity: 0.55;
+}
+
+.cntTagPendiente {
+    margin-left: 6px;
+}
+
+.cntOrigen {
+    display: inline-block;
+    padding: 2px 8px;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Debajo de Entradas y Salidas del resumen: de qué se componen. */
+.cntKpiDetalle {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.cntKpiDetalle:empty {
+    display: none;
+}
+
+.cntDesglose {
+    display: flex;
+    flex-direction: column;
+}
+
+.cntDesgloseFila {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 13px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.cntDesgloseFila:last-child {
+    border-bottom: none;
+}
+
+.cntDesgloseFila span:last-child {
+    font-weight: 600;
+}
+
+.cntDesgloseTotal {
+    color: var(--text-bright);
+    font-weight: 600;
+}
+
+.cntDesgloseTotal span:last-child:not(.cuentasNeg) {
+    color: var(--text-bright);
+}
+
 @media (max-width: 1100px) {
     .cuentasLayout {
         grid-template-columns: minmax(0, 1fr);

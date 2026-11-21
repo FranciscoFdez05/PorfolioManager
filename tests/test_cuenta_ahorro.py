@@ -161,3 +161,34 @@ def testAbrirLaVentanaAplicaLaAportacionAutomaticaUnaSolaVez(cliente):
 
     assert len(primera) == 1 and len(segunda) == 1
     assert primera[0]["nombre"] == "Ahorro mensual"
+
+
+def testLosMovimientosDeAhorroIncluyenRecurrentesYMarcanLoPendiente(tempDb):
+    from core.db import getDb
+    from stores.cuenta_ahorro_store import listarMovimientos
+    from stores.cuentas_store import crearTransferencia
+
+    hoy = datetime.date.today()
+    conexion = getDb()
+    # Una mensualidad cobrada en la cuenta de ahorro el día 1 del mes en curso
+    # (ya ha pasado) y otra el día 1 del año siguiente (pendiente).
+    mes = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+           "septiembre", "octubre", "noviembre", "diciembre"][hoy.month - 1]
+    conexion.execute(
+        f"INSERT INTO mensualidades (year, nombre, dia_cobro, cuenta, {mes}) VALUES (?, 'Seguro', '1', 'ahorro', '12')",
+        (str(hoy.year),),
+    )
+    conexion.execute(
+        "INSERT INTO ingresos_recurrentes (year, nombre, dia_cobro, cuenta, enero) VALUES (?, 'Renta', '1', 'ahorro', '50')",
+        (str(hoy.year + 1),),
+    )
+    conexion.commit()
+    crearTransferencia("banco", "ahorro", f"01-01-{hoy.year + 1}", "30")
+
+    movimientos = {m["origen"]: m for m in listarMovimientos() if m["cuenta"] == "ahorro"}
+
+    assert movimientos["mensualidad"]["pendiente"] is False
+    assert movimientos["mensualidad"]["kind"] == "salida"
+    assert movimientos["recurrente"]["pendiente"] is True
+    assert movimientos["transferencia"]["pendiente"] is True
+    assert movimientos["transferencia"]["kind"] == "entrada"

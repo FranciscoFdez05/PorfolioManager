@@ -84,12 +84,14 @@ def test_lo_que_solo_tiene_mes_cuenta_el_dia_1(conn):
     assert _punto(series["banco"], datetime.date(2026, 1, 1))["entradas"] >= Decimal("1000.00")
 
 
-def test_lo_posterior_a_hoy_del_mes_en_curso_se_apunta_hoy(conn):
+def test_lo_posterior_a_hoy_del_mes_en_curso_todavia_no_cuenta(conn):
     series = _historico(conn)
 
-    # 21-03-2026 (HOY es el 20): banco -> ahorro 999 + 9 de comisión. `saldos`
-    # ya lo cuenta porque trabaja por meses.
-    assert _punto(series["ahorro"], HOY)["entradas"] >= Decimal("999")
+    # 21-03-2026 (HOY es el 20): banco -> ahorro 999 + 9 de comisión. Aún no ha
+    # pasado, así que ni la gráfica ni `saldos` lo cuentan.
+    assert _punto(series["ahorro"], HOY)["entradas"] == Decimal(0)
+    despues = _historico(conn, datetime.date(2026, 3, 21))["ahorro"]
+    assert _punto(despues, datetime.date(2026, 3, 21))["entradas"] == Decimal("999")
 
 
 def test_lo_que_no_tiene_fecha_va_al_saldo_de_partida(conn):
@@ -233,3 +235,86 @@ def test_get_gastos_categorias(cliente):
 
     assert client.get("/api/cuentas/gastos-categorias").get_json() == {"categorias": []}
     assert client.get("/api/cuentas/gastos-categorias?desde=ayer").status_code == 400
+
+
+# ── Día de cobro y lista detallada ───────────────────────────────────────────
+
+
+def test_mensualidad_cuenta_desde_su_dia_de_cobro(tempDb):
+    from core.db import getDb
+    from stores.cuentas_store import saldos
+
+    conexion = getDb()
+    # Se cobra el 28; en marzo, por excepción, el 5. HOY es el 20 de marzo.
+    conexion.execute(
+        "INSERT INTO mensualidades (year, nombre, dia_cobro, dias_cobro, febrero, marzo) "
+        "VALUES ('2026', 'Seguro', '28', '{\"marzo\": \"5\"}', '10', '20')"
+    )
+    conexion.execute(
+        "INSERT INTO ingresos_recurrentes (year, nombre, dia_cobro, marzo) VALUES ('2026', 'Nomina', '25', '1000')"
+    )
+    conexion.commit()
+
+    banco = saldos(conexion, hoy=HOY)["banco"]
+    assert banco["salidas"] == Decimal("30")
+    # La nómina del 25 todavía no ha llegado.
+    assert banco["entradas"] == Decimal(0)
+    serie = _historico(conexion)["banco"]
+    assert _punto(serie, datetime.date(2026, 2, 28))["salidas"] == Decimal("10")
+    assert _punto(serie, datetime.date(2026, 3, 5))["salidas"] == Decimal("20")
+    assert saldos(conexion, hoy=datetime.date(2026, 3, 25))["banco"]["entradas"] == Decimal("1000")
+
+
+def test_dia_de_cobro_31_en_febrero_es_el_ultimo_dia(tempDb):
+    from core.db import getDb
+
+    conexion = getDb()
+    conexion.execute("INSERT INTO mensualidades (year, nombre, dia_cobro, febrero) VALUES ('2026', 'Alquiler', '31', '500')")
+    conexion.commit()
+
+    assert _punto(_historico(conexion)["banco"], datetime.date(2026, 2, 28))["salidas"] == Decimal("500")
+
+
+def _detallados(conn, cuentaId, hoy=HOY):
+    from stores.cuentas_historico import movimientosDetallados
+
+    return movimientosDetallados(cuentaId, conn, hoy=hoy, aEuros=_aEuros)
+
+
+@pytest.mark.parametrize("cuentaId", ["banco", "ahorro", "broker", "tarjeta"])
+def test_saldo_tras_el_ultimo_movimiento_ocurrido_es_el_de_saldos(conn, cuentaId):
+    from stores.cuentas_store import saldos
+
+    esperado = saldos(conn, hoy=HOY, aEuros=_aEuros)[cuentaId]["saldo"]
+    ocurridos = [m for m in _detallados(conn, cuentaId) if not m["pendiente"]]
+
+    assert Decimal(ocurridos[-1]["saldo"]) == esperado
+
+
+def test_detallados_incluye_cada_origen_y_marca_lo_pendiente(conn):
+    banco = _detallados(conn, "banco")
+    origenes = {m["origen"] for m in banco}
+
+    assert {"transferencia", "comision", "ingreso", "gasto", "recurrente"} <= origenes
+    futura = next(m for m in banco if m["fecha"] == "21-03-2026" and m["origen"] == "transferencia")
+    assert futura["pendiente"] is True
+    assert futura["kind"] == "salida"
+    assert futura["contraparte"] == "Cuenta de ahorro"
+    # Lo que no tiene fecha va el primero y no está pendiente.
+    assert banco[0]["dia"] == "" and banco[0]["pendiente"] is False
+
+
+def test_detallados_cada_saldo_es_el_anterior_mas_su_importe(conn):
+    from stores.cuentas_store import obtenerCuenta
+
+    movimientos = _detallados(conn, "broker")
+    saldo = Decimal(obtenerCuenta("broker", conn)["saldo_inicial"])
+    for m in movimientos:
+        saldo += Decimal(m["cantidad"]) if m["kind"] == "entrada" else -Decimal(m["cantidad"])
+        assert Decimal(m["saldo"]) == saldo
+    assert {"dividendo"} <= {m["origen"] for m in movimientos}
+    assert [m["orden"] for m in movimientos] == list(range(len(movimientos)))
+
+
+def test_detallados_de_cuenta_inexistente_esta_vacio(conn):
+    assert _detallados(conn, "nada") == []

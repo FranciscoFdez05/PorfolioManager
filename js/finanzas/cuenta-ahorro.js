@@ -160,6 +160,24 @@ function getCuentaAhorroSaldoInicial() {
 
 // ── Datos ────────────────────────────────────────────────────────────────
 
+/**
+ * Cuenta con la que se cobra una mensualidad o un recurrente en `month`: la
+ * excepción de ese mes si la tiene, o la habitual de la fila.
+ * @param {{cuenta?: string, cuentasCobro?: Object<string, string>}} row
+ * @param {string} month Clave del mes («marzo»).
+ * @returns {string} Identificador de la cuenta; vacío es la bancaria.
+ */
+function cuentaAhorroCuentaDelMes(row, month) {
+    const excepciones = row?.cuentasCobro || {}
+    return Object.hasOwn(excepciones, month) ? excepciones[month] || "" : row?.cuenta || ""
+}
+
+// Como en el servidor: vacío, la propia bancaria o una cuenta que ya no existe
+// (borrada) es la bancaria.
+function cuentaAhorroEsBancaria(cuentaId) {
+    return !cuentaId || cuentaId === "banco" || !cuentaAhorroTodas.some((c) => c.id === cuentaId)
+}
+
 async function loadCuentaAhorroBanco(year) {
     // Solo lo que pasa por la cuenta bancaria: lo pagado o cobrado con otra
     // cuenta no mueve su saldo, y las mensualidades y recurrentes sí.
@@ -171,7 +189,8 @@ async function loadCuentaAhorroBanco(year) {
                 if (!row.cuenta) total += parseEuroNumber(row.cantidad || "")
             })
             ;(data[recurrentesKey] || []).forEach((row) => {
-                total += parseEuroNumber(row.meses?.[month] || "")
+                if (cuentaAhorroEsBancaria(cuentaAhorroCuentaDelMes(row, month)))
+                    total += parseEuroNumber(row.meses?.[month] || "")
             })
         })
         return total
@@ -246,13 +265,41 @@ function getCuentaAhorroRemuneradasVinculadas() {
     return id ? cuentaAhorroRemuneradas.filter((cuenta) => cuenta.id === id) : []
 }
 
+/**
+ * ¿Ya ha llegado el día de un interés o un dividendo? Sin día cuenta desde el 1
+ * de su mes, como el saldo que calcula el servidor (`cuentas_store.saldos`).
+ * @param {{year: string, month: number, day: number}} p De splitCuentaAhorroFecha.
+ * @param {Date} [hoy]
+ * @returns {boolean}
+ */
+function cuentaAhorroYaOcurrido(p, hoy = new Date()) {
+    return new Date(Number(p.year), p.month, p.day || 1).getTime() <= hoy.getTime()
+}
+
+/**
+ * ¿Es de antes de la fecha de inicio de la cuenta (o de ese mismo día)? Su
+ * saldo inicial ya lo incluye, como en el servidor.
+ * @param {{year: string, month: number, day: number}} p De splitCuentaAhorroFecha.
+ * @param {string} [inicio] Fecha de inicio de la cuenta, aaaa-mm-dd.
+ * @returns {boolean}
+ */
+function cuentaAhorroAntesDelInicio(p, inicio = getCuentaAhorroActual()?.inicio) {
+    const [anio, mes, dia] = String(inicio || "")
+        .split("-")
+        .map(Number)
+    if (!anio || !mes || !dia) return false
+    return new Date(Number(p.year), p.month, p.day || 1).getTime() <= new Date(anio, mes - 1, dia).getTime()
+}
+
 // Todo lo que entra o sale de la cuenta seleccionada, con su año y mes.
 function buildCuentaAhorroFlows() {
     const flows = []
 
     getCuentaAhorroMovs().forEach((m) => {
         const month = CUENTA_AHORRO_MONTH_KEYS.indexOf(m.month)
-        if (month < 0) return
+        // Lo que aún no ha llegado su día no está todavía en la cuenta, y lo de
+        // antes de su fecha de inicio ya está en el saldo inicial.
+        if (month < 0 || m.pendiente || m.anterior) return
         const sign = m.kind === "salida" ? -1 : 1
         flows.push({
             type: "aporte",
@@ -265,7 +312,7 @@ function buildCuentaAhorroFlows() {
     getCuentaAhorroRemuneradasVinculadas().forEach((cuenta) => {
         ;(cuenta.rows || []).forEach((row) => {
             const p = splitCuentaAhorroFecha(row.fecha)
-            if (!p) return
+            if (!p || !cuentaAhorroYaOcurrido(p) || cuentaAhorroAntesDelInicio(p)) return
             flows.push({
                 type: "remunerada",
                 year: p.year,
@@ -277,7 +324,7 @@ function buildCuentaAhorroFlows() {
 
     cuentaAhorroDivEur.forEach(({ row, importe }) => {
         const p = splitCuentaAhorroFecha(row.fecha)
-        if (!p) return
+        if (!p || !cuentaAhorroYaOcurrido(p) || cuentaAhorroAntesDelInicio(p)) return
         flows.push({ type: "dividendo", year: p.year, month: p.month, importe })
     })
 
@@ -353,7 +400,14 @@ function formatCuentaAhorroSigned(value) {
 
 // Transferencias entre cuentas (y sus comisiones) o gastos e ingresos pagados y cobrados en la cuenta.
 function esCuentaAhorroGastoIngreso(m) {
-    return m.origen === "gasto" || m.origen === "ingreso"
+    return ["gasto", "ingreso", "mensualidad", "recurrente"].includes(m.origen)
+}
+
+const CUENTA_AHORRO_ORIGENES = {
+    gasto: "Gasto",
+    ingreso: "Ingreso",
+    mensualidad: "Mensualidad",
+    recurrente: "Ingreso recurrente"
 }
 
 function getCuentaAhorroMovimientosDelAnio(gastos = cuentaAhorroTab === "gastos") {
@@ -364,9 +418,12 @@ function getCuentaAhorroMovimientosDelAnio(gastos = cuentaAhorroTab === "gastos"
 
 // De dónde viene o a dónde va un movimiento, en una frase.
 function describeCuentaAhorroMovimiento(m) {
-    if (m.origen === "transferencia") return `${m.kind === "salida" ? "Hacia" : "Desde"} ${m.contraparte}`
-    if (m.origen === "comision") return `Comisión · hacia ${m.contraparte}`
-    return `${m.origen === "gasto" ? "Gasto" : "Ingreso"}${m.contraparte ? " · " + m.contraparte : ""}`
+    // Lo que no cuenta en el saldo lo dice al final, sea del origen que sea.
+    const estado = m.anterior ? " · antes del inicio" : m.pendiente ? " · pendiente" : ""
+    if (m.origen === "transferencia") return `${m.kind === "salida" ? "Hacia" : "Desde"} ${m.contraparte}${estado}`
+    if (m.origen === "comision") return `Comisión · hacia ${m.contraparte}${estado}`
+    const tipo = CUENTA_AHORRO_ORIGENES[m.origen] || "Ingreso"
+    return `${tipo}${estado}${m.contraparte ? " · " + m.contraparte : ""}`
 }
 
 // Cabecera con columnas ordenables: la activa lleva una flecha con el sentido.

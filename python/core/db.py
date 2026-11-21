@@ -323,7 +323,10 @@ CREATE TABLE IF NOT EXISTS cuentas (
     ahorro        INTEGER NOT NULL DEFAULT 0,
     -- Etiquetas además del tipo (JSON con ids de tipo, p. ej. ["broker"]): una
     -- cuenta puede ser banco y broker a la vez. El tipo sigue siendo la principal.
-    etiquetas     TEXT NOT NULL DEFAULT ''
+    etiquetas     TEXT NOT NULL DEFAULT '',
+    -- Día (aaaa-mm-dd) desde el que se lleva la cuenta: el saldo inicial es el
+    -- de ese día y lo anterior no cuenta. Vacío = toda la historia.
+    inicio        TEXT NOT NULL DEFAULT ''
 );
 
 -- Qué cuenta remunerada va con qué cuenta de dinero. Una por cada lado: la
@@ -854,7 +857,7 @@ CREATE TABLE IF NOT EXISTS muestras_cartera (
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 41
+ESQUEMA_VERSION = 42
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -2199,6 +2202,22 @@ def _esquema41(conn):
     """
     centimos.anadirColumnasCentimos(conn, centimos.COLUMNAS_FASE_F)
     centimos.convertirImportes(conn, centimos.COLUMNAS_FASE_F)
+
+
+@_migracion(42)
+def _esquema42(conn):
+    """Fecha de inicio de cada cuenta: desde cuándo se lleva su saldo.
+
+    Las cuentas llegaron después que Gastos e Ingresos, así que su saldo
+    calculado desde el principio no casa con el real. Con `inicio`, el saldo
+    inicial pasa a ser el de ese día y lo anterior se ignora en las cuentas,
+    sin borrar nada de Gastos ni de Ingresos. Añadir una columna con DEFAULT no
+    reescribe la tabla: volver atrás es levantar la imagen anterior, que la
+    ignora y vuelve a contar toda la historia.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(cuentas)")}
+    if "inicio" not in columnas:
+        conn.execute("ALTER TABLE cuentas ADD COLUMN inicio TEXT NOT NULL DEFAULT ''")
 
 
 class _CerrarAlTerminarElHilo:

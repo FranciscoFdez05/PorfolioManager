@@ -22,6 +22,7 @@ import datetime
 import re
 
 from core.dinero import ImporteInvalido, aDecimal, aTexto
+from stores.cuentas_historico import movimientosDetallados
 from stores.cuentas_store import (
     ID_AHORRO,
     ID_BANCO,
@@ -59,12 +60,38 @@ def buscarPorClave(clave, conn=None):
     return None
 
 
+# Lo que la ventana de ahorro lee de `movimientosDetallados`: los intereses y
+# los dividendos los suma ella aparte, con su propio detalle.
+_ORIGENES_RECURRENTES = ("mensualidad", "recurrente")
+
+
+def _sinConversion(importe, _moneda):
+    # Los dividendos se descartan aquí: no hace falta pedir el cambio a la red.
+    return importe
+
+
 def listarMovimientos(conn=None):
-    """Los movimientos de todas las cuentas de ahorro, cada uno con su cuenta."""
+    """Los movimientos de todas las cuentas de ahorro, cada uno con su cuenta.
+
+    Transferencias (y comisiones), gastos e ingresos como los da
+    `movimientosDeCuenta`, más las mensualidades y los ingresos recurrentes
+    cobrados en la cuenta, que también mueven su saldo. Cada uno lleva
+    `pendiente` (su día todavía no ha llegado) y `anterior` (es de antes de la
+    fecha de inicio de la cuenta): ninguno de los dos cuenta en el saldo de hoy
+    (misma regla que `cuentas_store.saldos`).
+    """
     movimientos = []
     for cuenta in cuentasDeAhorro(conn):
+        detallados = movimientosDetallados(cuenta["id"], conn, aEuros=_sinConversion)
+        pendientes = {(m["origen"], m["id"]) for m in detallados if m["pendiente"]}
+        anteriores = {(m["origen"], m["id"]) for m in detallados if m["anterior"]}
+        datos = {"cuenta": cuenta["id"], "cuenta_nombre": cuenta["nombre"]}
         for movimiento in movimientosDeCuenta(cuenta["id"], conn):
-            movimientos.append({**movimiento, "cuenta": cuenta["id"], "cuenta_nombre": cuenta["nombre"]})
+            clave = (movimiento["origen"], movimiento["id"])
+            movimientos.append({**movimiento, **datos, "pendiente": clave in pendientes, "anterior": clave in anteriores})
+        for movimiento in detallados:
+            if movimiento["origen"] in _ORIGENES_RECURRENTES:
+                movimientos.append({**movimiento, **datos})
     return movimientos
 
 
