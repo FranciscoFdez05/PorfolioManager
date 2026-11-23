@@ -425,8 +425,8 @@
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
-/* Sin eventos de ratón: si tapa parte del mapa, las baldosas de debajo siguen
-   respondiendo al cursor. */
+/* Vista previa de velas de las baldosas. Sin eventos de ratón: si tapa parte
+   del mapa, las baldosas de debajo siguen respondiendo al cursor. */
 .mapaDiaTv {
     position: fixed;
     z-index: 10000;
@@ -451,21 +451,86 @@
     visibility: visible;
 }
 
-/* Varias vistas previas cargadas a la vez (ver MAPA_DIA_TV_MAX_MARCOS en
-   mapa-dia.js), apiladas: solo se ve la activa. visibility y no display: con
-   display:none el gráfico de TradingView se monta sin medidas. */
-.mapaDiaTv iframe {
-    position: absolute;
-    inset: 0;
-    display: block;
-    width: 100%;
-    height: 100%;
-    border: 0;
-    visibility: hidden;
+/* Cabecera de la vista previa de velas: símbolo y OHLC de hoy. El alto es
+   MAPA_DIA_TV_CABECERA en mapa-dia.js. */
+.mapaDiaTvCab {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    height: 46px;
+    padding: 0 10px;
+    color: var(--text-primary);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
 }
 
-.mapaDiaTv iframe.mapaDiaTvActivo {
-    visibility: inherit;
+.mapaDiaTvSimbolo {
+    font-size: 13px;
+}
+
+.mapaDiaTvOhlc {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: pre;
+}
+
+.mapaDiaTvCuerpo.mapaDiaTvAviso {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: calc(100% - 46px);
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.mapaDiaTvSvg {
+    display: block;
+}
+
+.mapaDiaTvRejilla {
+    stroke: var(--border-soft);
+    stroke-width: 1;
+}
+
+.mapaDiaTvEje {
+    fill: var(--text-muted);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.mapaDiaTvSube {
+    color: var(--color-pos);
+    fill: var(--color-pos);
+    stroke: var(--color-pos);
+}
+
+.mapaDiaTvBaja {
+    color: var(--color-neg);
+    fill: var(--color-neg);
+    stroke: var(--color-neg);
+}
+
+.mapaDiaTvOhlc .mapaDiaTvSube,
+.mapaDiaTvOhlc .mapaDiaTvBaja {
+    stroke: none;
+}
+
+.mapaDiaTvUltimo {
+    stroke-dasharray: 2 3;
+    stroke-width: 1;
+}
+
+.mapaDiaTvEtiqueta {
+    stroke: none;
+}
+
+.mapaDiaTvEtiquetaTexto {
+    fill: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
 }
 
 html[data-theme="light"] .mapaDiaTv {

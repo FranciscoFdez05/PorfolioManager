@@ -327,3 +327,60 @@ def testRutaHistoricoRechazaTickersNoValidos(clienteHistorico, consulta):
     assert respuesta.status_code == 400
     assert respuesta.get_json()["ok"] is False
     assert feed.llamadas == []
+
+
+# --- Ruta /api/market/velas ------------------------------------------------------
+
+
+@pytest.fixture
+def clienteVelas(clienteAutenticado, monkeypatch):
+    from providers import tradingview_feed
+    from routes.market import marketBp
+
+    # Como las da el feed: [ts, cierre, máximo, mínimo, apertura].
+    feed = FeedConDivisa(
+        {"XETR:NVD": [(1, 124.32, 143.82, 123.4, 139.32), (2, 149.28, 150.94, 122.14, 131.7)]}, {"XETR:NVD": "EUR"}
+    )
+    monkeypatch.setattr(tradingview_feed, "fetchSeriesWithCurrency", feed)
+    client, _cabeceras, _app = clienteAutenticado(marketBp)
+    return client, feed
+
+
+def testRutaVelasDevuelveVelasDiariasEnOrdenOhlc(clienteVelas):
+    from routes.market import VELAS_VISTA_PREVIA_DIAS
+
+    client, feed = clienteVelas
+
+    respuesta = client.get("/api/market/velas?symbol=xetr:nvd")
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json() == {
+        "ok": True,
+        "simbolo": "XETR:NVD",
+        "divisa": "EUR",
+        "velas": [[1, 139.32, 143.82, 123.4, 124.32], [2, 131.7, 150.94, 122.14, 149.28]],
+    }
+    [(simbolos, resolucion, cuantas)] = feed.llamadas
+    assert (simbolos, resolucion) == (["XETR:NVD"], "1D")
+    # Los días pedidos más el margen de `_velasDeTodo`, no el máximo del feed.
+    assert VELAS_VISTA_PREVIA_DIAS <= cuantas < series_tradingview.MAX_VELAS_DIARIAS
+
+
+def testRutaVelasSinVelasRespondeVacio(clienteVelas):
+    client, _feed = clienteVelas
+
+    respuesta = client.get("/api/market/velas?symbol=FOO:NOPE")
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json() == {"ok": True, "simbolo": "FOO:NOPE", "divisa": None, "velas": []}
+
+
+@pytest.mark.parametrize("consulta", ["", "symbol=", "symbol=mal%20ticker", "symbol=X:%3Cscript%3E"])
+def testRutaVelasRechazaTickersNoValidos(clienteVelas, consulta):
+    client, feed = clienteVelas
+
+    respuesta = client.get(f"/api/market/velas?{consulta}")
+
+    assert respuesta.status_code == 400
+    assert respuesta.get_json()["ok"] is False
+    assert feed.llamadas == []

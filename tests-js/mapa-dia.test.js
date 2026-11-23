@@ -388,6 +388,44 @@ describe("mapaDiaSesionVelas", () => {
         })
     })
 
+    const diasAntes = (puntos, dias) => puntos.map(([ts, v]) => [ts - dias * 86400, v])
+
+    it("con la sesión abierta y días previos en las velas, el eje es la sesión entera de hoy", () => {
+        const ayer = diasAntes(velas(15.5, 22), 1)
+        expect(mapaDiaSesionVelas(velas(15.5, 18), DIA.inicio, DIA.fin, local(18, 10), ayer)).toEqual({
+            inicio: local(15, 30),
+            fin: local(22),
+            cerrado: false,
+            plano: false
+        })
+    })
+
+    it("el horario sale de todos los días previos, no solo del último", () => {
+        // Valor poco negociado: ayer solo operó de 10:00 a 13:00; anteayer, de 9:00 a 17:30.
+        const previas = [...diasAntes(velas(9, 17.5), 2), ...diasAntes(velas(10, 13), 1)]
+        expect(mapaDiaSesionVelas(velas(10, 12), DIA.inicio, DIA.fin, local(15), previas)).toEqual({
+            inicio: local(9),
+            fin: local(17, 30),
+            cerrado: false,
+            plano: false
+        })
+    })
+
+    it("horas sin velas en plena sesión no lo dan por cerrado; pasada la hora de cierre, sí", () => {
+        const previas = diasAntes(velas(9, 17.5), 1)
+        expect(mapaDiaSesionVelas(velas(9, 11), DIA.inicio, DIA.fin, local(15), previas).cerrado).toBe(false)
+        expect(mapaDiaSesionVelas(velas(9, 11), DIA.inicio, DIA.fin, local(18), previas).cerrado).toBe(true)
+    })
+
+    it("con el mercado cerrado, el eje sigue siendo la sesión entera", () => {
+        const previas = diasAntes(velas(9, 17.5), 1)
+        expect(mapaDiaSesionVelas(velas(9, 17.5), DIA.inicio, DIA.fin, local(23), previas)).toMatchObject({
+            inicio: local(9),
+            fin: local(17, 30),
+            cerrado: true
+        })
+    })
+
     it("sin velas desde hace rato, el mercado está cerrado", () => {
         expect(mapaDiaSesionVelas(velas(15.5, 22), DIA.inicio, DIA.fin, local(23, 50))).toMatchObject({
             inicio: local(15, 30),
@@ -398,6 +436,45 @@ describe("mapaDiaSesionVelas", () => {
 
     it("sin ninguna vela hoy, cerrado todo el día", () => {
         expect(mapaDiaSesionVelas([], DIA.inicio, DIA.fin, local(12))).toEqual({ ...DIA, cerrado: true, plano: true })
+    })
+})
+
+describe("mapaDiaAlargarVelas", () => {
+    const ventana = { inicio: local(9), fin: local(17, 30), plano: false }
+
+    it("sin velas desde hace rato, alarga con el último precio hasta ahora", () => {
+        const puntos = [
+            [local(9), 10],
+            [local(11), 12]
+        ]
+        expect(mapaDiaAlargarVelas(puntos, ventana, local(15))).toEqual([...puntos, [local(15), 12]])
+    })
+
+    it("con el mercado cerrado, alarga solo hasta el cierre", () => {
+        const puntos = [
+            [local(9), 10],
+            [local(11), 12]
+        ]
+        expect(mapaDiaAlargarVelas(puntos, ventana, local(20)).at(-1)).toEqual([local(17, 30), 12])
+    })
+
+    it("el retraso normal del feed no se rellena", () => {
+        const puntos = [
+            [local(9), 10],
+            [local(14, 45), 12]
+        ]
+        expect(mapaDiaAlargarVelas(puntos, ventana, local(15))).toBe(puntos)
+    })
+})
+
+describe("mapaDiaSvg con velas", () => {
+    it("no parte la línea en los huecos sin operaciones", () => {
+        const puntos = [
+            [local(9), 10],
+            [local(13), 12]
+        ]
+        const svg = mapaDiaSvg(puntos, { segundosHueco: HUECO }, { inicio: local(9), fin: local(17), velas: true })
+        expect(svg.match(/class="mapaDiaTrazo" d="([^"]*)"/)[1].match(/M/g)).toHaveLength(1)
     })
 })
 

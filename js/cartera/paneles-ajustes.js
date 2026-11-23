@@ -179,7 +179,7 @@ const PN_AJUSTES = {
                     clave: "precargaTv",
                     tipo: "check",
                     etiqueta: "Precargar los gráficos de vista previa",
-                    ayuda: "Carga en segundo plano el gráfico de TradingView de todos los activos para que aparezca al instante al pasar el cursor. Ocupa más memoria.",
+                    ayuda: "Pide en segundo plano las velas de todos los activos para que el gráfico aparezca al instante al pasar el cursor.",
                     defecto: false
                 }
             ]

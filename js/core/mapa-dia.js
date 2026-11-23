@@ -1,4 +1,4 @@
-// Minigráfico del día y vista previa de TradingView en los mapas de calor.
+// Minigráfico del día y vista previa de velas en los mapas de calor.
 //
 // La vista previa la usan el mapa de Análisis (heatmap.js) y el widget «Mapa»
 // de Paneles; el minigráfico, solo Paneles. El mapa pinta sus baldosas como
@@ -30,6 +30,10 @@ const MAPA_DIA_COBERTURA_MIN = 3600
 // cerrado). Tiene que quedarse por debajo de las 2 h que hay entre el cierre de
 // EE. UU. (22:00) y la medianoche, o ese cierre no se detectaría nunca.
 const MAPA_DIA_CIERRE_MIN = 90 * 60
+// Rato sin velas a partir del cual la línea se alarga con el último precio
+// (mapaDiaAlargarVelas). Por encima de lo que tarda el feed: 15 min de retraso
+// de algunas bolsas más la vela de 5 min en curso.
+const MAPA_DIA_SIN_OPERACIONES = 30 * 60
 // Hueco por defecto si la respuesta no trae `segundosHueco` (el del servidor).
 const MAPA_DIA_HUECO = 7200
 // Como mucho tantas marcas horarias en el eje, y ninguna pegada a los bordes
@@ -37,18 +41,11 @@ const MAPA_DIA_HUECO = 7200
 const MAPA_DIA_EJE_MAX_MARCAS = 4
 const MAPA_DIA_EJE_MARGEN = 8
 // Retardo antes de abrir la vista previa: al cruzar el mapa con el ratón no se
-// carga un iframe por cada baldosa que se toca de pasada.
+// piden las velas de cada baldosa que se toca de pasada.
 const MAPA_DIA_RETARDO_TV = 200
+// Las mismas medidas que .mapaDiaTv en css/pages/heatmap.css.
 const MAPA_DIA_TV_ANCHO = 440
 const MAPA_DIA_TV_ALTO = 280
-// Vistas previas que se quedan cargadas (ocultas) para que volver a una
-// baldosa ya vista sea inmediato. Crear el iframe de TradingView cuesta ~1 s
-// aunque su código ya esté en la caché del navegador, porque arranca la
-// aplicación de gráficos entera; cada uno vivo ocupa memoria, de ahí el tope.
-const MAPA_DIA_TV_MAX_MARCOS = 6
-// Lo más que espera la precarga a que un iframe termine de cargar antes de
-// pasar al siguiente: si TradingView no responde, no se queda atascada.
-const MAPA_DIA_TV_ESPERA_CARGA = 8000
 
 // Tickers por petición de velas: el tope que admite /api/market/series.
 const MAPA_DIA_VELAS_LOTE = 80
@@ -59,14 +56,6 @@ let _mapaDiaVelas = {} // periodo -> Map(ticker -> { puntos, ts }); `puntos` nul
 let _mapaDiaRefresco = null
 let _mapaDiaTvTimer = null
 let _mapaDiaTvSimbolo = ""
-// URL → iframe. Map conserva el orden de inserción: el primero es el que hace
-// más tiempo que no se usa y el que sale al pasar del tope.
-const _mapaDiaTvMarcos = new Map()
-// Tope de vistas previas vivas: el de siempre o, con la precarga activa, tantas
-// como símbolos tenga el mapa que la pidió.
-let _mapaDiaTvTope = MAPA_DIA_TV_MAX_MARCOS
-// Turno de la precarga en curso: cada llamada nueva deja sin efecto la anterior.
-let _mapaDiaTvPrecarga = 0
 
 /**
  * Serie de todos los activos en un periodo, cacheada un minuto y compartida
@@ -193,8 +182,10 @@ function mapaDiaTrazado(puntos, inicio, fin, hueco) {
 function mapaDiaSvg(puntos, datos, ventana = datos) {
     if (!Array.isArray(puntos) || puntos.length < 2) return ""
     // Fuera de «Hoy» las noches y los fines de semana son huecos normales del mercado, no
-    // falta de datos: la línea los une en vez de partirse en un trozo por sesión.
-    const hueco = ventana.dias ? Infinity : datos.segundosHueco || MAPA_DIA_HUECO
+    // falta de datos: la línea los une en vez de partirse en un trozo por sesión. Con
+    // velas tampoco se parte: un hueco entre velas es un rato sin operaciones, no un
+    // servidor parado como en los snapshots.
+    const hueco = ventana.dias || ventana.velas ? Infinity : datos.segundosHueco || MAPA_DIA_HUECO
     const { linea, area } = mapaDiaTrazado(puntos, ventana.inicio, ventana.fin, hueco)
     return `<svg class="mapaDiaLinea" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
         <path class="mapaDiaArea" d="${area}"/>
@@ -278,20 +269,89 @@ function mapaDiaSesion(puntos, inicio, fin, hueco = MAPA_DIA_HUECO) {
  * si no (la cripto), es el día entero. Sin ninguna vela hoy, el mercado lleva
  * cerrado todo el día.
  *
+ * Si las velas de días anteriores (`previas`) dicen el horario del activo
+ * (`mapaDiaHorarioPrevio`), el eje es la sesión entera de hoy y no solo hasta
+ * la última vela: con la sesión abierta la línea se ve avanzar, como la de la
+ * cripto. Y el mercado está cerrado cuando ha pasado la hora de cierre, no
+ * cuando lleva un rato sin velas: un valor poco negociado puede pasar horas
+ * sin operaciones en plena sesión. Sin días anteriores en las velas, el eje se
+ * ciñe a las de hoy y el cierre se deduce del rato sin velas.
+ *
  * @param {Array<[number, number]>} puntos Velas de hoy, ordenadas (puede estar vacía).
  * @param {number} inicio Inicio del día (ts).
  * @param {number} fin Fin del día (ts).
  * @param {number} [ahora] Instante actual (ts).
+ * @param {Array<[number, number]>} [previas] Velas anteriores a `inicio`, ordenadas.
  * @returns {{inicio: number, fin: number, cerrado: boolean, plano: boolean}} La ventana.
  */
-function mapaDiaSesionVelas(puntos, inicio, fin, ahora = Date.now() / 1000) {
+function mapaDiaSesionVelas(puntos, inicio, fin, ahora = Date.now() / 1000, previas = []) {
     if (!puntos.length) return { inicio, fin, cerrado: true, plano: true }
     const primera = puntos[0][0]
     const ultima = puntos[puntos.length - 1][0]
     const abreDespues = primera - inicio >= MAPA_DIA_CIERRE_MIN
-    const cerrado = Math.min(ahora, fin) - ultima >= MAPA_DIA_CIERRE_MIN
-    if (!abreDespues && !cerrado) return { inicio, fin, cerrado: false, plano: false }
-    return { inicio: primera, fin: ultima, cerrado, plano: false }
+    const sinVelasHaRato = Math.min(ahora, fin) - ultima >= MAPA_DIA_CIERRE_MIN
+    if (!abreDespues && !sinVelasHaRato) return { inicio, fin, cerrado: false, plano: false }
+    const horario = mapaDiaHorarioPrevio(previas, inicio)
+    if (!horario) return { inicio: primera, fin: ultima, cerrado: sinVelasHaRato, plano: false }
+    return {
+        inicio: Math.min(primera, horario.apertura),
+        fin: Math.min(fin, Math.max(ultima, horario.cierre)),
+        cerrado: ahora >= horario.cierre,
+        plano: false
+    }
+}
+
+/**
+ * Horario de hoy de un activo deducido de sus velas de días anteriores: la
+ * hora más temprana a la que hubo vela en alguno de esos días y la más tardía.
+ *
+ * Se toman todos los días y no solo el último porque en un valor poco
+ * negociado la primera y la última operación de un día suelto pueden quedar
+ * lejos de la apertura y del cierre. No hay tabla de horarios por bolsa.
+ *
+ * @param {Array<[number, number]>} previas Velas anteriores a hoy, ordenadas.
+ * @param {number} inicio Medianoche de hoy (ts).
+ * @returns {{apertura: number, cierre: number}|null} Instantes de hoy, o null sin al menos dos velas.
+ */
+function mapaDiaHorarioPrevio(previas, inicio) {
+    if (!Array.isArray(previas) || previas.length < 2) return null
+    // Segundos desde la medianoche local, para comparar días distintos.
+    const segundosDelDia = (ts) => {
+        const d = new Date(ts * 1000)
+        return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()
+    }
+    let desde = Infinity
+    let hasta = -Infinity
+    previas.forEach((p) => {
+        const s = segundosDelDia(p[0])
+        desde = Math.min(desde, s)
+        hasta = Math.max(hasta, s)
+    })
+    if (!(hasta > desde)) return null
+    // Con setHours y no sumando a `inicio`: el día del cambio de hora no dura 24 h.
+    const hoy = (s) => new Date(inicio * 1000).setHours(0, 0, s, 0) / 1000
+    return { apertura: hoy(desde), cierre: hoy(hasta) }
+}
+
+/**
+ * Alarga la línea de velas con el último precio hasta ahora (o hasta el cierre
+ * de la sesión) cuando lleva un rato sin velas.
+ *
+ * Una vela solo existe si hubo operaciones: en un valor poco negociado, horas
+ * sin velas no son datos que falten sino el mismo precio, y sin esto la línea
+ * se quedaba a medias en plena sesión. Por debajo de `MAPA_DIA_SIN_OPERACIONES`
+ * no se toca: es lo que tarda el feed (retraso de la bolsa más la vela en curso).
+ *
+ * @param {Array<[number, number]>} puntos Velas de hoy, ordenadas.
+ * @param {{fin: number, plano: boolean}} ventana Ventana de `mapaDiaSesionVelas`.
+ * @param {number} [ahora] Instante actual (ts).
+ * @returns {Array<[number, number]>} Las mismas velas o una copia con un punto más.
+ */
+function mapaDiaAlargarVelas(puntos, ventana, ahora = Date.now() / 1000) {
+    if (!puntos.length || ventana.plano) return puntos
+    const [ultimaTs, ultimoValor] = puntos[puntos.length - 1]
+    const hasta = Math.min(ahora, ventana.fin)
+    return hasta - ultimaTs >= MAPA_DIA_SIN_OPERACIONES ? [...puntos, [hasta, ultimoValor]] : puntos
 }
 
 /**
@@ -312,8 +372,12 @@ function mapaDiaSerieCelda(celda, datos, velas) {
         // mueve también con compras y ventas); quien la recibe puede sacar de
         // ella la variación del periodo.
         if (esDia) {
-            const ventana = { ...mapaDiaSesionVelas(enVentana, datos.inicio, datos.fin), velas: true }
-            return { puntos: enVentana.length ? enVentana : undefined, ventana }
+            const previas = conVelas.filter((p) => p[0] < datos.inicio)
+            const ventana = {
+                ...mapaDiaSesionVelas(enVentana, datos.inicio, datos.fin, Date.now() / 1000, previas),
+                velas: true
+            }
+            return { puntos: enVentana.length ? mapaDiaAlargarVelas(enVentana, ventana) : undefined, ventana }
         }
         if (enVentana.length >= 2) {
             return {
@@ -498,43 +562,193 @@ function mapaDiaProgramarRefresco() {
     }, MAPA_DIA_REFRESCO)
 }
 
-// ── Vista previa de TradingView ─────────────────────────────────────────────
+// ── Vista previa de velas ───────────────────────────────────────────────────
 
-// Velas diarias siempre, sea cual sea el periodo del mapa: muchos símbolos
-// (acciones de bolsas europeas, por ejemplo) solo tienen intervalos D, W y M en
-// TradingView, y con velas de minutos u horas el gráfico salía vacío. Sin
-// `range`: TradingView elige el intervalo a partir del rango y pasa por encima
-// de `interval` («3M» da velas de horas y vuelve a fallar).
-const MAPA_DIA_INTERVALO_TV = "D"
+// La vista previa era el gráfico incrustado de TradingView (widgetembed), que en
+// bolsas como Xetra solo tiene datos al cierre del día: se quedaba en la sesión
+// anterior y no había forma de saber desde fuera del iframe qué símbolos salían
+// así. Ahora se dibujan las velas diarias del feed (/api/market/velas), que sí
+// traen la de hoy en curso, en un SVG propio.
+
+// Ancho mínimo por vela en el recuadro: con menos, cuerpo y mecha se confunden.
+const MAPA_DIA_TV_PASO_MIN = 4
+// Medidas del dibujo dentro del recuadro (px): cabecera, eje de precios a la
+// derecha y eje de meses abajo.
+const MAPA_DIA_TV_CABECERA = 46
+const MAPA_DIA_TV_EJE_Y = 54
+const MAPA_DIA_TV_EJE_X = 22
+const MAPA_DIA_TV_MARGEN = 8
+// Separación mínima entre rótulos de mes, para que no se monten.
+const MAPA_DIA_TV_SEPARACION_MES = 36
+
+// Símbolo → { datos, ts }: velas ya pedidas. `datos` null si el símbolo no tiene.
+const _mapaDiaTvVelas = new Map()
+// Símbolo → Promise en curso, para no pedir dos veces el mismo.
+const _mapaDiaTvPeticiones = new Map()
+// Turno de la precarga en curso: cada llamada nueva deja sin efecto la anterior.
+let _mapaDiaTvPrecarga = 0
 
 /**
- * URL del gráfico de velas de TradingView para la vista previa.
- *
- * Es el gráfico avanzado (`widgetembed`), el mismo del modal y de Paneles: el
- * mini-symbol-overview que había antes solo dibuja una línea. Va sin barras de
- * herramientas ni volumen, porque la vista previa no se puede tocar.
+ * Velas diarias de un símbolo para la vista previa, cacheadas `MAPA_DIA_TTL`.
  *
  * @param {string} simbolo Símbolo de TradingView.
- * @returns {string} La URL del iframe.
+ * @returns {Promise<{divisa: string|null, velas: Array<number[]>}|null>} Las
+ *     velas `[ts, apertura, máximo, mínimo, cierre]`, o null si no hay o falla.
  */
-function mapaDiaUrlTv(simbolo) {
-    const claro = document.documentElement.getAttribute("data-theme") === "light"
-    const p = new URLSearchParams({
-        symbol: simbolo,
-        interval: MAPA_DIA_INTERVALO_TV,
-        // 1 = velas japonesas.
-        style: "1",
-        theme: claro ? "light" : "dark",
-        locale: idiomaActual(),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Etc/UTC",
-        // Con guion bajo: widgetembed ignora las variantes sin él (ver paneles.js).
-        hide_side_toolbar: "1",
-        hide_top_toolbar: "1",
-        hide_volume: "1",
-        symboledit: "0",
-        saveimage: "0"
+function mapaDiaCargarVelasTv(simbolo) {
+    const guardado = _mapaDiaTvVelas.get(simbolo)
+    if (guardado && Date.now() - guardado.ts < MAPA_DIA_TTL) return Promise.resolve(guardado.datos)
+    if (!_mapaDiaTvPeticiones.has(simbolo)) {
+        const peticion = fetch(`/api/market/velas?${new URLSearchParams({ symbol: simbolo })}`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((json) => {
+                const datos = json?.ok && json.velas?.length >= 2 ? { divisa: json.divisa, velas: json.velas } : null
+                _mapaDiaTvVelas.set(simbolo, { datos, ts: Date.now() })
+                return datos
+            })
+            .catch((error) => {
+                // Sin caché: el siguiente paso del ratón lo vuelve a intentar.
+                console.error(`Mapa: no se pudieron cargar las velas de ${simbolo}`, error)
+                return null
+            })
+            .finally(() => _mapaDiaTvPeticiones.delete(simbolo))
+        _mapaDiaTvPeticiones.set(simbolo, peticion)
+    }
+    return _mapaDiaTvPeticiones.get(simbolo)
+}
+
+/**
+ * Formato de un precio para los rótulos: más decimales cuanto más pequeño.
+ *
+ * @param {number} valor Precio.
+ * @returns {string} El precio con el formato del idioma de la interfaz.
+ */
+function mapaDiaFormatoPrecio(valor) {
+    const abs = Math.abs(valor)
+    const decimales = abs >= 1000 ? 0 : abs >= 1 ? 2 : 4
+    return valor.toLocaleString(uiLocale(), { minimumFractionDigits: decimales, maximumFractionDigits: decimales })
+}
+
+/**
+ * Marcas del eje de precios: valores redondos repartidos por el rango.
+ *
+ * @param {number} min Mínimo del eje.
+ * @param {number} max Máximo del eje.
+ * @returns {number[]} Hasta seis valores dentro de `[min, max]`.
+ */
+function mapaDiaMarcasPrecio(min, max) {
+    const crudo = (max - min) / 5
+    if (!(crudo > 0)) return [min]
+    const magnitud = 10 ** Math.floor(Math.log10(crudo))
+    const paso = [1, 2, 2.5, 5, 10].map((m) => m * magnitud).find((p) => p >= crudo) || 10 * magnitud
+    const marcas = []
+    for (let v = Math.ceil(min / paso) * paso; v <= max; v += paso) marcas.push(v)
+    return marcas
+}
+
+/**
+ * SVG de las velas diarias para el recuadro de la vista previa: las últimas
+ * que caben, la rejilla y el eje de precios a la derecha, los meses abajo y una
+ * línea con el último precio.
+ *
+ * @param {Array<number[]>} todas Velas `[ts, apertura, máximo, mínimo, cierre]`, ordenadas.
+ * @param {number} ancho Ancho del dibujo (px).
+ * @param {number} alto Alto del dibujo (px).
+ * @returns {string} El SVG.
+ */
+function mapaDiaSvgVelas(todas, ancho, alto) {
+    const anchoGrafico = ancho - MAPA_DIA_TV_EJE_Y - MAPA_DIA_TV_MARGEN
+    const altoGrafico = alto - MAPA_DIA_TV_EJE_X - MAPA_DIA_TV_MARGEN
+    const velas = todas.slice(-Math.floor(anchoGrafico / MAPA_DIA_TV_PASO_MIN))
+    const paso = anchoGrafico / velas.length
+    const cuerpo = Math.max(paso * 0.65, 1)
+    let min = Math.min(...velas.map((v) => v[3]))
+    let max = Math.max(...velas.map((v) => v[2]))
+    const margen = (max - min || max || 1) * 0.05
+    min -= margen
+    max += margen
+    const x = (i) => MAPA_DIA_TV_MARGEN + paso * (i + 0.5)
+    const y = (v) => MAPA_DIA_TV_MARGEN + ((max - v) / (max - min)) * altoGrafico
+    const f = (n) => n.toFixed(1)
+    const bordeDerecho = MAPA_DIA_TV_MARGEN + anchoGrafico
+
+    const rejilla = mapaDiaMarcasPrecio(min, max)
+        .map(
+            (v) =>
+                `<line class="mapaDiaTvRejilla" x1="${MAPA_DIA_TV_MARGEN}" x2="${f(bordeDerecho)}" y1="${f(y(v))}" y2="${f(y(v))}"/>` +
+                `<text class="mapaDiaTvEje" x="${f(bordeDerecho + 6)}" y="${f(y(v) + 4)}">${mapaDiaFormatoPrecio(v)}</text>`
+        )
+        .join("")
+
+    const meses = []
+    let ultimoX = -Infinity
+    velas.forEach((v, i) => {
+        const fecha = new Date(v[0] * 1000)
+        const anterior = i ? new Date(velas[i - 1][0] * 1000) : null
+        if (!anterior || anterior.getMonth() === fecha.getMonth()) return
+        if (x(i) - ultimoX < MAPA_DIA_TV_SEPARACION_MES || x(i) > bordeDerecho - 12) return
+        ultimoX = x(i)
+        const texto = fecha.toLocaleDateString(uiLocale(), { month: "short" }).replace(".", "")
+        meses.push(`<text class="mapaDiaTvEje" x="${f(x(i))}" y="${alto - 6}" text-anchor="middle">${texto}</text>`)
     })
-    return `https://www.tradingview.com/widgetembed/?${p.toString()}`
+
+    const dibujo = velas
+        .map(([, apertura, maximo, minimo, cierre], i) => {
+            const clase = cierre >= apertura ? "mapaDiaTvSube" : "mapaDiaTvBaja"
+            const arriba = y(Math.max(apertura, cierre))
+            const alturaCuerpo = Math.max(y(Math.min(apertura, cierre)) - arriba, 1)
+            return (
+                `<g class="${clase}"><line x1="${f(x(i))}" x2="${f(x(i))}" y1="${f(y(maximo))}" y2="${f(y(minimo))}"/>` +
+                `<rect x="${f(x(i) - cuerpo / 2)}" y="${f(arriba)}" width="${f(cuerpo)}" height="${f(alturaCuerpo)}"/></g>`
+            )
+        })
+        .join("")
+
+    const ultima = velas[velas.length - 1]
+    const claseUltima = ultima[4] >= ultima[1] ? "mapaDiaTvSube" : "mapaDiaTvBaja"
+    const yUltimo = y(ultima[4])
+    const precio =
+        `<line class="mapaDiaTvUltimo ${claseUltima}" x1="${MAPA_DIA_TV_MARGEN}" x2="${f(bordeDerecho)}" y1="${f(yUltimo)}" y2="${f(yUltimo)}"/>` +
+        `<rect class="mapaDiaTvEtiqueta ${claseUltima}" x="${f(bordeDerecho + 2)}" y="${f(yUltimo - 8)}" width="${MAPA_DIA_TV_EJE_Y - 4}" height="16" rx="2"/>` +
+        `<text class="mapaDiaTvEtiquetaTexto" x="${f(bordeDerecho + 6)}" y="${f(yUltimo + 4)}">${mapaDiaFormatoPrecio(ultima[4])}</text>`
+
+    return `<svg class="mapaDiaTvSvg" width="${ancho}" height="${alto}" viewBox="0 0 ${ancho} ${alto}" aria-hidden="true">${rejilla}${meses.join("")}${dibujo}${precio}</svg>`
+}
+
+/**
+ * Pinta en el recuadro de la vista previa la cabecera (símbolo, divisa, OHLC de
+ * hoy y variación sobre el cierre anterior) y el gráfico; sin velas, un aviso.
+ *
+ * Los textos van con `textContent`: el símbolo puede venir escrito a mano.
+ *
+ * @param {HTMLElement} caja Recuadro de la vista previa.
+ * @param {string} simbolo Símbolo de TradingView.
+ * @param {{divisa: string|null, velas: Array<number[]>}|null|undefined} datos
+ *     Velas del símbolo; undefined mientras se cargan.
+ */
+function mapaDiaPintarVelasTv(caja, simbolo, datos) {
+    caja.innerHTML = `<div class="mapaDiaTvCab"><b class="mapaDiaTvSimbolo"></b><span class="mapaDiaTvOhlc"></span></div><div class="mapaDiaTvCuerpo"></div>`
+    const cuerpo = caja.querySelector(".mapaDiaTvCuerpo")
+    caja.querySelector(".mapaDiaTvSimbolo").textContent = datos?.divisa ? `${simbolo} · ${datos.divisa}` : simbolo
+    if (!datos) {
+        cuerpo.classList.add("mapaDiaTvAviso")
+        cuerpo.textContent = datos === undefined ? "Cargando velas…" : "Sin velas para este símbolo"
+        return
+    }
+    const velas = datos.velas
+    const [, apertura, maximo, minimo, cierre] = velas[velas.length - 1]
+    const cierreAnterior = velas[velas.length - 2][4]
+    const variacion = cierreAnterior > 0 ? (cierre / cierreAnterior - 1) * 100 : null
+    const ohlc = caja.querySelector(".mapaDiaTvOhlc")
+    ohlc.textContent = `A ${mapaDiaFormatoPrecio(apertura)}  M ${mapaDiaFormatoPrecio(maximo)}  m ${mapaDiaFormatoPrecio(minimo)}  C ${mapaDiaFormatoPrecio(cierre)}`
+    if (variacion !== null) {
+        const pct = document.createElement("span")
+        pct.className = variacion >= 0 ? "mapaDiaTvSube" : "mapaDiaTvBaja"
+        pct.textContent = ` ${variacion >= 0 ? "+" : ""}${variacion.toLocaleString(uiLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %`
+        ohlc.appendChild(pct)
+    }
+    // El recuadro mide lo mismo con su borde de 1 px (border-box): dentro caben 2 px menos.
+    cuerpo.innerHTML = mapaDiaSvgVelas(velas, MAPA_DIA_TV_ANCHO - 2, MAPA_DIA_TV_ALTO - 2 - MAPA_DIA_TV_CABECERA)
 }
 
 function mapaDiaCajaTv() {
@@ -562,144 +776,55 @@ function mapaDiaColocarTv(caja, celda) {
 }
 
 /**
- * El iframe de la vista previa de `simbolo`, reutilizando el que ya esté cargado.
+ * Pide de antemano las velas de todos los símbolos de un mapa, para que la
+ * primera vista previa de cada uno salga sin esperar al feed.
  *
- * La clave es la URL y no el símbolo: con otro tema la URL cambia y hace falta
- * un iframe nuevo; el del tema anterior acaba saliendo por el tope.
- *
- * @param {HTMLElement} caja Contenedor de la vista previa.
- * @param {string} simbolo Símbolo de TradingView.
- * @returns {HTMLIFrameElement} El iframe, ya dentro de la caja.
- */
-function mapaDiaMarcoTv(caja, simbolo) {
-    const url = mapaDiaUrlTv(simbolo)
-    let marco = _mapaDiaTvMarcos.get(url)
-    if (marco?.isConnected) {
-        _mapaDiaTvMarcos.delete(url)
-    } else {
-        marco = document.createElement("iframe")
-        // sandbox antes que src: si se pone después, la primera carga va sin él.
-        marco.setAttribute("sandbox", "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox")
-        marco.setAttribute("frameborder", "0")
-        marco.setAttribute("allowtransparency", "true")
-        marco.setAttribute("scrolling", "no")
-        marco.referrerPolicy = "no-referrer"
-        marco.title = simbolo
-        marco.src = url
-        caja.appendChild(marco)
-    }
-    _mapaDiaTvMarcos.set(url, marco)
-    mapaDiaRecortarMarcos()
-    return marco
-}
-
-/** Quita las vistas previas que llevan más tiempo sin usarse hasta quedar en el tope. */
-function mapaDiaRecortarMarcos() {
-    while (_mapaDiaTvMarcos.size > _mapaDiaTvTope) {
-        const [masAntigua, viejo] = _mapaDiaTvMarcos.entries().next().value
-        viejo.remove()
-        _mapaDiaTvMarcos.delete(masAntigua)
-    }
-}
-
-/** Promesa que se cumple cuando el navegador está libre (o a los 3 s como mucho). */
-function mapaDiaEsperarOcio() {
-    return new Promise((resolver) => {
-        if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(resolver, { timeout: 3000 })
-        else setTimeout(resolver, 200)
-    })
-}
-
-/**
- * Promesa que se cumple cuando el iframe termina de cargar, o pasado
- * `MAPA_DIA_TV_ESPERA_CARGA` si no lo hace.
- *
- * @param {HTMLIFrameElement} marco Iframe recién creado.
- * @returns {Promise<void>}
- */
-function mapaDiaEsperarCarga(marco) {
-    return new Promise((resolver) => {
-        const temporizador = setTimeout(resolver, MAPA_DIA_TV_ESPERA_CARGA)
-        marco.addEventListener(
-            "load",
-            () => {
-                clearTimeout(temporizador)
-                resolver()
-            },
-            { once: true }
-        )
-    })
-}
-
-/**
- * Carga de antemano las vistas previas de todos los símbolos de un mapa, para
- * que ninguna tenga la espera de ~1 s al pasar el ratón por primera vez.
- *
- * Van una detrás de otra y con el navegador libre, no todas a la vez: cada
- * iframe arranca la aplicación de gráficos de TradingView entera y en paralelo
- * dejarían la página sin responder. El tope de iframes vivos sube hasta que
- * quepan todos; cada uno ocupa memoria, por eso la precarga es opcional.
- *
- * Llamarla con una lista vacía cancela la precarga en curso y devuelve el tope
- * al de siempre.
+ * Van una detrás de otra: todas a la vez abrirían decenas de conexiones al
+ * feed desde el servidor. Llamarla con una lista vacía cancela la precarga en curso.
  *
  * @param {string[]} simbolos Símbolos de TradingView del mapa.
  * @param {(hechos: number, total: number) => void} [alProgresar] Se llama al
- *     empezar y tras cada vista previa lista, solo mientras esta precarga siga
+ *     empezar y tras cada símbolo listo, solo mientras esta precarga siga
  *     siendo la vigente (una cancelada no pisa el progreso de la nueva).
  * @returns {Promise<void>} Se cumple al acabar o al quedar cancelada.
  */
 async function mapaDiaPrecargarTv(simbolos, alProgresar) {
     const turno = ++_mapaDiaTvPrecarga
     const unicos = [...new Set(simbolos.filter(Boolean))]
-    _mapaDiaTvTope = Math.max(MAPA_DIA_TV_MAX_MARCOS, unicos.length)
-    mapaDiaRecortarMarcos()
     const avisar = (hechos) => {
         if (alProgresar && turno === _mapaDiaTvPrecarga) alProgresar(hechos, unicos.length)
     }
     avisar(0)
     for (const [i, simbolo] of unicos.entries()) {
-        await mapaDiaEsperarOcio()
         if (turno !== _mapaDiaTvPrecarga) return
-        // También se pasa por las que ya estaban cargadas: así suben al final
-        // de la cola y no las echa el recorte al meter las que faltan.
-        const yaEstaba = _mapaDiaTvMarcos.get(mapaDiaUrlTv(simbolo))?.isConnected
-        const marco = mapaDiaMarcoTv(mapaDiaCajaTv(), simbolo)
-        if (!yaEstaba) await mapaDiaEsperarCarga(marco)
+        await mapaDiaCargarVelasTv(simbolo)
         avisar(i + 1)
     }
 }
 
 /**
- * Carga en segundo plano la vista previa de un activo del mapa recién pintado.
- *
- * La primera vista previa de la sesión descarga la aplicación de gráficos de
- * TradingView (varios segundos en frío); hacerlo mientras el navegador está
- * libre evita que esa espera caiga en el primer paso del ratón. Solo se hace
- * si todavía no hay ninguna cargada.
+ * Pide en segundo plano las velas de un activo del mapa recién pintado, para
+ * que la primera vista previa no espere al feed.
  *
  * @param {string} [simbolo] Símbolo de TradingView de alguna baldosa.
  */
 function mapaDiaPrecalentarTv(simbolo) {
-    if (!simbolo || _mapaDiaTvMarcos.size) return
-    const tarea = () => {
-        if (!_mapaDiaTvMarcos.size) mapaDiaMarcoTv(mapaDiaCajaTv(), simbolo)
-    }
+    if (!simbolo || _mapaDiaTvVelas.has(simbolo)) return
+    const tarea = () => mapaDiaCargarVelasTv(simbolo)
     if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(tarea, { timeout: 3000 })
     else setTimeout(tarea, 1000)
 }
 
 /**
- * Abre, tras un instante, la vista previa de TradingView junto a una baldosa.
- * Si ya está abierta con el mismo símbolo solo se recoloca, sin recargar el iframe.
+ * Abre, tras un instante, la vista previa de velas junto a una baldosa. Si ya
+ * está abierta con el mismo símbolo solo se recoloca, sin volver a pintarla.
  *
  * @param {HTMLElement} celda Baldosa sobre la que está el cursor.
  * @param {string} simbolo Símbolo de TradingView.
  */
 function mapaDiaMostrarTv(celda, simbolo) {
     const caja = mapaDiaCajaTv()
-    const clave = simbolo
-    if (clave === _mapaDiaTvSimbolo && caja.classList.contains("mapaDiaTvVisible")) {
+    if (simbolo === _mapaDiaTvSimbolo && caja.classList.contains("mapaDiaTvVisible")) {
         // Se cancela la de la baldosa por la que se pasó de camino: si no, se
         // abriría encima de esta.
         clearTimeout(_mapaDiaTvTimer)
@@ -707,17 +832,25 @@ function mapaDiaMostrarTv(celda, simbolo) {
         mapaDiaColocarTv(caja, celda)
         return
     }
-    if (caja.dataset.pendiente === clave) return
+    if (caja.dataset.pendiente === simbolo) return
     clearTimeout(_mapaDiaTvTimer)
-    caja.dataset.pendiente = clave
+    caja.dataset.pendiente = simbolo
     _mapaDiaTvTimer = setTimeout(() => {
         delete caja.dataset.pendiente
         if (!celda.isConnected) return
-        _mapaDiaTvSimbolo = clave
-        const marco = mapaDiaMarcoTv(caja, simbolo)
-        caja.querySelectorAll("iframe").forEach((f) => f.classList.toggle("mapaDiaTvActivo", f === marco))
+        _mapaDiaTvSimbolo = simbolo
+        const guardado = _mapaDiaTvVelas.get(simbolo)
+        const vigente = guardado && Date.now() - guardado.ts < MAPA_DIA_TTL
+        mapaDiaPintarVelasTv(caja, simbolo, vigente ? guardado.datos : undefined)
         mapaDiaColocarTv(caja, celda)
         caja.classList.add("mapaDiaTvVisible")
+        if (vigente) return
+        mapaDiaCargarVelasTv(simbolo).then((datos) => {
+            // El cursor pudo irse a otra baldosa o fuera del mapa mientras llegaban.
+            if (_mapaDiaTvSimbolo === simbolo && caja.classList.contains("mapaDiaTvVisible")) {
+                mapaDiaPintarVelasTv(caja, simbolo, datos)
+            }
+        })
     }, MAPA_DIA_RETARDO_TV)
 }
 

@@ -1,53 +1,52 @@
-// Precarga de las vistas previas de TradingView (js/core/mapa-dia.js).
+// Precarga de las vistas previas de velas (js/core/mapa-dia.js).
 //
-// Con la opción «Precargar» del mapa de Paneles se cargan en segundo plano los
-// iframes de todos los activos, uno detrás de otro. Se comprueba que caben
-// todos aunque pasen del tope normal, que no se duplican, que una precarga
-// nueva cancela la anterior y que al quitarla el tope vuelve al de siempre. Va
-// en un fichero aparte porque la reserva de iframes es estado del módulo.
-import { beforeAll, describe, expect, it } from "vitest"
+// Con la opción «Precargar» del mapa de Paneles se piden en segundo plano las
+// velas de todos los activos, una detrás de otra. Se comprueba que no se piden
+// repetidas ni las que ya están en caché, que una precarga nueva cancela la
+// anterior y que el progreso solo lo avisa la vigente. Va en un fichero aparte
+// porque la caché de velas es estado del módulo.
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { cargarScript } from "./cargar.js"
+
+let pedidos = []
 
 beforeAll(() => {
     window.escapeAttr = (s) => String(s)
-    // Sin requestIdleCallback la espera es un setTimeout corto; jsdom no carga
-    // los iframes externos, así que se simula su `load` al crearlos.
-    delete window.requestIdleCallback
     cargarScript("js/core/i18n.js")
     cargarScript("js/core/mapa-dia.js")
-    new MutationObserver((cambios) =>
-        cambios.forEach((c) =>
-            c.addedNodes.forEach((n) => {
-                if (n.tagName === "IFRAME") setTimeout(() => n.dispatchEvent(new Event("load")), 0)
-            })
-        )
-    ).observe(document.body, { childList: true, subtree: true })
 })
 
-function marcos() {
-    return [...document.querySelectorAll("#mapaDiaTv iframe")]
-}
+beforeEach(() => {
+    pedidos = []
+    vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url) => {
+            const simbolo = new URL(url, "http://x").searchParams.get("symbol")
+            pedidos.push(simbolo)
+            return {
+                ok: true,
+                json: async () => ({ ok: true, simbolo, divisa: "EUR", velas: [[1, 1, 2, 1, 2], [2, 2, 3, 2, 3]] })
+            }
+        })
+    )
+})
 
 function simbolos(n, prefijo = "NYSE:P") {
     return Array.from({ length: n }, (_, i) => `${prefijo}${i}`)
 }
 
 describe("precarga de vistas previas", () => {
-    it("carga todas aunque pasen del tope normal, sin repetir ni contar huecos", async () => {
-        const lista = simbolos(MAPA_DIA_TV_MAX_MARCOS + 4)
+    it("pide las velas de todos, sin repetir ni contar huecos", async () => {
+        const lista = simbolos(10)
         await mapaDiaPrecargarTv([...lista, lista[0], undefined, ""])
 
-        expect(marcos()).toHaveLength(lista.length)
-        lista.forEach((s) => expect(marcos().some((f) => f.src.includes(encodeURIComponent(s)))).toBe(true))
-        // Ninguna se enseña: solo quedan cargadas.
-        expect(marcos().filter((f) => f.classList.contains("mapaDiaTvActivo"))).toHaveLength(0)
+        expect(pedidos).toEqual(lista)
     })
 
-    it("repetirla con los mismos símbolos no crea iframes nuevos", async () => {
-        const antes = marcos()
-        await mapaDiaPrecargarTv(simbolos(MAPA_DIA_TV_MAX_MARCOS + 4))
+    it("repetirla con los mismos símbolos no vuelve a pedirlos mientras sigan en caché", async () => {
+        await mapaDiaPrecargarTv(simbolos(10))
 
-        expect(marcos()).toEqual(antes)
+        expect(pedidos).toEqual([])
     })
 
     it("una precarga nueva cancela la que estaba en curso", async () => {
@@ -55,15 +54,7 @@ describe("precarga de vistas previas", () => {
         await mapaDiaPrecargarTv(simbolos(2, "NYSE:B"))
         await primera
 
-        expect(marcos().filter((f) => f.src.includes("NYSE%3AA")).length).toBeLessThan(20)
-    })
-
-    it("sin símbolos vuelve al tope de siempre y deja las más recientes", async () => {
-        await mapaDiaPrecargarTv([])
-
-        expect(marcos()).toHaveLength(MAPA_DIA_TV_MAX_MARCOS)
-        // Las dos de la última precarga son las más recientes: siguen ahí.
-        expect(marcos().filter((f) => f.src.includes("NYSE%3AB"))).toHaveLength(2)
+        expect(pedidos.filter((s) => s.startsWith("NYSE:A")).length).toBeLessThan(20)
     })
 
     it("avisa del progreso de cero al total, sin contar repetidos ni huecos", async () => {
@@ -86,7 +77,7 @@ describe("precarga de vistas previas", () => {
         await mapaDiaPrecargarTv(simbolos(1, "NYSE:E"))
         await primera
 
-        // Solo llegó el aviso inicial: la nueva la canceló antes de cargar ninguna.
+        // Solo llegó el aviso inicial: la nueva la canceló antes de acabar ninguna.
         expect(avisosPrimera).toEqual([0])
     })
 

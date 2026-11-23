@@ -228,7 +228,7 @@ function pnBotonPrecarga(w, ctrls) {
     btn.setAttribute("aria-pressed", String(activa))
     btn.title = activa
         ? "Quitar la precarga: el gráfico se cargará al pasar el cursor"
-        : "Cargar ya todos los gráficos de vista previa (más memoria)"
+        : "Cargar ya las velas de todas las vistas previas"
     btn.innerHTML = `<i class="pnPrecargaBarra"></i><span class="pnPrecargaTexto">Precargar</span>`
     btn.addEventListener("click", () => {
         if (activa) delete w.cfg.precargaTv
@@ -344,7 +344,7 @@ function pnDibujarMapa(w, cuerpo) {
     lienzo.innerHTML = ""
     lienzo.classList.toggle("pnMapaRejilla", rejilla)
     // Con la precarga, todas las vistas previas se cargan en segundo plano; sin
-    // ella se cancela la que hubiera en curso y el tope de iframes vuelve al normal.
+    // ella se cancela la que hubiera en curso.
     if (pnSi(cfg, "precargaTv", false)) {
         mapaDiaPrecargarTv(
             enriquecidos.map((a) => a.tv),

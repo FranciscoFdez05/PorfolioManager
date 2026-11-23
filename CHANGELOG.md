@@ -22,6 +22,42 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.9.1] — 2026-11-23
+
+El mapa de Paneles en «Hoy» va al día: la línea de las acciones avanza con la
+sesión y la vista previa enseña la vela de hoy.
+
+**Esquema de base de datos:** no lo toca (sigue en el **42**).
+
+**Al actualizar:** nada que hacer.
+
+### Corregido
+
+- **Mapa en «Hoy»: la línea de las acciones no avanzaba.** Con horario de
+  bolsa, el eje acababa en la última vela y la línea llenaba siempre la casilla
+  entera. Ahora el eje es la sesión entera de hoy y la línea se va completando
+  como la de la cripto. El horario sale de las velas de días anteriores del
+  propio activo (la hora más temprana y la más tardía con vela), sin tabla de
+  horarios por bolsa; sin días anteriores en las velas, se queda como antes.
+- **Mapa en «Hoy»: valores poco negociados.** Una acción con horas sin
+  operaciones (Nextera o Altria en Xetra) salía «Cerrado» a media sesión,
+  tenía la línea partida en trozos y se quedaba a medias. Ahora solo sale
+  cerrada pasada su hora de cierre, los huecos entre velas se unen (son ratos
+  sin operaciones, no datos que falten) y, tras más de 30 minutos sin velas, la
+  línea sigue con el último precio hasta ahora o hasta el cierre.
+- **Vista previa del mapa en el día anterior.** El gráfico incrustado de
+  TradingView solo tiene datos al cierre del día en bolsas como Xetra
+  («End of day data») y no enseñaba la sesión en curso. La vista previa de los
+  mapas de Paneles y de Análisis pasa a ser un gráfico de velas propio con las
+  velas diarias del feed, que sí traen la de hoy: apertura, máximo, mínimo,
+  cierre y variación sobre el cierre anterior en la cabecera, unos cinco meses
+  de velas y el último precio marcado. Las velas salen de la ruta nueva
+  `GET /api/market/velas?symbol=`. La opción «Precargar» del mapa sigue y ahora
+  pide de antemano las velas en vez de cargar iframes, así que ya no ocupa más
+  memoria.
+
+---
+
 ## [5.9.0] — 2026-11-21
 
 Las cuentas cuadran con el banco: cada movimiento cuenta desde su día, se

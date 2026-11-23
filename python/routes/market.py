@@ -47,6 +47,11 @@ log = logging.getLogger(__name__)
 # servían durante horas las variaciones de los activos de la anterior.
 _histCache = {}
 
+# Días naturales de velas diarias en la vista previa de los mapas: unos cinco
+# meses, lo que cabe legible en el recuadro (el gráfico de TradingView enseñaba
+# más o menos lo mismo).
+VELAS_VISTA_PREVIA_DIAS = 150
+
 
 def _ficheroInvalidacion():
     return paths.TMP_DIR / "historico-invalidado"
@@ -523,6 +528,34 @@ def getMarketSeries():
     except (series_tradingview.PeriodoInvalido, series_tradingview.SimbolosInvalidos) as error:
         return jsonify({"ok": False, "error": str(error)}), 400
     return jsonify({"ok": True, "periodo": periodo, "series": series})
+
+
+@marketBp.route("/api/market/velas", methods=["GET"])
+def getMarketVelas():
+    """Últimas velas diarias de un ticker, con la de hoy en curso, para la vista previa de los mapas.
+
+    `?symbol=XETR:NVD` -> `{"ok": true, "simbolo", "divisa", "velas": [[ts, apertura, máximo, mínimo, cierre], ...]}`.
+    La vista previa era el gráfico incrustado de TradingView, que en bolsas como
+    Xetra solo da datos al cierre del día y se quedaba en la sesión anterior; el
+    feed sí trae la vela de hoy. Sin velas responde `divisa: null` y `velas: []`.
+    """
+    try:
+        simbolos = series_tradingview.normalizarSimbolos([str(request.args.get("symbol", ""))])
+    except series_tradingview.SimbolosInvalidos as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
+    if not simbolos:
+        return jsonify({"ok": False, "error": "Ticker no válido"}), 400
+    simbolo = simbolos[0]
+    desdeTs = int(time.time()) - VELAS_VISTA_PREVIA_DIAS * 86400
+    velas = series_tradingview.velasDelGrafico(simbolo, "TODO", desdeTs=desdeTs)
+    divisa, filas = velas if velas else (None, [])
+    return jsonify({
+        "ok": True,
+        "simbolo": simbolo,
+        "divisa": divisa,
+        # El feed las da como [ts, cierre, máximo, mínimo, apertura]; se mandan en orden OHLC.
+        "velas": [[f[0], f[4], f[2], f[3], f[1]] for f in filas if len(f) >= 5],
+    })
 
 
 @marketBp.route("/api/market/historico", methods=["GET"])
