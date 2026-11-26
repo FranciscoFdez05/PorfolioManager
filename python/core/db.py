@@ -484,6 +484,23 @@ CREATE TABLE IF NOT EXISTS ventas (
     PRIMARY KEY (id, year)
 );
 
+CREATE TABLE IF NOT EXISTS canjes (
+    id                 TEXT PRIMARY KEY,
+    fecha              TEXT NOT NULL DEFAULT '',
+    activo_origen      TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
+    activo_destino     TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
+    cantidad_entregada TEXT NOT NULL DEFAULT '',
+    cantidad_recibida  TEXT NOT NULL DEFAULT '',
+    regimen            TEXT NOT NULL DEFAULT 'neutral',
+    valor_mercado      TEXT NOT NULL DEFAULT '',
+    compensacion       TEXT NOT NULL DEFAULT '',
+    picos_cantidad     TEXT NOT NULL DEFAULT '',
+    picos_importe      TEXT NOT NULL DEFAULT '',
+    moneda             TEXT NOT NULL DEFAULT 'EUR',
+    fx_rate            TEXT NOT NULL DEFAULT '',
+    nota               TEXT NOT NULL DEFAULT ''
+);
+
 CREATE INDEX IF NOT EXISTS idx_activo_rows_asset_id ON activo_rows(asset_id);
 CREATE INDEX IF NOT EXISTS idx_activo_operation_rows_asset_id ON activo_operation_rows(asset_id);
 CREATE INDEX IF NOT EXISTS idx_activo_conversion_rows_asset_id ON activo_conversion_rows(asset_id);
@@ -857,7 +874,7 @@ CREATE TABLE IF NOT EXISTS muestras_cartera (
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 42
+ESQUEMA_VERSION = 43
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -2218,6 +2235,34 @@ def _esquema42(conn):
     columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(cuentas)")}
     if "inicio" not in columnas:
         conn.execute("ALTER TABLE cuentas ADD COLUMN inicio TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(43)
+def _esquema43(conn):
+    """Canjes de valores por fusión (ver `core/canjes.py`).
+
+    Tabla nueva, así que basta con crearla; el `CREATE TABLE IF NOT EXISTS` del
+    esquema base ya lo hace en una base nueva. Los importes van en texto
+    canónico, como las demás columnas en divisa: pueden estar en dólares, y la
+    columna `_cent` se lee siempre como euros.
+    """
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS canjes ("
+        " id TEXT PRIMARY KEY,"
+        " fecha TEXT NOT NULL DEFAULT '',"
+        " activo_origen TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,"
+        " activo_destino TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,"
+        " cantidad_entregada TEXT NOT NULL DEFAULT '',"
+        " cantidad_recibida TEXT NOT NULL DEFAULT '',"
+        " regimen TEXT NOT NULL DEFAULT 'neutral',"
+        " valor_mercado TEXT NOT NULL DEFAULT '',"
+        " compensacion TEXT NOT NULL DEFAULT '',"
+        " picos_cantidad TEXT NOT NULL DEFAULT '',"
+        " picos_importe TEXT NOT NULL DEFAULT '',"
+        " moneda TEXT NOT NULL DEFAULT 'EUR',"
+        " fx_rate TEXT NOT NULL DEFAULT '',"
+        " nota TEXT NOT NULL DEFAULT '')"
+    )
 
 
 class _CerrarAlTerminarElHilo:

@@ -292,7 +292,8 @@ async function buildMetricasPayload() {
         inversionesResp,
         pmResp,
         settingsResp,
-        rentResp
+        rentResp,
+        comprasAnualesResp
     ] = await Promise.all([
         fetch("/api/dividendos"),
         fetch("/api/intereses"),
@@ -305,7 +306,8 @@ async function buildMetricasPayload() {
         fetch("/api/metricas/inversiones").catch(() => null),
         fetch("/api/privatemarket").catch(() => null),
         fetch("/api/settings").catch(() => null),
-        fetch(rentabilidadUrl).catch(() => null)
+        fetch(rentabilidadUrl).catch(() => null),
+        fetch("/api/metricas/compras-anuales").catch(() => null)
     ])
     const divData = await divResp.json()
     const intData = await intResp.json()
@@ -393,6 +395,7 @@ async function buildMetricasPayload() {
     const pmData = pmResp ? await pmResp.json().catch(() => ({ rows: [] })) : { rows: [] }
     const settingsData = settingsResp ? await settingsResp.json().catch(() => ({})) : {}
     const rentData = rentResp ? await rentResp.json().catch(() => null) : null
+    const comprasAnualesData = comprasAnualesResp?.ok ? await comprasAnualesResp.json().catch(() => null) : null
     const ahorroConfig = settingsData.ahorroConfig || { objetivoAhorro: 30, presupuesto: {} }
 
     return {
@@ -416,6 +419,7 @@ async function buildMetricasPayload() {
         snapshotHistory: Array.isArray(snapshotData.data) ? snapshotData.data : [],
         rentabilidad: rentData?.ok ? rentData : null,
         inversiones: inversionesData,
+        comprasAnuales: comprasAnualesData,
         ahorroConfig
     }
 }

@@ -129,6 +129,9 @@ def readVentasYear(year, calculo=None):
         ],
         # Permutas cripto-cripto del ejercicio: ya cuentan en el resumen.
         "permutas": calculo.get("permutas", {}).get(normalized, []),
+        # Canjes de valores del ejercicio; los que declaran ya cuentan en el
+        # resumen, los neutrales van solo como justificante.
+        "canjes": calculo.get("canjes", {}).get(normalized, []),
         "revision": revisiones.leer(conn, "ventas", normalized),
     }
 

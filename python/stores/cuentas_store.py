@@ -187,6 +187,62 @@ def esAnteriorAlInicio(inicios, cuentaId, dia):
     return inicio is not None and (dia is None or dia <= inicio)
 
 
+def _puedeContar(inicio: datetime.date | None, dia: datetime.date | None, haciaAtras: bool) -> bool:
+    """¿Puede un movimiento mover el saldo de su cuenta en algún corte?
+
+    Filtro previo, barato, para no recorrer los cortes de un movimiento que
+    nunca cuenta. Lo que no tiene día nunca cuenta en una cuenta con fecha de
+    inicio: no se sabe a qué lado de ella cae.
+
+    Args:
+        inicio: Fecha de inicio de la cuenta, o None si cuenta toda la historia.
+        dia: Día del movimiento, o None si no tiene.
+        haciaAtras: Si lo anterior al inicio se descuenta del saldo de ese día
+            (ver `_signoDelMovimiento`).
+
+    Returns:
+        False si el movimiento no cuenta en ningún corte.
+    """
+    if inicio is None:
+        return True
+    if dia is None:
+        return False
+    return haciaAtras or dia > inicio
+
+
+def _signoDelMovimiento(
+    inicio: datetime.date | None, dia: datetime.date | None, hoy: datetime.date, haciaAtras: bool
+) -> int:
+    """Con qué signo entra un movimiento en el saldo de su cuenta a final de `hoy`.
+
+    Sin fecha de inicio, el saldo parte del inicial y suma lo ocurrido hasta
+    `hoy`. Con ella, el saldo inicial es el real al final del día de inicio:
+    lo posterior hasta `hoy` se suma y, con `haciaAtras`, un corte anterior al
+    inicio se obtiene descontando lo ocurrido entre `hoy` y el inicio. Así
+    Métricas puede enseñar los meses anteriores a un reinicio partiendo del
+    saldo real, sin necesitar el saldo inicial antiguo (el reinicio lo pisa).
+
+    Args:
+        inicio: Fecha de inicio de la cuenta, o None si cuenta toda la historia.
+        dia: Día del movimiento, o None si no tiene.
+        hoy: Fecha de corte.
+        haciaAtras: Si los cortes anteriores al inicio se calculan hacia atrás.
+            Sin él, lo anterior al inicio no cuenta nunca (ventana Cuentas).
+
+    Returns:
+        1 si suma, -1 si se descuenta y 0 si no cuenta en ese corte.
+    """
+    if inicio is None:
+        return 1 if _haOcurrido(dia, hoy) else 0
+    if dia is None:
+        return 0
+    if inicio < dia <= hoy:
+        return 1
+    if haciaAtras and hoy < dia <= inicio:
+        return -1
+    return 0
+
+
 @functools.lru_cache(maxsize=8192)
 def _decimal(texto):
     # Cacheado: los importes se repiten mucho y Decimal es inmutable, así que
@@ -837,12 +893,12 @@ def rendimientos(conn=None, hoy=None, aEuros=None):
     return _rendimientosEn(conn, [hoy], aEuros)[0]
 
 
-def _rendimientosEn(conn, fechas, aEuros=None):
+def _rendimientosEn(conn, fechas, aEuros=None, haciaAtras=False):
     """`rendimientos` para varias fechas de corte, leyendo cada tabla una sola vez.
 
     Cada fila se interpreta (fecha, importe, cambio) una vez y se suma en el
     resultado de cada fecha a la que ya ha llegado. Devuelve una lista paralela
-    a `fechas`.
+    a `fechas`. `haciaAtras`: ver `_signoDelMovimiento`.
     """
     resultados = [{} for _ in fechas]
     # Lo anterior a la fecha de inicio de una cuenta no es de su saldo.
@@ -857,16 +913,18 @@ def _rendimientosEn(conn, fechas, aEuros=None):
         if not year:
             continue
         dia = _diaEfectivo(year, month, fila["fecha"])
-        if esAnteriorAlInicio(inicios, fila["cuenta_id"], dia):
+        inicio = inicios.get(fila["cuenta_id"])
+        if not _puedeContar(inicio, dia, haciaAtras):
             continue
         neto = None
         for hoy, resultado in zip(fechas, resultados, strict=True):
-            if not _haOcurrido(dia, hoy):
+            signo = _signoDelMovimiento(inicio, dia, hoy, haciaAtras)
+            if not signo:
                 continue
             if neto is None:
                 neto = _decimal(fila["acumulado"]) - _decimal(fila["impuestos"])
             datos = resultado.setdefault(fila["cuenta_id"], {"intereses": Decimal(0), "dividendos": Decimal(0)})
-            datos["intereses"] += neto
+            datos["intereses"] += signo * neto
 
     # Cada dividendo va a la cuenta que trae apuntada; los que no la tienen (o la
     # tienen de una cuenta borrada) van a la que cobra los dividendos, si hay.
@@ -884,17 +942,19 @@ def _rendimientosEn(conn, fechas, aEuros=None):
         if not year:
             continue
         dia = _diaEfectivo(year, month, fila["fecha"])
-        if esAnteriorAlInicio(inicios, destino, dia):
+        inicio = inicios.get(destino)
+        if not _puedeContar(inicio, dia, haciaAtras):
             continue
         enEuros = None
         for hoy, resultado in zip(fechas, resultados, strict=True):
-            if not _haOcurrido(dia, hoy):
+            signo = _signoDelMovimiento(inicio, dia, hoy, haciaAtras)
+            if not signo:
                 continue
             if enEuros is None:
                 aEuros = aEuros or _cambioAEuros()
                 enEuros = aEuros(_decimal(fila["total"]), fila["moneda_total"])
             datos = resultado.setdefault(destino, {"intereses": Decimal(0), "dividendos": Decimal(0)})
-            datos["dividendos"] += enEuros
+            datos["dividendos"] += signo * enEuros
 
     return resultados
 
@@ -917,25 +977,31 @@ def _columnasRecurrentes(tabla):
     ])
 
 
-def _saldosEn(conn, fechas, aEuros=None):
+def _saldosEn(conn, fechas, aEuros=None, haciaAtras=False):
     """`saldos` para varias fechas de corte en un solo recorrido de las tablas.
 
     `saldosDelMes` necesita el saldo al cierre del mes anterior y al final del
     mes: leer y convertir cada fila una vez y sumarla en cada corte evita
     repetir el recorrido entero. Devuelve una lista paralela a `fechas`.
+    `haciaAtras`: ver `_signoDelMovimiento`.
     """
     cuentas = listarCuentas(conn)
     acumulados = [
         {c["id"]: {"entradas": Decimal(0), "salidas": Decimal(0), "comisiones": Decimal(0)} for c in cuentas}
         for _ in fechas
     ]
-    rendidos = _rendimientosEn(conn, fechas, aEuros)
+    rendidos = _rendimientosEn(conn, fechas, aEuros, haciaAtras)
     existentes = acumulados[0]
     inicios = _iniciosDe(cuentas)
 
     def laCuenta(cuentaId, dia):
-        # La cuenta existe y el movimiento es posterior a su fecha de inicio.
-        return cuentaId in existentes and not esAnteriorAlInicio(inicios, cuentaId, dia)
+        # La cuenta existe y el movimiento cuenta en ella en algún corte.
+        return cuentaId in existentes and _puedeContar(inicios.get(cuentaId), dia, haciaAtras)
+
+    def signoEn(cuentaId, dia, hoy):
+        if cuentaId not in existentes:
+            return 0
+        return _signoDelMovimiento(inicios.get(cuentaId), dia, hoy, haciaAtras)
 
     for fila in conn.execute(
         f"SELECT fecha, origen, destino, {importeSql('cantidad')} AS cantidad, {importeSql('comision')} AS comision "
@@ -946,14 +1012,14 @@ def _saldosEn(conn, fechas, aEuros=None):
         importe = _decimal(fila["cantidad"])
         comision = _decimal(fila["comision"])
         for hoy, acumulado in zip(fechas, acumulados, strict=True):
-            if not _haOcurrido(dia, hoy):
-                continue
-            if laCuenta(fila["destino"], dia):
-                acumulado[fila["destino"]]["entradas"] += importe
-            if laCuenta(fila["origen"], dia):
-                acumulado[fila["origen"]]["salidas"] += importe
+            signo = signoEn(fila["destino"], dia, hoy)
+            if signo:
+                acumulado[fila["destino"]]["entradas"] += signo * importe
+            signo = signoEn(fila["origen"], dia, hoy)
+            if signo:
+                acumulado[fila["origen"]]["salidas"] += signo * importe
                 # La comisión se cuenta aparte: no es dinero que llegue a otra cuenta.
-                acumulado[fila["origen"]]["comisiones"] += comision
+                acumulado[fila["origen"]]["comisiones"] += signo * comision
 
     for tabla, campo in (("ingresos_rows", "entradas"), ("gastos_rows", "salidas")):
         for fila in conn.execute(
@@ -965,8 +1031,9 @@ def _saldosEn(conn, fechas, aEuros=None):
                 continue
             importe = _decimal(fila["cantidad"])
             for hoy, acumulado in zip(fechas, acumulados, strict=True):
-                if _haOcurrido(dia, hoy):
-                    acumulado[cuentaId][campo] += importe
+                signo = signoEn(cuentaId, dia, hoy)
+                if signo:
+                    acumulado[cuentaId][campo] += signo * importe
 
     # Mensualidades e ingresos recurrentes: importes por mes, de la cuenta con la
     # que se pagan o en la que se cobran (vacía, o una que ya no existe, = bancaria).
@@ -988,10 +1055,11 @@ def _saldosEn(conn, fechas, aEuros=None):
                     continue
                 importe = None
                 for hoy, acumulado in zip(fechas, acumulados, strict=True):
-                    if _haOcurrido(dia, hoy):
+                    signo = signoEn(destino, dia, hoy)
+                    if signo:
                         if importe is None:
                             importe = _decimal(fila[mes])
-                        acumulado[destino][campo] += importe
+                        acumulado[destino][campo] += signo * importe
 
     return [
         {
@@ -1025,13 +1093,20 @@ def saldosDelMes(year, month, conn=None, aEuros=None):
     `inicial` es el saldo con el que la cuenta entra en el mes (todo lo ocurrido
     hasta el mes anterior) y `rendimientos` lo que ese mes le suman los intereses
     y dividendos, que no tienen día propio.
+
+    Es para Métricas, que enseña cualquier mes con todos sus movimientos: un
+    mes anterior al reinicio de una cuenta no puede arrancar en el saldo del
+    reinicio. Por eso se calcula hacia atrás desde él (`haciaAtras`): ese
+    saldo menos lo ocurrido entre el corte y la fecha de inicio.
     """
     conn = conn or getDb()
     indice = MONTH_KEYS.index(month)
     primerDia = datetime.date(int(year), indice + 1, 1)
     finDeMes = (primerDia + datetime.timedelta(days=32)).replace(day=1) - datetime.timedelta(days=1)
     aEuros = aEuros or _cambioAEuros()
-    antes, despues = _saldosEn(conn, [primerDia - datetime.timedelta(days=1), finDeMes], aEuros)
+    antes, despues = _saldosEn(
+        conn, [primerDia - datetime.timedelta(days=1), finDeMes], aEuros, haciaAtras=True
+    )
     return {
         cuentaId: {
             "inicial": datos["saldo"],

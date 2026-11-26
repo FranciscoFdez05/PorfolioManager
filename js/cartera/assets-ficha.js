@@ -101,6 +101,10 @@ function renderAssetTablePage(asset) {
                                     ${["EUR", "USD", "GBP"].map((c) => `<button class="assetCurrBtn${normalizeCurrencyCode(asset.currency || "EUR") === c ? " active" : ""}" data-currency="${c}">${c}</button>`).join("")}
                                 </span>
                             </div>
+                            <button id="registrarCanjeBtn" class="assetMenuItem" type="button">
+                                <span class="assetMenuIcon">${iconoHtml("Cambio")}</span>
+                                <span class="assetMenuText">Registrar fusión o canje</span>
+                            </button>
                             <div class="assetMenuSep"></div>
                             <button id="deleteAssetBtn" class="assetMenuItem assetMenuItemDanger" type="button">
                                 <span class="assetMenuIcon">${iconoHtml("Borrar")}</span>
@@ -1363,6 +1367,12 @@ function initAssetTableLogic(asset) {
             }
         })
     }
+
+    // El formulario vive en js/finanzas/ventas-canjes.js; desde la ficha sale con
+    // este activo ya elegido como entregado o como recibido.
+    document.getElementById("registrarCanjeBtn")?.addEventListener("click", () => {
+        if (currentAssetId) openVentasCanjeDesdeActivo(currentAssetId)
+    })
 
     document.querySelectorAll("#assetCurrencyRow .assetCurrBtn").forEach((btn) => {
         btn.addEventListener("click", async (e) => {

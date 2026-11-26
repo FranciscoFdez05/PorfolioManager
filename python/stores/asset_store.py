@@ -360,6 +360,11 @@ def listAssets():
     for assetId, opR in opRowsByAsset.items():
         if any(r["cantidad"] or r["total"] for r in opR):
             assetsWithRows.add(assetId)
+    # Un activo que solo tiene títulos recibidos en un canje de valores también
+    # está en cartera: sin esto el filtro «Portfolio» lo escondería.
+    for assetId, datos in posiciones.items():
+        if any(isinstance(fila, dict) and fila.get("canje") for fila in datos["filas"]):
+            assetsWithRows.add(assetId)
 
     tipoDeCambio = tipoActualConMemo()
     result = []

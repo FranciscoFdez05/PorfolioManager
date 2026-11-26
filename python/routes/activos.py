@@ -7,7 +7,7 @@ from core.centimos import importeSql
 from core.db import getActiveDbPath, getDb
 from core.validation import jsonBody
 from providers.finnhub_client import convertAmount, fetchExchangeRate
-from stores import alertas_store, grafico_activo, rendimiento_activo, revisiones, series_tradingview
+from stores import alertas_store, compras_anuales, grafico_activo, rendimiento_activo, revisiones, series_tradingview
 from stores.asset_store import (
     deleteAssetFile,
     getAssetFile,
@@ -770,3 +770,14 @@ def getMetricasInversiones():
         "byMonth": {k: float(dinero.redondear(v)) for k, v in byMonth.items()},
         "byYear": {k: float(dinero.redondear(v)) for k, v in byYear.items()},
     })
+
+
+@activosBp.route("/api/metricas/compras-anuales", methods=["GET"])
+def getMetricasComprasAnuales():
+    """Activos comprados cada año y rendimiento de lo que sigue en cartera de ellos.
+
+    Returns:
+        JSON `{"ok": True, "anios": [...], "sinTipo": [...]}` (ver
+        `stores.compras_anuales.resumenComprasPorAnio`).
+    """
+    return jsonify({"ok": True, **compras_anuales.resumenComprasPorAnio(getDb())})

@@ -138,6 +138,14 @@ class Operacion:
     origen: str = ""                      # "ficha" | "ventas": de dónde salió la fila
     fiscal: bool = True                   # si genera resultado declarable
     defecto: str = ""                     # incidencia de sus datos; vacío si están bien
+    # Fecha de adquisición a efectos fiscales cuando no es la de la operación:
+    # en un canje de valores en régimen neutral (art. 81.1 LIS) los títulos
+    # recibidos entran en cartera el día del canje pero conservan la fecha de
+    # los entregados, y el FIFO tiene que tratarlos como los más antiguos.
+    fechaAntiguedad: date | None = None
+    # Pérdida aplazada por antiaplicación que el lote trae de otro activo (la
+    # que tenían los títulos entregados en un canje neutral).
+    perdidaDiferida: Decimal = Decimal("0")
 
     def claveOrden(self):
         # Una adquisición del mismo día se coloca antes que la transmisión: no
@@ -188,6 +196,11 @@ class ConsumoLote:
     costeUnitario: Decimal
     coste: Decimal
     origen: str = ""
+    # Pérdida aplazada que esta parte del lote llevaba encima y que su salida
+    # libera, y el defecto de datos del lote. Hacen falta para traspasar el lote
+    # entero a otro activo en un canje neutral.
+    perdidaDiferida: Decimal = Decimal("0")
+    defecto: str = ""
 
 
 @dataclass
@@ -266,16 +279,17 @@ def aplicarFifo(operaciones, perdidasDiferidas=None):
                 continue
             # Valor de adquisición = importe + gastos inherentes (art. 35.1).
             coste = op.importe + op.comision
-            lotes.append(Lote(
+            lote = Lote(
                 ref=op.ref,
-                fecha=op.fecha,
+                fecha=op.fechaAntiguedad or op.fecha,
                 cantidad=op.cantidad,
                 costeTotal=coste,
                 restante=op.cantidad,
                 origen=op.origen,
-                perdidaDiferida=diferidas.get(op.ref, Decimal("0")),
+                perdidaDiferida=op.perdidaDiferida + diferidas.get(op.ref, Decimal("0")),
                 defecto=op.defecto,
-            ))
+            )
+            _colocarLote(lotes, lote, heredado=op.fechaAntiguedad is not None)
             continue
 
         if op.tipo != TRANSMISION:
@@ -285,6 +299,30 @@ def aplicarFifo(operaciones, perdidasDiferidas=None):
 
     lotesVivos = [lote for lote in lotes if lote.restante > 0]
     return resultados, lotesVivos
+
+
+def _colocarLote(lotes: list, lote: Lote, heredado: bool) -> None:
+    """Añade un lote a la cola FIFO en el sitio que le da su antigüedad.
+
+    Un lote normal llega en orden cronológico y va al final. Un lote heredado
+    (canje neutral) llega el día del canje con una fecha anterior, así que se
+    coloca delante de los adquiridos después de esa fecha: se transmitirá antes
+    que ellos, como manda el art. 37.2 LIRPF. A igual fecha va detrás de los que
+    ya estaban, para no alterar el orden de lo existente.
+
+    Args:
+        lotes: Cola de lotes, de más antiguo a más reciente. Se modifica.
+        lote: Lote nuevo.
+        heredado: Si conserva una fecha de adquisición anterior a su entrada.
+    """
+    if not heredado:
+        lotes.append(lote)
+        return
+    for indice, existente in enumerate(lotes):
+        if existente.fecha > lote.fecha:
+            lotes.insert(indice, lote)
+            return
+    lotes.append(lote)
 
 
 def _transmitir(lotes, op):
@@ -329,6 +367,7 @@ def _transmitir(lotes, op):
         # transmite la mitad de la recompra, se libera la mitad de la pérdida.
         # Se calcula antes de descontar `restante`, que es sobre lo que queda
         # pendiente de liberar.
+        liberada = Decimal("0")
         if lote.perdidaDiferida > 0:
             liberada = lote.perdidaDiferida * tomado / lote.restante
             lote.perdidaDiferida -= liberada
@@ -342,6 +381,8 @@ def _transmitir(lotes, op):
             costeUnitario=costeUnitario,
             coste=coste,
             origen=lote.origen,
+            perdidaDiferida=liberada,
+            defecto=lote.defecto,
         ))
 
         costeTotal += coste

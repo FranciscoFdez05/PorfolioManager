@@ -541,8 +541,21 @@ El cálculo de ganancias y pérdidas patrimoniales vive en el servidor, no en el
 | `core/fifo.py` | Reparto en lotes en `Decimal`, puro y determinista. Las comisiones **suman** al valor de adquisición y **restan** al de transmisión (art. 35 LIRPF). |
 | `core/fiscal_es.py` | Escala de la base del ahorro por ejercicio (art. 66), regla de los dos meses o de antiaplicación (art. 33.5.f/g) y compensación del saldo negativo con arrastre a los cuatro ejercicios siguientes (art. 49.1.b). |
 | `stores/ventas_fifo.py` | Línea temporal de cada activo: qué filas de la ficha, de las operaciones de cripto y de la tabla de ventas adquieren y cuáles transmiten. |
+| `core/canjes.py` | Qué operaciones FIFO genera un canje de valores en cada régimen (Strategy: `RegimenNeutral`, `RegimenGravado`). Puro, como `fifo`. |
+| `stores/canjes_store.py` | Validación y acceso a la tabla `canjes` (Repository). |
 
 El FIFO recorre **toda** la historia del activo, no solo las ventas del año abierto en pantalla — que era el error de fondo del cálculo anterior en el navegador: dos ejercicios distintos consumían los mismos lotes y el coste de adquisición salía duplicado. Las minusvalías ya no se recortan a cero, y vender más de lo que hay en cartera (o apuntar la misma venta en la ficha *y* en la tabla de ventas) sale como **incidencia** en vez de tragarse en silencio.
+
+### Fusiones y canjes de valores
+
+**Ficha del activo › ··· › Registrar fusión o canje** apunta a mano un canje (se listan, editan y borran en Ventas) (una empresa que absorbe a otra). El usuario elige el régimen, porque depende de datos que la aplicación no puede comprobar; que una fusión entre sociedades no residentes en la UE se acoja al especial depende de la doctrina de la DGT para cada operación.
+
+- **Neutral** (arts. 76 a 89 LIS; art. 81 para el socio): la entrega consume por FIFO los lotes del activo entregado sin declarar nada, y cada trozo consumido entra en el activo recibido como un lote con su coste y su **fecha de adquisición original** (`Operacion.fechaAntiguedad`). `core/fifo.py` coloca esos lotes por antigüedad, delante de los adquiridos después, y la pérdida aplazada por antiaplicación que llevaban viaja con ellos. No cuentan como recompra para la regla de los dos meses. La compensación en dinero rebaja el coste heredado en proporción a los títulos entregados; si lo supera, el coste se deja a cero y sale una incidencia. Los picos son una transmisión declarable de títulos ya canjeados.
+- **General**: permuta (art. 37.1.h LIRPF). La entrega se transmite por el valor de mercado de lo recibido más el efectivo, y el activo recibido gana un lote con la fecha del canje.
+
+Como el destino depende del FIFO del origen hasta el día del canje, `stores/ventas_fifo._añadirCanjes` liquida primero el origen con lo anterior y recorre los canjes en orden cronológico (un canje encadenado ve los lotes heredados del anterior). La posición de la cartera hace lo mismo en `stores/rendimiento_activo._incorporarCanjes`, con filas de ficha marcadas con `canje`, y el navegador las recibe ya resueltas en `GET /api/canjes` (`posicion`) para no repetir el reparto.
+
+Rutas: `GET/POST /api/canjes`, `PUT/DELETE /api/canjes/<id>` y `POST /api/canjes/previsualizar`, que calcula los lotes y lo que se declararía sin guardar nada. Los canjes de cada ejercicio salen en `GET /api/ventas/<año>` (`canjes`) y en el informe anual, también los neutrales, con los lotes traspasados como justificante.
 
 ### Simular una venta antes de hacerla
 
@@ -600,6 +613,13 @@ En la pestaña de **Métricas**, calculadas por el servidor (`core/rentabilidad.
 Hacen falta varios días de histórico para que salgan; hasta entonces la tarjeta lo avisa. La respuesta incluye además la **cobertura** del año, para saber con cuántos huecos se está midiendo. El endpoint es `/api/portfolio/rentabilidad`, y acepta `value`/`invested` para clavar el último punto con lo que hay en pantalla: los snapshots se guardan cada pocos minutos y sin eso las KPIs no cuadrarían con las de arriba.
 
 **Comparación con un índice** — el gráfico de evolución superpone una serie de referencia a elegir: S&P 500, MSCI World, Nasdaq 100, Euro Stoxx 50, IBEX 35 o Bitcoin. Se compara contra el índice TWR de la cartera, no contra su valor en euros: la línea del portfolio no debe subir solo porque se haya aportado. Los cierres se piden a **Yahoo Finance** (el único proveedor conectado que sirve series largas sin clave) y se guardan en la tabla `benchmark_prices`, porque el pasado no cambia y sin caché cada visita a Métricas volvería a bajar años de cotizaciones.
+
+**Resumen anual de activos** — agrupa las compras por su año de adquisición y enseña, para cada año y cada activo, lo invertido, el % vendido, el coste de lo que sigue en cartera, su valor actual y el rendimiento latente. Lo calcula el servidor (`stores/compras_anuales.py`, endpoint `GET /api/metricas/compras-anuales`) con el mismo FIFO de posición que la ficha del activo (`rendimiento_activo.comprasPorAnio`), así que la suma de todos los años cuadra con el invertido bruto de la cartera. Notas:
+
+- El coste es el bruto del lote (comisiones incluidas): el rendimiento de cada año ya va neto de ellas.
+- Lo vendido solo aparece como % vendido; su ganancia o pérdida está en Ventas.
+- Los títulos recibidos en un canje neutral cuentan en el año de los entregados.
+- Los importes en otra divisa se pasan a euros con el cambio de hoy; si falta, se suman sin convertir y la sección lo avisa.
 
 ---
 
@@ -1328,9 +1348,9 @@ python/
   server.py          arranque de Flask y rutas estáticas
   core/              infraestructura: paths, db, errors, validation, secret_store,
                      seguridad_app, csp, rate_limit; y el cálculo puro:
-                     fifo, fiscal_es, informe_renta, rentabilidad, pnl_divisa
+                     fifo, fiscal_es, canjes, informe_renta, rentabilidad, pnl_divisa
   stores/            acceso a datos y sanitización por dominio; además
-                     ventas_fifo, valoracion, market_data, fx_historico, benchmark
+                     ventas_fifo, canjes_store, valoracion, market_data, fx_historico, benchmark
   providers/         clientes de cotizaciones + http/text comunes + api_stats
   admin/             portfolios, backups, credenciales, snapshot_scheduler y los
                      hilos de Telegram (telegram_listener, telegram_comandos, avisos_scheduler)

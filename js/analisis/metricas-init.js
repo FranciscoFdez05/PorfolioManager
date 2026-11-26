@@ -217,6 +217,7 @@ async function mRenderAll(payload) {
         () => mRenderDivReinvertidos(dividendos),
         () => mRenderInteresesSection(payload.intereses, payload.cuentasRemuneradas),
         () => mRenderInvertidoPeriodo(inversiones || { byMonth: {}, byYear: {} }),
+        () => mRenderComprasAnuales(payload.comprasAnuales),
         () => mRenderPasivosCharts(dividendos, payload.intereses || []),
         () => mRenderBonosTipos(b),
         () => mRenderBonosInst(b),

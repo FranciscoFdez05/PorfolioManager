@@ -851,9 +851,30 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
         })
     }
 
-    timelineEvents.sort((left, right) => left.date - right.date)
+    for (const canjeRow of getAssetCanjesRows(asset)) {
+        timelineEvents.push({
+            kind: "canje",
+            date: parseAssetOperationDate(canjeRow.fecha || ""),
+            row: canjeRow
+        })
+    }
 
+    // Un canje se ejecuta al cierre del día: va detrás de lo demás de su fecha,
+    // igual que en el servidor (stores/rendimiento_activo.py).
+    timelineEvents.sort((left, right) => left.date - right.date || (left.kind === "canje") - (right.kind === "canje"))
+
+    let fechaEventoAnterior = null
     for (const event of timelineEvents) {
+        // Cada lote apunta la fecha en que entró, para que los heredados de un
+        // canje puedan colocarse por su antigüedad delante de los posteriores.
+        marcarAntiguedadLotes(lots, fechaEventoAnterior)
+        fechaEventoAnterior = event.date
+
+        if (event.kind === "canje") {
+            await aplicarMovimientoCanje(lots, event.row, targetCurrency)
+            continue
+        }
+
         if (event.kind === "assetRow") {
             const row = event.row
             const operationType = String(row.tipoOperacion || "")
@@ -1032,6 +1053,56 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
     }
 
     return lots
+}
+
+function marcarAntiguedadLotes(lots, fecha) {
+    for (const lot of lots) {
+        if (lot.antiguedad === undefined) lot.antiguedad = fecha
+    }
+}
+
+// Movimiento de un canje de valores ya resuelto por el servidor: una salida del
+// activo entregado, o un lote del recibido con el coste y la fecha de
+// adquisición que hereda. El coste viene en la moneda del activo entregado y la
+// compensación en dinero en la del canje; las dos se pasan a la del activo.
+async function aplicarMovimientoCanje(lots, row, targetCurrency) {
+    const quantity = parseLooseNumber(row.cantidad || "") || 0
+    if (quantity <= 0) return
+
+    if (String(row.tipo || "").toLowerCase() === "venta") {
+        consumeAssetLots(lots, quantity)
+        return
+    }
+
+    const coste = await convertAmountForDisplay(
+        parseLooseNumber(row.coste || "") || 0,
+        normalizeCurrencyCode(row.moneda || targetCurrency),
+        targetCurrency
+    )
+    const descuento = await convertAmountForDisplay(
+        parseLooseNumber(row.descuento || "") || 0,
+        normalizeCurrencyCode(row.monedaDescuento || targetCurrency),
+        targetCurrency
+    )
+    const totalCost = Math.max(0, coste - descuento)
+    const antiguedad = row.fechaAntiguedad
+        ? parseAssetOperationDate(row.fechaAntiguedad)
+        : parseAssetOperationDate(row.fecha || "")
+    const lot = {
+        origen: "canje",
+        remaining: quantity,
+        priceQuantity: quantity,
+        unitCost: totalCost / quantity,
+        displayUnitPrice: totalCost / quantity,
+        totalCost,
+        antiguedad
+    }
+    const posicion = row.fechaAntiguedad ? lots.findIndex((existente) => existente.antiguedad > antiguedad) : -1
+    if (posicion === -1) {
+        lots.push(lot)
+    } else {
+        lots.splice(posicion, 0, lot)
+    }
 }
 
 // Con `esComisionCripto`, cada lote apunta lo que costó la cripto que se fue en

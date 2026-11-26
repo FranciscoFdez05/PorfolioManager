@@ -190,7 +190,13 @@ def _detectarAntiaplicacion(resultados, operaciones, ventana):
     la finalidad de la norma (penalizar el lavado de la pérdida manteniendo la
     posición) no se cumple.
     """
-    adquisiciones = [op for op in operaciones if op.tipo == ADQUISICION and op.cantidad > 0]
+    # Los títulos recibidos en un canje neutral no son una adquisición nueva:
+    # sustituyen a los entregados y conservan su fecha (art. 81.1 LIS), así que
+    # no pueden ser la "recompra" que bloquea una pérdida.
+    adquisiciones = [
+        op for op in operaciones
+        if op.tipo == ADQUISICION and op.cantidad > 0 and op.fechaAntiguedad is None
+    ]
     if not adquisiciones:
         return {}, {}
 

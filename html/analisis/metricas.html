@@ -145,6 +145,74 @@
         </div>
     </div>
 
+    <!-- -- Resumen anual de activos: compras por año y su rendimiento -- -->
+    <div class="metricasSection" id="mSectionComprasAnuales" data-mcat="portfolio">
+        <div class="metricasSectionHeader">
+            <div class="mGastosHeaderLeft">
+                <span class="metricasSectionTitle">Resumen anual de activos</span>
+                <div class="mToggleGroup" id="mComprasYearToggle"></div>
+            </div>
+        </div>
+        <div class="metricasChartsGrid2">
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Lo que queda de cada año: coste y valor actual</div>
+                <div class="metricasChartWrap" style="height:280px">
+                    <canvas id="mChartComprasAnualesValor"></canvas>
+                </div>
+            </div>
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Rendimiento por año de compra</div>
+                <div class="metricasChartWrap" style="height:280px">
+                    <canvas id="mChartComprasAnualesRend"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="metricasKpiRow mComprasKpiRow">
+            <div class="metricasKpiGroup mkpiGroupPortfolio">
+                <span class="metricasKpiGroupLabel" id="mkpiComprasAnioLabel">Compras del año</span>
+                <div class="metricasKpiCards">
+                    <div class="metricasKpiCard" data-mhelp="Coste de todas las compras del año, incluidas las que ya se han vendido.">
+                        <div class="mkpiLabel">Invertido</div>
+                        <div class="mkpiValue" id="mkpiComprasInvertido">---</div>
+                        <div class="mkpiSubValue" id="mkpiComprasActivos">---</div>
+                    </div>
+                    <div class="metricasKpiCard" data-mhelp="Coste de la parte de esas compras que sigue en cartera tras las ventas (FIFO).">
+                        <div class="mkpiLabel">Sigue en cartera</div>
+                        <div class="mkpiValue" id="mkpiComprasCosteVivo">---</div>
+                        <div class="mkpiSubValue" id="mkpiComprasVendido">---</div>
+                    </div>
+                    <div class="metricasKpiCard" data-mhelp="Valor a precio de hoy de lo que sigue en cartera de las compras del año.">
+                        <div class="mkpiLabel">Valor actual</div>
+                        <div class="mkpiValue" id="mkpiComprasValor">---</div>
+                    </div>
+                    <div class="metricasKpiCard" data-mhelp="Valor actual menos coste de lo que sigue en cartera. Lo vendido no entra: su resultado está en Ventas.">
+                        <div class="mkpiLabel">Rendimiento latente</div>
+                        <div class="mkpiValue" id="mkpiComprasRend">---</div>
+                        <div class="mkpiSubValue" id="mkpiComprasRendPct">---</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="metricasChartCard metricasTableCard">
+            <table class="metricasTable" id="mComprasTable">
+                <thead>
+                    <tr>
+                        <th>Activo</th>
+                        <th>Tipo</th>
+                        <th>Invertido</th>
+                        <th>% Vendido</th>
+                        <th>Coste en cartera</th>
+                        <th>Valor actual</th>
+                        <th>Rendimiento €</th>
+                        <th>Rendimiento %</th>
+                    </tr>
+                </thead>
+                <tbody id="mComprasTableBody"></tbody>
+            </table>
+        </div>
+        <div class="mChartNota hidden" id="mComprasNota"></div>
+    </div>
+
     <!-- -- Distribución --------------------------------------- -->
     <div class="metricasSection" id="mSectionDistribucion" data-mcat="portfolio">
         <div class="metricasSectionHeader">

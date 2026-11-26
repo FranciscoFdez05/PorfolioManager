@@ -448,6 +448,7 @@ async function buildAssetTodosOrigenPartes(asset) {
         { etiqueta: "Operaciones spot", valor: sumaDe("operacion"), color: ASSET_TODOS_CHART_COLORS.azul },
         { etiqueta: "Recibidas", valor: sumaDe("transaccion"), color: ASSET_TODOS_CHART_COLORS.ambar },
         { etiqueta: "Conversiones", valor: sumaDe("conversion"), color: ASSET_TODOS_CHART_COLORS.magenta },
+        { etiqueta: "Canjes", valor: sumaDe("canje"), color: ASSET_TODOS_CHART_COLORS.naranja },
         { etiqueta: "Comisiones", valor: comisionesCripto, color: ASSET_TODOS_CHART_COLORS.rojo, esPerdida: true }
     ]
 }

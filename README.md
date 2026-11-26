@@ -7,7 +7,7 @@
 <h1 align="center">PorfolioManager</h1>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-5.9.1-blue" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-6.0.0-blue" alt="Version"></a>
   <a href="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml"><img src="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB" alt="Python">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED" alt="Docker">
@@ -24,8 +24,8 @@ Market quotes are optional: without API keys you enter prices yourself. The inte
 
 - **Portfolio**: summary, per-asset page with average price and performance split into asset effect and currency effect, and investment plans.
 - **Finances**: expenses, income, recurring income with extra payments, monthly payments, cash accounts, dividends, fixed income and bonds.
-- **Spanish taxation**: sales with FIFO, the two-month rule and loss offsetting; annual report in CSV and HTML.
-- **Metrics**: TWR, XIRR, drawdown, volatility and comparison against indices.
+- **Spanish taxation**: sales with FIFO, the two-month rule and loss offsetting; mergers and share exchanges entered by hand, keeping the cost and purchase date of each lot; annual report in CSV and HTML.
+- **Metrics**: TWR, XIRR, drawdown, volatility, comparison against indices and a yearly summary of the assets bought each year and how they have performed.
 - **Crypto**: stablecoins, trades, conversions, staking and earn. Read-only wallet linking (Bitcoin by address —Legacy, SegWit or Taproot—, xpub/ypub/zpub —including Taproot accounts— or single public key, with automatic format detection; Ethereum and BNB Smart Chain by address or public key; Solana and XRP) that imports on-chain movements into Transactions, plus a **Seguimiento** page with the balance, euro value and latest movements of your own wallets and of third-party ones you follow, with optional Telegram alerts on every new movement; addresses and xpubs are stored encrypted and never shown in full.
 - **Alerts**: per-asset price alerts and sharp-drop and sharp-rise, position return, price vs. average cost, missing quote, portfolio value, portfolio drop and asset weight alerts (on one asset or the whole portfolio) sent by Telegram, watched by the server even with the web app closed.
 - **Operations**: automatic backups, Telegram alerts and commands, optional two-step login with a code sent by Telegram, HTTPS enabled from the app itself, and an iOS Shortcut to log expenses from your phone.
@@ -110,6 +110,7 @@ Secrets live in `.env` (copy `.env.example`; `./docker-setup` does it for you). 
 | **Mi dinero › Calendario › Vencimientos** | Maturities of your fixed income and bonds on the calendar, next to expenses, income and recurring payments |
 | **Dividendos › Ingresos pasivos** | Dividends of the last 12 months, monthly average and yield on cost per asset and overall |
 | **Dividendos › Reinvertir** | A dividend can be marked as reinvested: it adds a "Reinvertido" purchase to the asset sheet that counts in the position and in FIFO |
+| Asset page **···** › **Registrar fusión o canje** | Enter a merger or share exchange by hand. Under the tax-neutral regime (art. 81 LIS) the new shares keep the cost and purchase date of each lot handed over: cash compensation lowers that cost, and fractional shares paid in cash count as a sale. Under the general regime it is taxed as a swap at market value. The lots are previewed before saving, and the exchange shows up in the position, under Ventas and in the annual report |
 | **Ajustes › Exportar a CSV** | Download expenses, income, dividends, operations and accounts as Excel-ready CSV |
 | **Herramientas › Proyección** | Compound interest, financial independence (how much you need and when you get there), how long savings last with yearly withdrawals, Monte Carlo with your portfolio's volatility, and real return after tax and inflation |
 | **Herramientas › Cartera / Mercado** | Simulate a purchase (units you get for the amount invested, new average price, position and weight in the portfolio, automatic from your holdings or fully manual), position sizing by risk, how much a holding must rise to recover a drop, dollar-cost averaging versus lump sum with real historical prices, the ratio between any two assets against its own history, a comparison tool that overlays two to eight assets on one chart (from your portfolio or found by ticker with any of the data providers) with their return, volatility, maximum drawdown and correlation, and an equivalence table: type an amount of any currency, stock, ETF, crypto or metal and see what it is worth in all the others, with each one's performance on one chart |

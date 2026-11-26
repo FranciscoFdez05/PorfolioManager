@@ -18,6 +18,7 @@ const NOMBRES = [
     "mRenderDivReinvertidos",
     "mRenderInteresesSection",
     "mRenderInvertidoPeriodo",
+    "mRenderComprasAnuales",
     "mRenderPasivosCharts",
     "mRenderBonosTipos",
     "mRenderBonosInst",

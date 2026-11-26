@@ -154,6 +154,154 @@
     border-color: var(--accent, #3a7bd5);
 }
 
+/* ── Canjes de valores ──────────────────────────────────────────────────────
+   Bloque con los canjes del ejercicio, debajo del resumen, y el formulario de
+   alta, que tiene más campos que el de una venta. */
+
+.ventasCanjesTablaWrapper {
+    overflow-x: auto;
+}
+
+/* Pocas columnas: el ancho mínimo de la tabla de ventas (1400px) la cortaría. */
+.ventasCanjesTabla.operationsTable {
+    min-width: 100%;
+    width: 100%;
+}
+
+/* Dos columnas: son doce campos y en una sola el formulario no cabía en la
+   pantalla. Por debajo de 640px vuelve a una. */
+.ventasCanjeModal {
+    width: min(820px, 100%);
+}
+
+.ventasCanjeGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 18px;
+    margin-top: 6px;
+}
+
+.ventasCanjeCampo,
+.ventasCanjeAncho {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.ventasCanjeAncho {
+    grid-column: 1 / -1;
+}
+
+.ventasCanjeGrid .assetModalLabel {
+    margin-top: 0;
+}
+
+.ventasCanjeAncho > .assetModalHint:first-child {
+    margin-top: 0;
+}
+
+@media (max-width: 640px) {
+    .ventasCanjeGrid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.ventasCanjeEtiquetaAyuda {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ventasCreateModal .ventasCanjeEtiquetaAyuda > .assetModalLabel {
+    margin-top: 0;
+}
+
+.ventasCanjeAyudaBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid var(--border-mid);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.ventasCanjeAyudaBtn:hover,
+.ventasCanjeAyudaBtn.active {
+    border-color: var(--accent, #3a7bd5);
+    color: var(--text-primary);
+}
+
+.ventasCanjeAyuda {
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-panel);
+}
+
+.ventasCanjeAyuda.hidden {
+    display: none;
+}
+
+.ventasCanjeAyudaTabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.76rem;
+    line-height: 1.35;
+}
+
+.ventasCanjeAyudaTabla th,
+.ventasCanjeAyudaTabla td {
+    padding: 5px 6px;
+    border-bottom: 1px solid var(--border-soft);
+    text-align: left;
+    vertical-align: top;
+}
+
+.ventasCanjeAyudaTabla thead th {
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.ventasCanjeAyudaTabla tbody th {
+    width: 30%;
+    color: var(--text-dim);
+    font-weight: 600;
+}
+
+.ventasCanjePrevia {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-panel);
+}
+
+.ventasCanjePrevia.hidden {
+    display: none;
+}
+
+.ventasCanjePrevia .ventasArrastresTitulo:not(:first-child) {
+    margin-top: 10px;
+}
+
+.ventasCanjeLista li {
+    grid-template-columns: 90px 1fr 110px;
+    gap: 8px;
+}
+
+.ventasCanjeLista li span:last-child {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
 /* Ajustada al alto visible (fitPageActive, ver base.css): mainContent no hace
    scroll; la tabla se queda con el hueco que dejan la barra de años y el
    resumen del ejercicio y hace scroll por dentro. */
@@ -172,6 +320,12 @@
     .fitPageActive .ventasPageExpanded .interesesYearBar,
     .fitPageActive .ventasPageExpanded .ventasResumen {
         flex: 0 0 auto;
+    }
+
+    /* Con varios canjes el bloque no puede quitarle todo el alto a la tabla. */
+    .fitPageActive .ventasPageExpanded .ventasCanjesTablaWrapper {
+        max-height: calc(22 * var(--vh));
+        overflow-y: auto;
     }
 
     .fitPageActive .ventasPageExpanded .operationsTableWrapper {

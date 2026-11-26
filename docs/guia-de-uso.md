@@ -165,6 +165,23 @@ Al apuntar un cobro, marca **Reinvertir automáticamente** e indica las particip
 - **No suma a la cuenta**: un dividendo reinvertido no entra en el saldo ni en lo que rinde la cuenta que cobra los dividendos, porque no llega a ella.
 - En **Métricas › Dividendos reinvertidos** (debajo de «Dividendos por mes») hay el total reinvertido, las participaciones compradas, el número de reinversiones y el porcentaje de tus dividendos que reinviertes, con el histórico por año (y las participaciones acumuladas), el resumen por instrumento y la lista de reinversiones. Siguen contando también en los totales de dividendos del resto de Métricas, porque se cobraron.
 
+### Fusiones y canjes de valores
+
+Cuando una empresa absorbe a otra y te cambia sus acciones por las suyas, apúntalo desde la ficha de cualquiera de los dos activos: botón **···** › **Registrar fusión o canje**. Crea antes el activo que recibes, si no existe. Desde la ficha del activo con acciones (Tesla) sale elegido como entregado; desde la del activo sin acciones (SpaceX), como recibido.
+
+- **Títulos entregados** y **títulos recibidos (enteros)**: la ecuación de canje aplicada a tu posición.
+- **Picos**: la fracción de acción que el bróker te paga en efectivo, con lo que cobraste por ella.
+- **Compensación complementaria en dinero**: el efectivo que acompaña al canje, si lo hay.
+- **Valor de mercado de los títulos recibidos**: obligatorio en el régimen general.
+- **Moneda** y **tipo de cambio**: los importes se anotan como los liquida el bróker. Si no van en euros, indica el tipo del día del canje.
+
+Elige el **régimen fiscal**:
+
+- **Especial (neutral)**: el canje no tributa. Cada lote de las acciones entregadas pasa al activo recibido con su coste y su **fecha de adquisición original**, así que una venta posterior consume primero los más antiguos. La compensación en dinero rebaja ese coste y los picos se declaran como una venta.
+- **General (permuta)**: se declara la ganancia o la pérdida de las acciones entregadas al valor de mercado de lo recibido, y las nuevas se adquieren por ese valor con la fecha del canje.
+
+Que una fusión entre sociedades de fuera de la UE pueda acogerse al régimen especial depende de la doctrina de la DGT para esa operación: compruébalo con la documentación del canje. **Previsualizar** enseña los lotes que recibirás y lo que se declara, sin guardar nada. Los canjes del ejercicio salen debajo del resumen de Ventas y en el informe anual (CSV e imprimible), con el detalle de los lotes traspasados.
+
 ### Exportar a CSV
 
 **Ajustes › Datos › Exportar a CSV** descarga gastos e ingresos (de un año), dividendos, operaciones y cuentas con sus saldos. El fichero usa «;» como separador y coma decimal, y se abre en Excel con los acentos bien. El texto que empieza como una fórmula se neutraliza. Ruta: `GET /api/exportar/<módulo>.csv` (con `?anio=` en gastos e ingresos).

@@ -28,6 +28,7 @@ from routes.alertas_reglas import alertasReglasBp
 from routes.atajo import atajoBp
 from routes.auth import authBp, prepararAltaInicial
 from routes.backup import backupBp
+from routes.canjes import canjesBp
 from routes.carteras_conocidas import carterasConocidasBp
 from routes.categorias import categoriasBp
 from routes.cuenta_ahorro import cuentaAhorroBp
@@ -166,6 +167,7 @@ app.register_blueprint(activosBp)
 app.register_blueprint(atajoBp)
 app.register_blueprint(actualizacionBp)
 app.register_blueprint(ajustesBp)
+app.register_blueprint(canjesBp)
 app.register_blueprint(alertasBp)
 app.register_blueprint(alertasReglasBp)
 app.register_blueprint(backupBp)

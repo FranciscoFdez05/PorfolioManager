@@ -125,7 +125,8 @@ def _prepararInforme(year):
         return None, (jsonify({"ok": False, "error": "Año no encontrado"}), 404)
 
     return informe_renta.construir(
-        normalizedYear, data["rows"], data["resumen"], data.get("permutas", ())
+        normalizedYear, data["rows"], data["resumen"], data.get("permutas", ()),
+        data.get("canjes", ()),
     ), None
 
 

@@ -22,6 +22,44 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [6.0.0] — 2026-11-26
+
+Las fusiones y canjes de valores se registran con su tratamiento fiscal, y
+Métricas enseña qué se compró cada año y cómo rinde hoy lo que queda de ello.
+
+**Esquema de base de datos:** sube al **43** (antes el 42; tabla nueva `canjes`).
+Volver atrás es levantar la imagen anterior y restaurar
+`data/backups/auto/<portfolio>_pre-esquema-42-a-43_*.db`; la imagen anterior
+también funciona sin restaurar, pero ignora los canjes registrados (la
+posición y las ventas salen como si no existieran).
+
+**Al actualizar:** nada que hacer.
+
+### Añadido
+
+- **Fusiones y canjes de valores.** En el menú ··· de la ficha de un activo,
+  «Registrar fusión o canje» apunta a mano un canje (por ejemplo, unas acciones absorbidas por
+  otra empresa). En el régimen neutral (art. 81 LIS) cada lote entregado pasa
+  al activo recibido con su coste y su fecha de adquisición original, así que
+  el FIFO de las ventas posteriores los consume por esa fecha; la compensación
+  en dinero rebaja el coste y los picos se declaran como una venta. En el
+  régimen general tributa como una permuta a valor de mercado. Se previsualiza
+  antes de guardar, mueve la posición de la cartera y sale en Ventas y en el
+  informe anual con los lotes traspasados.
+- **Resumen anual de activos en Métricas.** Nueva sección en Portfolio con lo
+  que se compró cada año: cuánto se invirtió, qué parte sigue en cartera tras
+  las ventas (FIFO), su valor actual y su rendimiento latente en € y %, por año
+  y por activo. Lo vendido sale como porcentaje vendido; su resultado sigue en
+  Ventas. Endpoint `GET /api/metricas/compras-anuales`.
+
+### Corregido
+
+- **Reiniciar cuentas ya no estropea Métricas.** La gráfica «Saldo durante el
+  mes» arrancaba cualquier mes anterior al reinicio en el saldo nuevo, así que
+  los años anteriores salían mal. Ahora esos meses se calculan hacia atrás
+  desde el saldo real del reinicio, descontando lo ocurrido entre medias. La
+  ventana Cuentas sigue contando solo lo posterior.
+
 ## [5.9.1] — 2026-11-23
 
 El mapa de Paneles en «Hoy» va al día: la línea de las acciones avanza con la

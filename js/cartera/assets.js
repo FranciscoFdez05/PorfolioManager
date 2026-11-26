@@ -3,6 +3,9 @@
 
 const exchangeRateCache = new Map()
 let externalVentasRowsCache = []
+// Movimientos de posición de los canjes de valores (fusiones), ya resueltos por
+// el servidor: qué sale del activo entregado y qué lotes entran en el recibido.
+let externalCanjesRowsCache = []
 let externalTransaccionesRowsCache = []
 let externalOperacionesRowsCache = []
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
@@ -597,7 +600,32 @@ async function loadVentasRowsForAssets() {
 
     const data = await response.json()
     externalVentasRowsCache = Array.isArray(data?.rows) ? data.rows : []
+    // Los canjes sacan títulos de la cartera igual que las ventas, así que se
+    // cargan con ellas: quien necesita unas necesita los otros.
+    await loadCanjesRowsForAssets()
     return externalVentasRowsCache
+}
+
+async function loadCanjesRowsForAssets() {
+    try {
+        const response = await fetch("/api/canjes")
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`)
+        }
+        const data = await response.json()
+        externalCanjesRowsCache = Array.isArray(data?.posicion) ? data.posicion : []
+    } catch (error) {
+        // Sin canjes la cartera sale como antes de registrarlos; no es motivo
+        // para dejar sin cargar las ventas.
+        console.error("No se pudieron cargar los canjes", error)
+        externalCanjesRowsCache = []
+    }
+    return externalCanjesRowsCache
+}
+
+function getAssetCanjesRows(asset) {
+    const assetId = String(asset?.id || "").trim()
+    return externalCanjesRowsCache.filter((row) => String(row?.assetId || "").trim() === assetId)
 }
 
 async function loadTransaccionesRowsForAssets() {

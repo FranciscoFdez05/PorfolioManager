@@ -138,6 +138,7 @@ async function initVentasLogic() {
     renderVentasYearButtons()
     renderVentasTable()
     bindVentasEvents()
+    bindVentasCanjes()
 
     const ventasTable = document.getElementById("ventasBody")?.closest("table")
     if (ventasTable) bindTableSort(ventasTable, "ventas")
@@ -150,6 +151,8 @@ function applyVentasPayload(payload) {
         rows: Array.isArray(payload?.rows) ? payload.rows.map(normalizeVentaRow) : [],
         resumen: payload?.resumen || null,
         incidencias: Array.isArray(payload?.incidencias) ? payload.incidencias : [],
+        // Canjes de valores del ejercicio, ya liquidados (js/finanzas/ventas-canjes.js).
+        canjes: Array.isArray(payload?.canjes) ? payload.canjes : [],
         revision: Number.isInteger(payload?.revision) ? payload.revision : null
     }
     ventasBaseFilas = currentVentasData.rows.map(filaDeHechoVenta)
@@ -558,6 +561,7 @@ function renderVentasTable() {
 // anual y progresiva, así que la suma de las columnas de una fila sola no
 // significa nada por sí misma.
 function renderVentasResumen() {
+    renderVentasCanjes()
     const contenedor = document.getElementById("ventasResumen")
 
     if (!contenedor) {

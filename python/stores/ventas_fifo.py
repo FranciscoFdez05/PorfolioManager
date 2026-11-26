@@ -23,11 +23,11 @@ adquisición inventados.
 import threading
 from decimal import Decimal
 
-from core import dinero, fifo, fiscal_es
+from core import canjes as canjesFiscal, dinero, fifo, fiscal_es
 from core.centimos import importeSql
 from core.db import getDb
 from core.fifo import ADQUISICION, TRANSMISION, Operacion
-from stores import rendimiento_activo
+from stores import canjes_store, rendimiento_activo
 from stores.fx_historico import tipoActualConMemo
 
 # Motivos de incidencia propios de esta capa (los de reparto viven en core.fifo).
@@ -71,6 +71,15 @@ _MENSAJES = {
         "Una parte de lo que se vende llegó por una transferencia recibida y se "
         "desconoce su coste de adquisición."
     ),
+    canjesFiscal.INCIDENCIA_SIN_VALOR: (
+        "Un canje en régimen general necesita el valor de mercado de los títulos "
+        "recibidos: es el valor de transmisión de los entregados."
+    ),
+    canjesFiscal.INCIDENCIA_COMPENSACION: (
+        "La compensación en dinero del canje supera el valor fiscal de los títulos "
+        "entregados. Se ha dejado el coste de los recibidos a cero; revisa la "
+        "operación con la documentación del canje."
+    ),
 }
 
 # Incidencias que impiden siquiera colocar la fila en la línea temporal. Las
@@ -81,8 +90,27 @@ BLOQUEANTES = {
 }
 
 
+# Las incidencias de reparto de una entrega de canje dicen lo mismo que en una
+# venta, pero el texto de la venta ("fecha de venta") despista en un canje.
+_MENSAJES_CANJE = {
+    fifo.INCIDENCIA_STOCK: (
+        "El activo entregado no tiene tantos títulos en la fecha del canje. Revisa "
+        "la cantidad entregada o si falta registrar alguna compra anterior."
+    ),
+    fifo.INCIDENCIA_SIN_LOTES: (
+        "El activo entregado no tiene ninguna compra registrada antes de la fecha "
+        "del canje, así que no hay coste ni fecha de adquisición que traspasar."
+    ),
+}
+
+
 def mensajeIncidencia(codigo):
     return _MENSAJES.get(codigo, "")
+
+
+def mensajeIncidenciaCanje(codigo):
+    """Texto de una incidencia de canje; las que no son de reparto, como en una venta."""
+    return _MENSAJES_CANJE.get(codigo) or mensajeIncidencia(codigo)
 
 
 def _esCripto(tipo):
@@ -455,6 +483,205 @@ def _filaPermuta(resultado, meta):
     }
 
 
+def _leerCanjes(activos, filas=None):
+    """Canjes guardados como `core.canjes.Canje`, con los importes en euros.
+
+    El tipo de cambio es el anotado en el canje, como en el resto de
+    operaciones: si falta en una divisa que no es el euro, el canje lleva la
+    incidencia y la arrastran los lotes y transmisiones que genera.
+
+    Args:
+        activos: `{activoId: {...}}` de `_cargarActivos`.
+        filas: Filas de canje a usar en vez de las guardadas (previsualización).
+
+    Returns:
+        Lista de canjes en orden cronológico (fecha y orden de alta). Los que
+        apuntan a un activo inexistente o tienen la fecha ilegible no se
+        devuelven: la clave foránea y la validación al guardar los impiden.
+    """
+    lista = []
+    for fila in (canjes_store.leerFilas() if filas is None else filas):
+        if fila["activo_origen"] not in activos or fila["activo_destino"] not in activos:
+            continue
+        try:
+            fecha = fifo.parseFecha(fila["fecha"])
+        except fifo.FifoError:
+            continue
+        valorMercado = _num(fila["valor_mercado"])
+        compensacion = _num(fila["compensacion"])
+        picosImporte = _num(fila["picos_importe"])
+        defecto = _defectoDeFila(fila, ("valor_mercado", "compensacion", "picos_importe"))
+        factor = _factorEur(fila["moneda"], fila["fx_rate"])
+        if factor is None:
+            if any(valor > 0 for valor in (valorMercado, compensacion, picosImporte)):
+                defecto = defecto or fifo.INCIDENCIA_SIN_TIPO
+            factor = Decimal("1")
+        lista.append(canjesFiscal.Canje(
+            id=str(fila["id"]),
+            fecha=fecha,
+            origenId=fila["activo_origen"],
+            destinoId=fila["activo_destino"],
+            entregadas=_num(fila["cantidad_entregada"]),
+            recibidas=_num(fila["cantidad_recibida"]),
+            regimen=str(fila["regimen"] or canjesFiscal.NEUTRAL),
+            valorMercadoEur=valorMercado * factor if valorMercado > 0 else None,
+            compensacionEur=compensacion * factor,
+            picosCantidad=_num(fila["picos_cantidad"]),
+            picosImporteEur=picosImporte * factor,
+            secuencia=int(fila["seq"]),
+            defecto=defecto,
+        ))
+    lista.sort(key=lambda canje: (canje.fecha, canje.secuencia))
+    return lista
+
+
+def _añadirCanjes(porActivo, activos, filas=None):
+    """Mete los canjes de valores en la línea temporal de origen y destino.
+
+    El destino necesita saber qué lotes del origen se entregaron, y eso depende
+    del FIFO del origen hasta el día del canje. Por eso cada canje liquida
+    primero el origen con lo anterior a él y le añade su entrega, y con los
+    trozos de lote consumidos genera las operaciones del destino. Los canjes se
+    recorren en orden cronológico para que un canje encadenado (A por B y luego
+    B por C) vea ya los lotes que B heredó de A.
+
+    Args:
+        porActivo: `{activoId: [Operacion]}`; se modifica.
+        activos: `{activoId: {...}}` de `_cargarActivos`.
+        filas: Filas de canje a usar en vez de las guardadas (previsualización).
+
+    Returns:
+        `{canjeId: {"canje", "origen", "destino", "lotes"}}` para el informe:
+        nombres de los activos y las adquisiciones generadas en el destino.
+    """
+    meta = {}
+    for canje in _leerCanjes(activos, filas):
+        estrategia = canjesFiscal.estrategia(canje.regimen)
+        entrega = estrategia.operacionEntrega(canje)
+        previas = [
+            op for op in porActivo.get(canje.origenId, [])
+            if op.claveOrden() < entrega.claveOrden()
+        ]
+        resultados, _lotes = fiscal_es.calcularConNormativa(
+            [*previas, entrega], activos[canje.origenId].get("type", "")
+        )
+        resultadoEntrega = next(r for r in resultados if r.ref == entrega.ref)
+
+        destino = estrategia.operacionesDestino(canje, resultadoEntrega)
+        porActivo.setdefault(canje.origenId, []).append(entrega)
+        porActivo.setdefault(canje.destinoId, []).extend(destino)
+        meta[canje.id] = {
+            "canje": canje,
+            "origen": activos[canje.origenId]["name"],
+            "destino": activos[canje.destinoId]["name"],
+            "lotes": [op for op in destino if op.tipo == ADQUISICION],
+        }
+    return meta
+
+
+def _declaraAparte(ref, resultado):
+    """Transmisión fiscal que no sale de la tabla Ventas: permuta o canje."""
+    return resultado.fiscal and (ref.startswith("permuta:") or canjesFiscal.esRefDeCanje(ref))
+
+
+def _filaCanje(meta, resultadosPorRef):
+    """Un canje ya liquidado, listo para JSON e informe (tipo «canje»).
+
+    Lleva el detalle de los lotes traspasados aunque no declare nada: en el
+    régimen neutral es la única prueba de que el coste y la fecha de los títulos
+    recibidos salen de los entregados, que es lo que se pide en una
+    comprobación.
+    """
+    canje = meta["canje"]
+    entrega = resultadosPorRef.get(canje.refEntrega)
+    picos = resultadosPorRef.get(canje.refPicos)
+    concepto = f"Canje {meta['origen']} → {meta['destino']}"
+
+    transmisiones = []
+    for resultado, activo in ((entrega, meta["origen"]), (picos, meta["destino"])):
+        if resultado is not None and resultado.fiscal:
+            fila = _filaPermuta(resultado, {"activo": activo, "par": concepto})
+            transmisiones.append({**fila, "tipo": "canje", "canje": canje.id})
+
+    incidencia = next(
+        (codigo for codigo in (
+            entrega.incidencia if entrega is not None else "",
+            *(op.defecto for op in meta["lotes"]),
+            picos.incidencia if picos is not None else "",
+        ) if codigo),
+        "",
+    )
+    neutral = canje.regimen == canjesFiscal.NEUTRAL
+    return {
+        "tipo": "canje",
+        "id": canje.id,
+        "fecha": canje.fecha.strftime("%d-%m-%Y"),
+        "regimen": canje.regimen,
+        "origen": meta["origen"],
+        "destino": meta["destino"],
+        "concepto": concepto,
+        "entregadas": _money(canje.entregadas, escala="0.00000001"),
+        "recibidas": _money(canje.recibidas, escala="0.00000001"),
+        "picosCantidad": _money(canje.picosCantidad, escala="0.00000001"),
+        "compensacion": _money(canje.compensacionEur),
+        "costeTraspasado": (
+            _money(sum((op.importe for op in meta["lotes"]), Decimal("0"))) if neutral else ""
+        ),
+        "lotes": [
+            {
+                "fechaAdquisicion": (op.fechaAntiguedad or op.fecha).strftime("%d-%m-%Y"),
+                "cantidad": _money(op.cantidad, escala="0.00000001"),
+                "coste": _money(op.importe),
+            }
+            for op in meta["lotes"]
+        ],
+        "transmisiones": transmisiones,
+        "incidencia": incidencia,
+        "mensaje": mensajeIncidenciaCanje(incidencia),
+    }
+
+
+ID_PREVISUALIZACION = "previsualizacion"
+
+
+def previsualizarCanje(valores, canjeId=None):
+    """Qué saldría de guardar un canje, sin guardarlo.
+
+    Se recalcula toda la línea temporal con el canje dentro (sustituyendo al
+    guardado si se está editando), porque los lotes que se traspasan dependen
+    de todo el histórico del activo entregado.
+
+    Args:
+        valores: Canje ya validado por `canjes_store.validar` (claves de la API).
+        canjeId: Id del canje que se edita, para no contarlo dos veces.
+
+    Returns:
+        El canje en el formato de `_filaCanje`, sin `id` guardado.
+    """
+    porActivo, activos = _operacionesDeFichas()
+    ventas = _leerVentasCrudas()
+    _añadirVentas(porActivo, ventas, activos)
+    _añadirMovimientosPropios(porActivo, activos)
+
+    filas = [dict(fila) for fila in canjes_store.leerFilas() if fila["id"] != canjeId]
+    filas.append({
+        "seq": max((fila["seq"] for fila in filas), default=0) + 1,
+        "id": ID_PREVISUALIZACION,
+        **{columna: valores[clave] for columna, clave in canjes_store.COLUMNAS if clave != "id"},
+    })
+    meta = _añadirCanjes(porActivo, activos, filas)
+
+    previa = meta.get(ID_PREVISUALIZACION)
+    if previa is None:
+        return None
+    resultadosPorRef = {}
+    for activoId in (previa["canje"].origenId, previa["canje"].destinoId):
+        tipo = activos.get(activoId, {}).get("type", "")
+        resultados, _lotes = fiscal_es.calcularConNormativa(porActivo.get(activoId, []), tipo)
+        resultadosPorRef.update({r.ref: r for r in resultados})
+    return _filaCanje(previa, resultadosPorRef)
+
+
 def _leerVentasCrudas():
     conn = getDb()
     return conn.execute(
@@ -648,6 +875,7 @@ def _calcularTodoSinCache():
     ventas = _leerVentasCrudas()
     invalidas = _añadirVentas(porActivo, ventas, activos)
     metaPermutas = _añadirMovimientosPropios(porActivo, activos)
+    metaCanjes = _añadirCanjes(porActivo, activos)
 
     resultadosPorRef = {}
     lotesVivos = {}
@@ -669,16 +897,26 @@ def _calcularTodoSinCache():
         if resultado is not None:
             resultadosPorAnio.setdefault(fila["year"], []).append(resultado)
 
-    # Las permutas declaran como una transmisión más, en el ejercicio de su fecha,
-    # pero salen aparte: no son ventas a fiat ni tienen fila en la tabla Ventas.
+    # Las permutas y los canjes declaran como una transmisión más, en el
+    # ejercicio de su fecha, pero salen aparte: no son ventas a fiat ni tienen
+    # fila en la tabla Ventas.
     permutas = {}
     for ref, resultado in resultadosPorRef.items():
-        if ref.startswith("permuta:") and resultado.fiscal:
+        if _declaraAparte(ref, resultado):
             anio = str(resultado.fecha.year)
             resultadosPorAnio.setdefault(anio, []).append(resultado)
-            permutas.setdefault(anio, []).append(_filaPermuta(resultado, metaPermutas.get(ref, {})))
+            if ref.startswith("permuta:"):
+                permutas.setdefault(anio, []).append(_filaPermuta(resultado, metaPermutas.get(ref, {})))
     for filasPermuta in permutas.values():
         filasPermuta.sort(key=lambda f: (f["fecha"][6:], f["fecha"][3:5], f["fecha"][:2], f["id"]))
+
+    # Todos los canjes del ejercicio, también los neutrales que no declaran
+    # nada: el informe tiene que poder justificar de dónde salen el coste y la
+    # fecha de los títulos recibidos.
+    canjesPorAnio = {}
+    for meta in metaCanjes.values():
+        anio = str(meta["canje"].fecha.year)
+        canjesPorAnio.setdefault(anio, []).append(_filaCanje(meta, resultadosPorRef))
 
     # Un ejercicio existente sin ventas válidas también necesita liquidación
     # (a cero) para que la pantalla tenga algo que enseñar.
@@ -696,7 +934,7 @@ def _calcularTodoSinCache():
             resultados, liquidacion, fiscal_es.escalaDelEjercicio(anio)
         )
         for resultado in resultados:
-            if resultado.ref.startswith("permuta:"):
+            if _declaraAparte(resultado.ref, resultado):
                 continue
             _, ventaId = resultado.ref.rsplit(":", 1)
             filas[(anio, ventaId)] = _serializarFila(
@@ -725,6 +963,7 @@ def _calcularTodoSinCache():
         "incidencias": incidencias,
         "lotes_vivos": lotesVivos,
         "permutas": permutas,
+        "canjes": canjesPorAnio,
     }
 
 
@@ -772,7 +1011,7 @@ def _liquidarCon(porActivo, activos, ventas, invalidas, extra=None):
             resultadosPorAnio.setdefault(str(fila["year"]), []).append(resultado)
 
     for ref, resultado in porRef.items():
-        if ref.startswith("permuta:") and resultado.fiscal:
+        if _declaraAparte(ref, resultado):
             resultadosPorAnio.setdefault(str(resultado.fecha.year), []).append(resultado)
 
     if extra is not None:
@@ -813,6 +1052,7 @@ def simularVenta(assetId, fechaTexto, cantidad, precio, comision=0):
     ventas = _leerVentasCrudas()
     invalidas = _añadirVentas(porActivo, ventas, activos)
     _añadirMovimientosPropios(porActivo, activos)
+    _añadirCanjes(porActivo, activos)
 
     # La venta simulada se teclea en la divisa del activo y no tiene tipo
     # anotado: se usa el que ya esté en la caché para esa fecha, sin descargar.
@@ -944,8 +1184,7 @@ def _liquidarResultados(porRef, ventas, invalidas):
             resultadosPorAnio.setdefault(str(fila["year"]), []).append(resultado)
 
     for ref, resultado in porRef.items():
-        esPermuta = ref.startswith("permuta:") and resultado.fiscal
-        if esPermuta or ref.startswith(PREFIJO_SIMULACION_MULTIPLE):
+        if _declaraAparte(ref, resultado) or ref.startswith(PREFIJO_SIMULACION_MULTIPLE):
             resultadosPorAnio.setdefault(str(resultado.fecha.year), []).append(resultado)
 
     return fiscal_es.liquidarEjercicios(resultadosPorAnio)
@@ -978,6 +1217,7 @@ def simularVariasVentas(ventasSimuladas, fecha, conjunto=None):
     ventas = _leerVentasCrudas()
     invalidas = _añadirVentas(porActivo, ventas, activos)
     _añadirMovimientosPropios(porActivo, activos)
+    _añadirCanjes(porActivo, activos)
 
     basePorActivo = {}
     lotesVivos = {}

@@ -124,6 +124,55 @@ def test_quitar_la_fecha_vuelve_a_contar_toda_la_historia(conn):
     assert _saldos(conn)["banco"]["saldo"] == antes
 
 
+_MESES_METRICAS = [("2025", "diciembre"), ("2026", "enero"), ("2026", "febrero"), ("2026", "marzo"), ("2026", "abril")]
+
+
+def _mesesDeMetricas(conn, cuentas):
+    from stores.cuentas_store import saldosDelMes
+
+    return {
+        (year, month): {c: saldosDelMes(year, month, conn, aEuros=_aEuros)[c] for c in cuentas}
+        for year, month in _MESES_METRICAS
+    }
+
+
+def test_metricas_no_cambian_si_el_reinicio_casa_con_lo_calculado(conn):
+    from stores.cuentas_store import reiniciarCuentas
+
+    # Broker y tarjeta no tienen movimientos sin fecha, que con fecha de inicio
+    # dejan de contar: así el reinicio con el saldo calculado es neutro.
+    cuentas = ("broker", "tarjeta")
+    antes = _mesesDeMetricas(conn, cuentas)
+    calculados = _saldos(conn, hoy=datetime.date(2026, 2, 15))
+    reiniciarCuentas("15-02-2026", {c: str(calculados[c]["saldo"]) for c in cuentas})
+
+    assert _mesesDeMetricas(conn, cuentas) == antes
+
+
+def test_metricas_de_meses_anteriores_parten_del_saldo_real(conn):
+    from stores.cuentas_store import reiniciarCuentas, saldosDelMes
+
+    antes = saldosDelMes("2026", "enero", conn, aEuros=_aEuros)["broker"]
+    calculado = _saldos(conn, hoy=datetime.date(2026, 2, 15))["broker"]["saldo"]
+    reiniciarCuentas("15-02-2026", {"broker": str(calculado + 100)})
+    despues = saldosDelMes("2026", "enero", conn, aEuros=_aEuros)["broker"]
+
+    # Un mes anterior al reinicio no arranca en el saldo nuevo: arranca en lo
+    # que había entonces, desplazado solo por la diferencia con lo calculado.
+    assert despues["inicial"] == antes["inicial"] + 100
+    assert despues["rendimientos"] == antes["rendimientos"]
+
+
+def test_el_reinicio_no_cambia_la_ventana_cuentas(conn):
+    from stores.cuentas_store import reiniciarCuentas
+
+    # La ventana Cuentas sigue sin contar lo anterior al inicio.
+    reiniciarCuentas("15-02-2026", {"broker": "1000"})
+    broker = _saldos(conn, hoy=datetime.date(2026, 2, 15))["broker"]
+    assert broker["saldo"] == Decimal("1000")
+    assert broker["dividendos"] == Decimal(0)
+
+
 def test_la_migracion_42_anade_la_columna(tempDb):
     from core import db
 

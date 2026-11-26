@@ -61,6 +61,32 @@ COLUMNAS_DETALLE = (
     ("perdidaDiferidaLiberada", "Pérdida diferida integrada"),
 )
 
+# Cómo se rotula el régimen de cada canje y la norma que lo sostiene.
+REGIMENES_CANJE = {
+    "neutral": "Régimen especial (art. 81 LIS): sin renta; los títulos recibidos "
+               "conservan el valor y la fecha de los entregados",
+    "gravado": "Régimen general: permuta (art. 37.1.h LIRPF), ganancia o pérdida "
+               "a valor de mercado",
+}
+
+NOTA_CANJES = (
+    "El régimen de cada canje lo indica el usuario. Que una fusión entre "
+    "sociedades no residentes en la Unión Europea pueda acogerse al régimen "
+    "especial depende de la doctrina de la DGT para esa operación: compruébalo "
+    "con la documentación del canje."
+)
+
+COLUMNAS_CANJE = (
+    ("fecha", "Fecha del canje"),
+    ("concepto", "Canje"),
+    ("regimen", "Régimen"),
+    ("entregadas", "Títulos entregados"),
+    ("recibidas", "Títulos recibidos"),
+    ("picosCantidad", "Fracción liquidada (picos)"),
+    ("costeTraspasado", "Valor fiscal traspasado"),
+    ("compensacion", "Compensación en dinero"),
+)
+
 
 def _dec(valor):
     """Decimal tolerante para las cifras que llegan ya serializadas.
@@ -92,12 +118,18 @@ def _es(valor):
     return f"{signo}{'.'.join(grupos)},{decimales}"
 
 
-def construir(anio, filas, resumen, permutas=()):
+def construir(anio, filas, resumen, permutas=(), canjes=()):
     """Estructura intermedia que comparten el CSV y el HTML.
 
     `permutas` son las permutas cripto por cripto del ejercicio: transmisiones
     diferenciadas (tipo «permuta») que no se mezclan con las ventas, aunque su
     resultado ya forme parte del resumen.
+
+    `canjes` son los canjes de valores del ejercicio (ver `core.canjes`). Sus
+    transmisiones declarables (la entrega en régimen general y los picos) suman
+    como las demás; los neutrales, que no declaran nada, salen igualmente con
+    los lotes traspasados para poder justificar el coste de los títulos
+    recibidos.
 
     Se calcula una sola vez y la usan las dos salidas: si el CSV y el HTML se
     construyeran por separado acabarían divergiendo, y la discrepancia entre el
@@ -106,8 +138,14 @@ def construir(anio, filas, resumen, permutas=()):
     computables = [f for f in filas if not f.get("incidencia")]
     permutasComputables = [f for f in permutas if not f.get("incidencia")]
     incidencias = [f for f in filas if f.get("incidencia")] + [f for f in permutas if f.get("incidencia")]
+    transmisionesCanje = [t for canje in canjes for t in canje.get("transmisiones", ())]
+    incidencias += [
+        {"fecha": c.get("fecha", ""), "activo": c.get("concepto", ""), "mensaje": c.get("mensaje", "")}
+        for c in canjes if c.get("incidencia")
+    ]
 
-    resultados = [*computables, *permutasComputables]
+    resultados = [*computables, *permutasComputables,
+                  *(t for t in transmisionesCanje if not t.get("incidencia"))]
     ganancias = sum((_dec(f["dineroDeclarar"]) for f in resultados
                      if _dec(f["dineroDeclarar"]) > 0), Decimal("0"))
     perdidas = sum((-_dec(f["dineroDeclarar"]) for f in resultados
@@ -125,6 +163,7 @@ def construir(anio, filas, resumen, permutas=()):
         "generado": date.today().strftime("%d-%m-%Y"),
         "detalle": computables,
         "permutas": permutasComputables,
+        "canjes": list(canjes),
         "incidencias": incidencias,
         # Conceptos en el orden en que los pide el apartado de la declaración.
         "totales": [
@@ -203,6 +242,9 @@ def aCsv(informe):
                 for clave, _etiqueta in COLUMNAS_DETALLE
             ])
 
+    if informe["canjes"]:
+        _canjesCsv(escritor, informe["canjes"])
+
     escritor.writerow([])
     escritor.writerow(["RESUMEN DEL EJERCICIO"])
     for concepto, importe in informe["totales"]:
@@ -249,6 +291,39 @@ def aCsv(informe):
 
     # BOM: sin él, Excel abre el CSV como ANSI y destroza los acentos.
     return "﻿" + buffer.getvalue()
+
+
+def _celdaCanjeCsv(canje, clave):
+    if clave == "regimen":
+        return REGIMENES_CANJE.get(canje.get("regimen"), canje.get("regimen", ""))
+    if clave in ("fecha", "concepto", "entregadas", "recibidas", "picosCantidad"):
+        return _textoCsv(canje.get(clave, ""))
+    valor = canje.get(clave)
+    return "" if valor in (None, "") else _es(valor)
+
+
+def _canjesCsv(escritor, canjes):
+    """Bloque de canjes: cada canje, sus lotes traspasados y lo que declara."""
+    escritor.writerow([])
+    escritor.writerow(["CANJES DE VALORES (fusiones, absorciones y canjes)"])
+    escritor.writerow([NOTA_CANJES])
+    escritor.writerow([etiqueta for _clave, etiqueta in COLUMNAS_CANJE])
+    for canje in canjes:
+        escritor.writerow([_celdaCanjeCsv(canje, clave) for clave, _e in COLUMNAS_CANJE])
+        for lote in canje.get("lotes", ()):
+            escritor.writerow([
+                "", "Lote recibido", "Adquirido el " + _textoCsv(lote.get("fechaAdquisicion", "")),
+                "", _textoCsv(lote.get("cantidad", "")), "", _es(lote.get("coste")), "",
+            ])
+        for fila in canje.get("transmisiones", ()):
+            if fila.get("incidencia"):
+                continue
+            escritor.writerow([
+                _textoCsv(fila.get(clave, "")) if clave in ("fecha", "cantidad") else
+                _textoCsv(fila.get("activo", "") + " (" + fila.get("par", "") + ")") if clave == "activo" else
+                _es(fila.get(clave))
+                for clave, _etiqueta in COLUMNAS_DETALLE
+            ])
 
 
 # ── HTML imprimible ───────────────────────────────────────────────────────────
@@ -300,6 +375,76 @@ def _numHtml(valor):
     texto = _es(valor)
     clase = "num neg" if texto.startswith("-") else "num"
     return f'<td class="{clase}">{html.escape(texto)}</td>'
+
+
+def _tablaDatosCanje(canje):
+    """Ficha de un canje: fecha, régimen, títulos e importes traspasados."""
+    regimen = REGIMENES_CANJE.get(canje.get("regimen"), canje.get("regimen", ""))
+    datos = [
+        ("Fecha del canje", canje.get("fecha", "")),
+        ("Régimen", regimen),
+        ("Títulos entregados", canje.get("entregadas", "")),
+        ("Títulos recibidos", canje.get("recibidas", "")),
+        ("Fracción liquidada (picos)", canje.get("picosCantidad", "")),
+    ]
+    filas = "".join(
+        f"<tr><td>{html.escape(etiqueta)}</td><td>{html.escape(str(valor))}</td></tr>"
+        for etiqueta, valor in datos
+    )
+    for etiqueta, clave in (("Valor fiscal traspasado", "costeTraspasado"),
+                            ("Compensación en dinero", "compensacion")):
+        if canje.get(clave) not in (None, ""):
+            filas += f"<tr><td>{html.escape(etiqueta)}</td>{_numHtml(canje[clave])}</tr>"
+    return f"<table><tbody>{filas}</tbody></table>"
+
+
+def _tablaLotesCanje(lotes):
+    cuerpo = "".join(
+        _filaHtml([
+            f'<td>{html.escape(str(lote.get("fechaAdquisicion", "")))}</td>',
+            f'<td class="num">{html.escape(str(lote.get("cantidad", "")))}</td>',
+            _numHtml(lote.get("coste")),
+        ])
+        for lote in lotes
+    )
+    return (
+        "<table><thead><tr><th>Fecha de adquisición</th>"
+        '<th class="num">Títulos recibidos</th><th class="num">Valor de adquisición</th>'
+        f"</tr></thead><tbody>{cuerpo}</tbody></table>"
+    )
+
+
+def _tablaTransmisionesCanje(transmisiones):
+    cabeceras = "".join(
+        f'<th class="{"num" if clave not in ("fecha", "activo") else ""}">'
+        f"{html.escape(etiqueta)}</th>"
+        for clave, etiqueta in COLUMNAS_DETALLE
+    )
+    cuerpo = []
+    for fila in transmisiones:
+        celdas = [
+            f'<td>{html.escape(str(fila.get("fecha", "")))}</td>',
+            f'<td>{html.escape(str(fila.get("activo", "")))}</td>',
+            f'<td class="num">{html.escape(str(fila.get("cantidad", "")))}</td>',
+        ]
+        celdas += [_numHtml(fila.get(clave)) for clave, _e in COLUMNAS_DETALLE[3:]]
+        cuerpo.append(_filaHtml(celdas))
+    return f"<table><thead><tr>{cabeceras}</tr></thead><tbody>{''.join(cuerpo)}</tbody></table>"
+
+
+def _canjesHtml(canjes):
+    """Sección de canjes: ficha de cada canje, lotes traspasados y transmisiones."""
+    partes = ["<h2>Canjes de valores (fusiones, absorciones y canjes)</h2>",
+              f'<p class="meta">{html.escape(NOTA_CANJES)}</p>']
+    for canje in canjes:
+        partes.append(f'<p><strong>{html.escape(canje.get("concepto", ""))}</strong></p>')
+        partes.append(_tablaDatosCanje(canje))
+        if canje.get("lotes"):
+            partes.append(_tablaLotesCanje(canje["lotes"]))
+        transmisiones = [t for t in canje.get("transmisiones", ()) if not t.get("incidencia")]
+        if transmisiones:
+            partes.append(_tablaTransmisionesCanje(transmisiones))
+    return "".join(partes)
 
 
 def aHtml(informe, nonce=""):
@@ -372,6 +517,9 @@ def aHtml(informe, nonce=""):
             f"<table><thead><tr>{cabeceras}</tr></thead>"
             f"<tbody>{''.join(cuerpo)}</tbody></table>"
         )
+
+    if informe["canjes"]:
+        partes.append(_canjesHtml(informe["canjes"]))
 
     # ── Resumen ──
     partes.append("<h2>Resumen del ejercicio</h2>")

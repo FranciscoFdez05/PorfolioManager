@@ -7,7 +7,7 @@
 <h1 align="center">PorfolioManager</h1>
 
 <p align="center">
-  <a href="../CHANGELOG.md"><img src="https://img.shields.io/badge/versi%C3%B3n-5.9.1-blue" alt="Versión"></a>
+  <a href="../CHANGELOG.md"><img src="https://img.shields.io/badge/versi%C3%B3n-6.0.0-blue" alt="Versión"></a>
   <a href="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml"><img src="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB" alt="Python">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED" alt="Docker">
@@ -24,8 +24,8 @@ Las cotizaciones externas son opcionales: sin claves de API, los precios los int
 
 - **Cartera**: resumen, ficha por activo con precio medio, rendimiento y desglose entre efecto activo y efecto divisa, y planes de inversión.
 - **Finanzas**: gastos, ingresos, ingresos recurrentes con pagas extra, mensualidades, cuentas de dinero, dividendos, renta fija y bonos.
-- **Fiscalidad española**: ventas con FIFO, regla de los dos meses y compensación de pérdidas; informe anual en CSV y HTML.
-- **Métricas**: TWR, XIRR, drawdown, volatilidad y comparación con índices.
+- **Fiscalidad española**: ventas con FIFO, regla de los dos meses y compensación de pérdidas; fusiones y canjes de valores a mano, conservando el coste y la fecha de cada lote; informe anual en CSV y HTML.
+- **Métricas**: TWR, XIRR, drawdown, volatilidad, comparación con índices y resumen anual de los activos comprados cada año con su rendimiento.
 - **Cripto**: stablecoins, operaciones, conversiones, staking y earn. Enlace de wallets en solo lectura (Bitcoin por dirección —Legacy, SegWit o Taproot—, xpub/ypub/zpub —también de cuentas Taproot— o clave pública suelta, con detección automática del formato; Ethereum y BNB Smart Chain por dirección o clave pública; Solana y XRP) que importa los movimientos on-chain a Transacciones, y un apartado **Seguimiento** con el saldo, el valor en euros y los últimos movimientos de tus wallets y de las ajenas que sigas, con avisos opcionales por Telegram de cada movimiento nuevo; las direcciones y xpub se guardan cifradas y nunca se muestran enteras.
 - **Alertas**: alertas de precio por activo y avisos de caídas y subidas bruscas, rentabilidad de la posición, precio frente al precio medio, activos sin cotización, valor y caída de la cartera y peso de un activo (sobre un activo o sobre toda la cartera) por Telegram, vigiladas por el servidor aunque la web esté cerrada.
 - **Operación**: backups automáticos, avisos y comandos por Telegram, verificación en dos pasos opcional con código por Telegram, HTTPS desde la propia aplicación y Atajo de iOS para apuntar gastos desde el móvil.
@@ -110,6 +110,7 @@ Los secretos van en `.env` (copia `.env.example`; `./docker-setup` lo hace por t
 | **Mi dinero › Calendario › Vencimientos** | Vencimientos de tu renta fija y bonos en el calendario, junto a gastos, ingresos y pagos recurrentes |
 | **Dividendos › Ingresos pasivos** | Dividendos de los últimos 12 meses, media mensual y rentabilidad sobre coste por activo y global |
 | **Dividendos › Reinvertir** | Un dividendo se puede marcar como reinvertido: añade a la ficha del activo una compra «Reinvertido» que cuenta en la posición y en el FIFO |
+| Ficha del activo **···** › **Registrar fusión o canje** | Apunta a mano una fusión o un canje de valores. En el régimen neutral (art. 81 LIS) los títulos recibidos conservan el coste y la fecha de adquisición de cada lote entregado: la compensación en dinero rebaja ese coste, y los picos liquidados en efectivo cuentan como una venta. En el régimen general tributa como una permuta a valor de mercado. Antes de guardar se previsualizan los lotes, y el canje sale en la posición, en Ventas y en el informe anual |
 | **Ajustes › Exportar a CSV** | Descarga gastos, ingresos, dividendos, operaciones y cuentas en CSV listo para Excel |
 | **Herramientas › Proyección** | Interés compuesto, independencia financiera (cuánto necesitas y cuándo llegas), cuánto dura un capital retirando cada año, Monte Carlo con la volatilidad de tu cartera y rentabilidad real tras impuestos e inflación |
 | **Herramientas › Cartera / Mercado** | Simular una compra (unidades que salen por lo invertido, precio medio nuevo, posición y peso en la cartera, en automático desde tus posiciones o todo a mano), tamaño de posición por riesgo, cuánto hay que subir para recuperar una caída, DCA frente a invertir todo de golpe con precios históricos reales, el ratio entre dos activos cualesquiera frente a su historia, un comparador que solapa en un gráfico de dos a ocho activos (de tu cartera o buscados por ticker con cualquiera de las APIs) con su rentabilidad, volatilidad, caída máxima y correlación, y una tabla de equivalencias: escribes una cantidad de cualquier divisa, acción, ETF, cripto o metal y ves cuánto vale en todos los demás, con el rendimiento de cada uno en un gráfico |
