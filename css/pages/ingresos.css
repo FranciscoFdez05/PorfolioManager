@@ -490,9 +490,11 @@
 @media (max-width: 1280px) {
     .dividendosMainArea {
         grid-template-columns: 1fr;
+        grid-template-rows: none;
     }
 
     .dividendosSummarySection {
+        overflow-y: visible;
         max-width: 320px;
         margin-right: 0;
     }

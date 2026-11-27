@@ -346,16 +346,25 @@ function openDividendosTipoModal(defaultFecha = "") {
     overlay.className = "modalOverlay"
 
     const modal = document.createElement("div")
-    modal.className = "assetModal"
+    modal.className = "assetModal dividendosTipoModal"
     modal.setAttribute("role", "dialog")
     modal.setAttribute("aria-modal", "true")
+    modal.setAttribute("aria-labelledby", "dividendosTipoTitulo")
     modal.innerHTML = `
-        <h3 class="assetModalTitle">Añadir dividendo</h3>
-        <p class="cuentasHint">¿Qué quieres añadir?</p>
+        <h3 class="assetModalTitle" id="dividendosTipoTitulo">Añadir dividendo</h3>
+        <p class="dividendosTipoPregunta">¿Qué quieres añadir?</p>
+        <div class="dividendosTipoOpciones">
+            <button type="button" class="dividendosTipoOpcion" id="dividendosTipoIngresoBtn" data-no-autohide="true">
+                <span class="dividendosTipoOpcionTitulo">Ingreso</span>
+                <span class="dividendosTipoOpcionTexto">El dividendo se cobra en efectivo.</span>
+            </button>
+            <button type="button" class="dividendosTipoOpcion" id="dividendosTipoReinversionBtn" data-no-autohide="true">
+                <span class="dividendosTipoOpcionTitulo">Reinversión</span>
+                <span class="dividendosTipoOpcionTexto">Se compran participaciones del mismo activo.</span>
+            </button>
+        </div>
         <div class="assetModalActions dividendosModalActions">
             <button type="button" class="cancelButton" id="dividendosTipoCancelBtn">Cancelar</button>
-            <button type="button" class="primaryButton" id="dividendosTipoIngresoBtn" data-no-autohide="true">Ingreso</button>
-            <button type="button" class="primaryButton" id="dividendosTipoReinversionBtn" data-no-autohide="true">Reinversión</button>
         </div>
     `
 

@@ -22,6 +22,33 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [6.0.1] — 2026-11-27
+
+Retoques en la ventana Dividendos: el resumen lateral ya no alarga la página y
+elegir el tipo de dividendo se entiende sin abrir el formulario.
+
+**Esquema de base de datos:** no lo toca (sigue en el **43**).
+
+**Al actualizar:** nada que hacer.
+
+### Cambiado
+
+- **Dividendos: elegir entre ingreso y reinversión.** El primer paso de
+  «Añadir dividendo» pasa de dos botones iguales a dos tarjetas, cada una con
+  una línea que explica qué hace: «Ingreso» (se cobra en efectivo) y
+  «Reinversión» (se compran participaciones del mismo activo). Se resaltan con
+  el acento del tema al pasar el ratón o al llegar con el teclado, y en
+  pantallas estrechas se apilan.
+
+### Corregido
+
+- **Dividendos: el resumen lateral desbordaba la página.** Con el bloque de
+  ingresos pasivos y su lista por activo, la columna de tarjetas pasaba del
+  final de la tabla y la página entera hacía scroll. Ahora la tabla y el
+  lateral terminan a la misma altura y el lateral se desplaza por dentro. En
+  pantallas de 1280px o menos, donde el resumen va debajo de la tabla, se queda
+  como antes.
+
 ## [6.0.0] — 2026-11-26
 
 Las fusiones y canjes de valores se registran con su tratamiento fiscal, y
